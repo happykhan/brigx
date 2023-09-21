@@ -2,7 +2,7 @@
   import { interpolate } from 'd3';
     import { arc, symbol, symbolTriangle } from 'd3-shape';
     // Figure settings 
-    let height = 400;
+    let height = 800;
     let width = 600;    
     let total = 72000;
     let arrowAngleLimit = 5; 
@@ -213,7 +213,7 @@
 
 </script>
 
-<h1>Feature demo</h1>
+<h2>Preview</h2>
     <svg {height} {width}>
         <style>
             .small {

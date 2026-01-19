@@ -934,7 +934,7 @@ export class CircularPlotRenderer {
     const refLength = data.reference.length;
     
     // Render reference ring first
-    this.renderReferenceRing(this.svg, cx, cy, refLength);
+    this.renderReferenceRing(mainGroup as any, cx, cy, refLength);
     
     // Calculate ring positions - GC Content and GC Skew come first as their own rings
     let currentRadius = this.config.innerRadius;
@@ -942,13 +942,13 @@ export class CircularPlotRenderer {
     // Render GC Content ring (first ring outside reference, no gap)
     if (data.reference.gcContent) {
       currentRadius += this.config.ringSpacing; // Small spacing from reference
-      this.renderGCRing(this.svg, cx, cy, refLength, data.reference.gcContent, currentRadius);
+      this.renderGCRing(mainGroup as any, cx, cy, refLength, data.reference.gcContent, currentRadius);
       currentRadius += this.config.gcRingWidth + this.config.ringSpacing;
     }
     
     // Render GC Skew ring (second ring outside reference)
     if (data.reference.gcSkew) {
-      this.renderGCSkewRing(this.svg, cx, cy, refLength, data.reference.gcSkew, currentRadius);
+      this.renderGCSkewRing(mainGroup as any, cx, cy, refLength, data.reference.gcSkew, currentRadius);
       currentRadius += this.config.gcRingWidth + this.config.ringSpacing;
     }
     
@@ -959,12 +959,12 @@ export class CircularPlotRenderer {
       const ringWidth = ring.customWidth || this.config.ringWidth;
       const radius = currentRadius + (index * (ringWidth + this.config.ringSpacing));
       
-      this.renderQueryRing(this.svg!, cx, cy, refLength, ring, radius, ringWidth);
+      this.renderQueryRing(mainGroup as any, cx, cy, refLength, ring, radius, ringWidth);
       
       // Render annotations for this ring if any
       if (ring.annotations && ring.annotations.length > 0) {
         this.renderAnnotations(
-          this.svg!,
+          mainGroup as any,
           cx, cy, refLength,
           ring.annotations,
           radius,
@@ -976,20 +976,20 @@ export class CircularPlotRenderer {
       currentRadius = radius + ringWidth + this.config.ringSpacing;
     });
     
-    this.renderScaleMarkers(this.svg, cx, cy, refLength);
+    this.renderScaleMarkers(mainGroup as any, cx, cy, refLength);
     
     // Add GC analysis legend if present
     if (data.reference.gcContent || data.reference.gcSkew) {
-      this.renderGCLegend(this.svg, !!data.reference.gcSkew);
+      this.renderGCLegend(mainGroup as any, !!data.reference.gcSkew);
     }
     
     // Add ring legend
     if (visibleRings.length > 0) {
-      this.renderRingLegend(this.svg, visibleRings);
+      this.renderRingLegend(mainGroup as any, visibleRings);
     }
     
     // Render title and reference size in center
-    this.renderTitle(this.svg, cx, cy, refLength);
+    this.renderTitle(mainGroup as any, cx, cy, refLength);
     
     // Restore svg reference
     this.svg = tempSvg;

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "build:check": "next build && echo '\n✅ Build successful! Safe to push to Vercel.'",
+    "deploy": "npm run build:check && git add -A && git commit -m 'Deploy: build verified' && git push"
   },
   "dependencies": {
     "@biowasm/aioli": "^3.2.1",

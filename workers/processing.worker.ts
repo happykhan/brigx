@@ -123,6 +123,7 @@ self.onmessage = (e: MessageEvent) => {
         queryName,
         color,
         visible: true,
+        hits: alignments || [],
         windows,
         statistics
       };

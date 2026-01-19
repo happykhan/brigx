@@ -442,8 +442,114 @@ export class CircularPlotRenderer {
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('class', 'annotations');
     
+    // Collect label positions for collision detection
+    interface LabelPosition {
+      annotation: Annotation;
+      midAngle: number;
+      adjustedAngle: number;
+      labelX: number;
+      labelY: number;
+      width: number;
+      height: number;
+    }
+    const labelPositions: LabelPosition[] = [];
+    
+    // First pass: calculate initial positions (skip empty labels)
     annotations.forEach(ann => {
-      // Wrap coordinates if needed
+      // Skip annotations without labels
+      if (!ann.label || ann.label.trim() === '') {
+        return;
+      }
+      
+      const start = Math.max(1, Math.min(ann.start, refLength));
+      const end = Math.max(1, Math.min(ann.end, refLength));
+      const startAngle = (start / refLength) * 2 * Math.PI - Math.PI / 2;
+      const endAngle = (end / refLength) * 2 * Math.PI - Math.PI / 2;
+      const midAngle = (startAngle + endAngle) / 2;
+      
+      const textWidth = ann.label.length * (this.config.labelFontSize * 0.6);
+      const textHeight = this.config.labelFontSize + 4;
+      
+      labelPositions.push({
+        annotation: ann,
+        midAngle,
+        adjustedAngle: midAngle,
+        labelX: 0,
+        labelY: 0,
+        width: textWidth,
+        height: textHeight
+      });
+    });
+    
+    // Adjust angles to avoid overlaps (move along arc)
+    const labelDistance = outerRadius + 30;
+    
+    // Sort by angle for easier collision detection
+    labelPositions.sort((a, b) => a.midAngle - b.midAngle);
+    
+    // Calculate minimum angular separation based on label widths
+    // Convert label width to angular distance at labelDistance radius
+    const getMinAngularSeparation = (lp1: LabelPosition, lp2: LabelPosition) => {
+      const avgWidth = (lp1.width + lp2.width) / 2;
+      const avgHeight = (lp1.height + lp2.height) / 2;
+      // Account for both width and height, use the larger dimension
+      const maxDimension = Math.max(avgWidth, avgHeight);
+      // Add some padding
+      const padding = 10;
+      return (maxDimension + padding) / labelDistance;
+    };
+    
+    // Iterative adjustment to spread out overlapping labels
+    for (let iteration = 0; iteration < 15; iteration++) {
+      let hasOverlap = false;
+      
+      // Check all pairs of labels for overlaps (not just adjacent)
+      for (let i = 0; i < labelPositions.length; i++) {
+        for (let j = i + 1; j < labelPositions.length; j++) {
+          const curr = labelPositions[i];
+          const next = labelPositions[j];
+          
+          const minSeparation = getMinAngularSeparation(curr, next);
+          let angleDiff = Math.abs(next.adjustedAngle - curr.adjustedAngle);
+          
+          // Handle wrap-around at 2π
+          if (angleDiff > Math.PI) {
+            angleDiff = 2 * Math.PI - angleDiff;
+          }
+          
+          if (angleDiff < minSeparation) {
+            hasOverlap = true;
+            // Push them apart with stronger force
+            const adjustment = (minSeparation - angleDiff);
+            const force = 0.8; // Higher force for stronger adjustment
+            
+            // Determine direction to push
+            const direction = (next.adjustedAngle > curr.adjustedAngle) ? 1 : -1;
+            
+            curr.adjustedAngle -= adjustment * force * 0.5 * direction;
+            next.adjustedAngle += adjustment * force * 0.5 * direction;
+          }
+        }
+      }
+      
+      if (!hasOverlap) break;
+    }
+    
+    // Calculate final label positions
+    labelPositions.forEach(lp => {
+      lp.labelX = cx + labelDistance * Math.cos(lp.adjustedAngle);
+      lp.labelY = cy + labelDistance * Math.sin(lp.adjustedAngle);
+    });
+    
+    // Create a lookup map for annotations with labels
+    const labelMap = new Map<string, LabelPosition>();
+    labelPositions.forEach(lp => {
+      const key = `${lp.annotation.start}-${lp.annotation.end}-${lp.annotation.label}`;
+      labelMap.set(key, lp);
+    });
+    
+    // Second pass: render all annotations
+    annotations.forEach(ann => {
       const start = Math.max(1, Math.min(ann.start, refLength));
       const end = Math.max(1, Math.min(ann.end, refLength));
       
@@ -451,6 +557,10 @@ export class CircularPlotRenderer {
       const endAngle = (end / refLength) * 2 * Math.PI - Math.PI / 2;
       
       const color = ann.color || '#666666';
+      
+      // Check if this annotation has a label
+      const key = `${ann.start}-${ann.end}-${ann.label}`;
+      const lp = labelMap.get(key);
       
       if (ann.shape === 'block') {
         // Simple block arc
@@ -486,54 +596,55 @@ export class CircularPlotRenderer {
         
         group.appendChild(arcElement);
         
-        // Add text label with leader line
-        const midAngle = (startAngle + endAngle) / 2;
-        const featureRadius = (innerRadius + outerRadius) / 2;
-        const featureX = cx + featureRadius * Math.cos(midAngle);
-        const featureY = cy + featureRadius * Math.sin(midAngle);
-        
-        // Position label further out with offset to avoid overlap
-        const labelDistance = outerRadius + 30;
-        const labelX = cx + labelDistance * Math.cos(midAngle);
-        const labelY = cy + labelDistance * Math.sin(midAngle);
-        
-        // Draw leader line
-        const leaderLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        leaderLine.setAttribute('x1', String(featureX));
-        leaderLine.setAttribute('y1', String(featureY));
-        leaderLine.setAttribute('x2', String(labelX));
-        leaderLine.setAttribute('y2', String(labelY));
-        leaderLine.setAttribute('stroke', '#333');
-        leaderLine.setAttribute('stroke-width', '1');
-        leaderLine.setAttribute('opacity', '0.6');
-        group.appendChild(leaderLine);
-        
-        // Draw label background
-        const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        const textWidth = ann.label.length * (this.config.labelFontSize * 0.6);
-        const textHeight = this.config.labelFontSize + 4;
-        labelBg.setAttribute('x', String(labelX - textWidth / 2));
-        labelBg.setAttribute('y', String(labelY - textHeight / 2));
-        labelBg.setAttribute('width', String(textWidth));
-        labelBg.setAttribute('height', String(textHeight));
-        labelBg.setAttribute('fill', '#ffffff');
-        labelBg.setAttribute('stroke', '#333');
-        labelBg.setAttribute('stroke-width', '1');
-        labelBg.setAttribute('rx', '3');
-        labelBg.setAttribute('opacity', '0.9');
-        group.appendChild(labelBg);
-        
-        // Draw label text
-        const labelText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        labelText.setAttribute('x', String(labelX));
-        labelText.setAttribute('y', String(labelY));
-        labelText.setAttribute('text-anchor', 'middle');
-        labelText.setAttribute('dominant-baseline', 'middle');
-        labelText.setAttribute('font-size', String(this.config.labelFontSize));
-        labelText.setAttribute('font-weight', 'bold');
-        labelText.setAttribute('fill', '#000');
-        labelText.textContent = ann.label;
-        group.appendChild(labelText);
+        // Add text label with leader line only if annotation has a label
+        if (lp) {
+          const midAngle = (startAngle + endAngle) / 2;
+          const featureRadius = (innerRadius + outerRadius) / 2;
+          const featureX = cx + featureRadius * Math.cos(midAngle);
+          const featureY = cy + featureRadius * Math.sin(midAngle);
+          
+          // Use adjusted label position from collision detection
+          const labelX = lp.labelX;
+          const labelY = lp.labelY;
+          
+          // Draw leader line
+          const leaderLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          leaderLine.setAttribute('x1', String(featureX));
+          leaderLine.setAttribute('y1', String(featureY));
+          leaderLine.setAttribute('x2', String(labelX));
+          leaderLine.setAttribute('y2', String(labelY));
+          leaderLine.setAttribute('stroke', '#333');
+          leaderLine.setAttribute('stroke-width', '1');
+          leaderLine.setAttribute('opacity', '0.6');
+          group.appendChild(leaderLine);
+          
+          // Draw label background
+          const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          const textWidth = lp.width;
+          const textHeight = lp.height;
+          labelBg.setAttribute('x', String(labelX - textWidth / 2));
+          labelBg.setAttribute('y', String(labelY - textHeight / 2));
+          labelBg.setAttribute('width', String(textWidth));
+          labelBg.setAttribute('height', String(textHeight));
+          labelBg.setAttribute('fill', '#ffffff');
+          labelBg.setAttribute('stroke', '#333');
+          labelBg.setAttribute('stroke-width', '1');
+          labelBg.setAttribute('rx', '3');
+          labelBg.setAttribute('opacity', '0.9');
+          group.appendChild(labelBg);
+          
+          // Draw label text
+          const labelText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          labelText.setAttribute('x', String(labelX));
+          labelText.setAttribute('y', String(labelY));
+          labelText.setAttribute('text-anchor', 'middle');
+          labelText.setAttribute('dominant-baseline', 'middle');
+          labelText.setAttribute('font-size', String(this.config.labelFontSize));
+          labelText.setAttribute('font-weight', 'bold');
+          labelText.setAttribute('fill', '#000');
+          labelText.textContent = ann.label;
+          group.appendChild(labelText);
+        }
         
       } else if (ann.shape === 'arrow-forward' || ann.shape === 'arrow-reverse') {
         // Arrow shape (gene-like) - adaptive based on feature length
@@ -640,54 +751,55 @@ export class CircularPlotRenderer {
           arrowElement.setAttribute('opacity', '0.7');
         });
         
-        // Add text label with leader line for arrow
-        const midAngle = (startAngle + endAngle) / 2;
-        const featureRadius = (innerRadius + outerRadius) / 2;
-        const featureX = cx + featureRadius * Math.cos(midAngle);
-        const featureY = cy + featureRadius * Math.sin(midAngle);
-        
-        // Position label further out
-        const labelDistance = outerRadius + 30;
-        const labelX = cx + labelDistance * Math.cos(midAngle);
-        const labelY = cy + labelDistance * Math.sin(midAngle);
-        
-        // Draw leader line
-        const leaderLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        leaderLine.setAttribute('x1', String(featureX));
-        leaderLine.setAttribute('y1', String(featureY));
-        leaderLine.setAttribute('x2', String(labelX));
-        leaderLine.setAttribute('y2', String(labelY));
-        leaderLine.setAttribute('stroke', '#333');
-        leaderLine.setAttribute('stroke-width', '1');
-        leaderLine.setAttribute('opacity', '0.6');
-        group.appendChild(leaderLine);
-        
-        // Draw label background
-        const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        const textWidth = ann.label.length * (this.config.labelFontSize * 0.6);
-        const textHeight = this.config.labelFontSize + 4;
-        labelBg.setAttribute('x', String(labelX - textWidth / 2));
-        labelBg.setAttribute('y', String(labelY - textHeight / 2));
-        labelBg.setAttribute('width', String(textWidth));
-        labelBg.setAttribute('height', String(textHeight));
-        labelBg.setAttribute('fill', '#ffffff');
-        labelBg.setAttribute('stroke', '#333');
-        labelBg.setAttribute('stroke-width', '1');
-        labelBg.setAttribute('rx', '3');
-        labelBg.setAttribute('opacity', '0.9');
-        group.appendChild(labelBg);
-        
-        // Draw label text
-        const labelText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        labelText.setAttribute('x', String(labelX));
-        labelText.setAttribute('y', String(labelY));
-        labelText.setAttribute('text-anchor', 'middle');
-        labelText.setAttribute('dominant-baseline', 'middle');
-        labelText.setAttribute('font-size', String(this.config.labelFontSize));
-        labelText.setAttribute('font-weight', 'bold');
-        labelText.setAttribute('fill', '#000');
-        labelText.textContent = ann.label;
-        group.appendChild(labelText);
+        // Add text label with leader line for arrow only if annotation has a label
+        if (lp) {
+          const midAngle = (startAngle + endAngle) / 2;
+          const featureRadius = (innerRadius + outerRadius) / 2;
+          const featureX = cx + featureRadius * Math.cos(midAngle);
+          const featureY = cy + featureRadius * Math.sin(midAngle);
+          
+          // Use adjusted label position from collision detection
+          const labelX = lp.labelX;
+          const labelY = lp.labelY;
+          
+          // Draw leader line
+          const leaderLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          leaderLine.setAttribute('x1', String(featureX));
+          leaderLine.setAttribute('y1', String(featureY));
+          leaderLine.setAttribute('x2', String(labelX));
+          leaderLine.setAttribute('y2', String(labelY));
+          leaderLine.setAttribute('stroke', '#333');
+          leaderLine.setAttribute('stroke-width', '1');
+          leaderLine.setAttribute('opacity', '0.6');
+          group.appendChild(leaderLine);
+          
+          // Draw label background
+          const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          const textWidth = lp.width;
+          const textHeight = lp.height;
+          labelBg.setAttribute('x', String(labelX - textWidth / 2));
+          labelBg.setAttribute('y', String(labelY - textHeight / 2));
+          labelBg.setAttribute('width', String(textWidth));
+          labelBg.setAttribute('height', String(textHeight));
+          labelBg.setAttribute('fill', '#ffffff');
+          labelBg.setAttribute('stroke', '#333');
+          labelBg.setAttribute('stroke-width', '1');
+          labelBg.setAttribute('rx', '3');
+          labelBg.setAttribute('opacity', '0.9');
+          group.appendChild(labelBg);
+          
+          // Draw label text
+          const labelText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          labelText.setAttribute('x', String(labelX));
+          labelText.setAttribute('y', String(labelY));
+          labelText.setAttribute('text-anchor', 'middle');
+          labelText.setAttribute('dominant-baseline', 'middle');
+          labelText.setAttribute('font-size', String(this.config.labelFontSize));
+          labelText.setAttribute('font-weight', 'bold');
+          labelText.setAttribute('fill', '#000');
+          labelText.textContent = ann.label;
+          group.appendChild(labelText);
+        }
       }
     });
     

@@ -107,17 +107,24 @@ export default function Home() {
     if (cachedPlotData && cachedPlotData.rings) {
       const updatedRings = cachedPlotData.rings.map(ringData => {
         if (ringData.queryId === ringId) {
+          console.log(`[Page] Updating annotations for ring ${ringData.queryName}, preserving hits: ${ringData.hits?.length || 0}, windows: ${ringData.windows?.length || 0}`);
           return {
             ...ringData,
-            annotations
+            annotations,
+            // CRITICAL: Explicitly preserve alignment data
+            hits: ringData.hits || [],
+            windows: ringData.windows || [],
+            statistics: ringData.statistics || { meanIdentity: 0, genomeCoverage: 0, totalAlignedBases: 0 },
+            lastzOutput: ringData.lastzOutput || ''
           };
         }
         return ringData;
       });
       
       const updatedPlotData = {
-        ...cachedPlotData,
-        rings: updatedRings
+        reference: cachedPlotData.reference,
+        rings: updatedRings,
+        config: cachedPlotData.config
       };
       
       setPlotData(updatedPlotData);
@@ -327,7 +334,18 @@ export default function Home() {
                 mergedRings = [...mergedRings, ...newRingsWithAnnotations];
               }
             } else {
-              mergedRings = update.partialData!.rings;
+              // No existing rings - add annotations from ringAnnotations state
+              console.log('[Page] No existing rings, adding annotations from state');
+              mergedRings = update.partialData!.rings!.map(ring => {
+                const annotations = ringAnnotations[ring.queryId] || ring.annotations || [];
+                if (annotations.length > 0) {
+                  console.log(`[Page] Adding annotations to ring ${ring.queryName}:`, annotations.length);
+                }
+                return {
+                  ...ring,
+                  annotations
+                };
+              });
             }
             
             const updatedPlotData = {
@@ -361,14 +379,18 @@ export default function Home() {
                 windows: newRingData.windows,
                 statistics: newRingData.statistics,
                 lastzOutput: newRingData.lastzOutput,
-                // CRITICAL: Preserve annotations from existing ring
-                annotations: existingRing.annotations || []
+                // CRITICAL: Preserve annotations from existing ring OR ringAnnotations state
+                annotations: existingRing.annotations || ringAnnotations[existingRing.queryId] || []
               };
             }
             console.log(`[Page] Keeping existing ring without alignment: ${existingRing.queryName}`);
             return existingRing;
           })
-        : result.rings; // Use alignment results directly if no existing rings
+        : result.rings?.map(ring => ({
+            ...ring,
+            // Add annotations from ringAnnotations state if they exist
+            annotations: ring.annotations || ringAnnotations[ring.queryId] || []
+          })) || []; // Use alignment results directly with annotations from state if no existing rings
       
       console.log('[Page] Final rings after merge:', finalRings?.map(r => ({ name: r.queryName, hits: r.hits?.length || 0, annotations: r.annotations?.length || 0 })));
       

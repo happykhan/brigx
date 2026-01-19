@@ -40,8 +40,8 @@ export class BRIGController {
     );
     console.log('[Controller] Processing worker created');
 
-    // Initialize alignment workers (one per core)
-    const numWorkers = Math.min(navigator.hardwareConcurrency || 4, 8);
+    // Initialize alignment workers (4 workers for balanced performance)
+    const numWorkers = 4;
     console.log(`[Controller] Initializing ${numWorkers} alignment workers...`);
     
     for (let i = 0; i < numWorkers; i++) {
@@ -418,136 +418,151 @@ export class BRIGController {
       }
 
       // Parse and prepare query genomes for each ring
+      // Merge all files in each ring into a single query genome
       console.log('[Controller] Step 3: Preparing query genomes for rings');
       this.updateProgress('Preparing query genomes', 15);
-      const queries: ParsedGenome[] = [];
+      
+      const queryGenomes: ParsedGenome[] = [];
       
       for (let i = 0; i < rings.length; i++) {
         const ring = rings[i];
         console.log(`[Controller] Processing ring ${i + 1}/${rings.length}: ${ring.legendText} with ${ring.files.length} files`);
         
-        // Parse all files in this ring
-        const allGenomesInRing: ParsedGenome[] = [];
+        // Parse all files and merge sequences
+        const allSequences: string[] = [];
+        let totalLength = 0;
+        
         for (let j = 0; j < ring.files.length; j++) {
           console.log(`[Controller]   Parsing file ${j + 1}/${ring.files.length}: ${ring.files[j].name}`);
           const genomes = await this.parseGenomes(ring.files[j]);
-          allGenomesInRing.push(...genomes);
+          
+          for (const genome of genomes) {
+            allSequences.push(genome.sequence);
+            totalLength += genome.sequence.length;
+          }
         }
         
-        console.log(`[Controller]   Total sequences in ring: ${allGenomesInRing.length}`);
-        
-        if (allGenomesInRing.length === 0) {
+        if (allSequences.length === 0) {
           console.warn(`[Controller]   Warning: ${ring.legendText} has no sequences, skipping`);
           continue;
         }
         
-        // Merge all sequences in this ring into one query
-        let query: ParsedGenome;
-        if (allGenomesInRing.length > 1) {
-          console.log(`[Controller]   Merging ${allGenomesInRing.length} sequences for ${ring.legendText}`);
-          query = await this.mergeGenomes(allGenomesInRing);
-          // Override name with ring legend text
-          query.name = ring.legendText;
-        } else {
-          query = allGenomesInRing[0];
-          query.name = ring.legendText; // Use ring name instead of file name
-        }
+        // Merge all sequences into a single genome for this ring
+        const mergedGenome: ParsedGenome = {
+          id: `merged-${ring.id}`,
+          name: ring.legendText,
+          sequence: allSequences.join('N'.repeat(100)), // Join with 100 N's as spacer
+          length: totalLength + (allSequences.length - 1) * 100,
+          gcContent: 0, // Will be calculated if needed
+          isCircular: false
+        };
         
-        queries.push(query);
-        console.log(`[Controller]   Ring prepared: ${query.name}, length: ${query.length}`);
+        console.log(`[Controller]   Ring merged: ${allSequences.length} sequences -> ${mergedGenome.length} bp total`);
+        queryGenomes.push(mergedGenome);
       }
 
-      // Run alignments in parallel (using all 8 workers)
-      console.log(`[Controller] Step 4: Running ${queries.length} alignments in parallel with ${this.alignmentWorkers.length} workers`);
+      // Run alignments across worker pool
+      console.log(`[Controller] Step 4: Running alignments for ${queryGenomes.length} rings`);
       this.updateProgress('Running alignments', 20);
+      
       const alignmentResults: Array<{ result: AlignmentResult; rawOutput: string }> = [];
-      const workerPool = [...this.alignmentWorkers];
-      let completed = 0;
-      const totalQueries = queries.length;
-
-      const runNextAlignment = async (workerIndex: number): Promise<void> => {
-        while (queries.length > 0) {
-          const query = queries.shift();
-          if (!query) break;
-
+      
+      // Process rings with worker pool (max 4 concurrent)
+      let activeWorkers = 0;
+      let nextRingIndex = 0;
+      const maxConcurrent = Math.min(4, this.alignmentWorkers.length);
+      
+      const processNextRing = async (workerIndex: number): Promise<void> => {
+        while (nextRingIndex < queryGenomes.length) {
+          const ringIndex = nextRingIndex++;
+          const query = queryGenomes[ringIndex];
+          const ring = rings[ringIndex];
+          
           this.updateProgress(
-            `Aligning ${query.name}`,
-            20 + (completed / totalQueries) * 50,
-            `${completed + 1}/${totalQueries}`
+            `Aligning ${ring.legendText}`,
+            Math.round(20 + ((ringIndex + 1) / queryGenomes.length) * 50),
+            `${ringIndex + 1}/${queryGenomes.length}`
           );
-
+          
           try {
-            // Check cache if not forcing realignment
             const cacheKey = `${reference.name}:${query.name}`;
             let result: { result: AlignmentResult; rawOutput: string };
             
             if (!params.forceAlignment && this.alignmentCache.has(cacheKey)) {
               console.log(`[Controller] Using cached alignment for ${query.name}`);
               const cachedResult = this.alignmentCache.get(cacheKey)!;
-              result = { result: cachedResult, rawOutput: '' }; // Use empty string for cached
+              result = { result: cachedResult, rawOutput: '' };
             } else {
-              console.log(`[Controller] Running fresh alignment for ${query.name}`);
+              console.log(`[Controller] Aligning ${query.name} (${query.length} bp)`);
               result = await this.alignWithWorker(
-                workerPool[workerIndex],
+                this.alignmentWorkers[workerIndex],
                 reference,
                 query,
                 params
               );
-              // Cache the result
               this.alignmentCache.set(cacheKey, result.result);
             }
             
             alignmentResults.push(result);
-            completed++;
-          } catch (error) {
-            console.error(`Error aligning ${query.name}:`, error);
-            // Continue with other alignments
+            console.log(`[Controller] Ring ${ringIndex + 1}/${queryGenomes.length} completed: ${result.result.hits?.length || 0} hits`);
+          } catch (error: any) {
+            console.error(`[Controller] Alignment error for ${query.name}:`, error);
+            // Push empty result to maintain array alignment
+            alignmentResults.push({
+              result: {
+                queryId: ring.id,
+                queryName: ring.legendText,
+                queryLength: query.length,
+                totalHits: 0,
+                hits: [],
+                metadata: { timestamp: Date.now(), lastzVersion: '1.04.52', parameters: params }
+              },
+              rawOutput: ''
+            });
           }
         }
       };
-
-      await Promise.all(workerPool.map((_, i) => runNextAlignment(i)));
-
-      console.log(`[Controller] All alignments completed. Results: ${alignmentResults.length}`);
-      alignmentResults.forEach((ar, idx) => {
-        console.log(`[Controller]   Alignment ${idx + 1}: ${ar.result.queryName}, hits: ${ar.result.hits?.length || 0}`);
-      });
+      
+      // Start worker pool
+      await Promise.all(
+        Array.from({ length: maxConcurrent }, (_, i) => processNextRing(i))
+      );
+      
+      console.log(`[Controller] All ${alignmentResults.length} alignments completed`);
 
       // Process alignments to rings
-      console.log(`[Controller] Step 5: Processing ${alignmentResults.length} alignment results to rings`);
+      console.log(`[Controller] Step 5: Processing alignments to rings`);
       this.updateProgress('Processing alignment data', 70);
       const ringDataArray: RingData[] = [];
       
       for (let i = 0; i < alignmentResults.length; i++) {
-        const { result: alignment, rawOutput } = alignmentResults[i];
-        const ringConfig = rings[i]; // Use the corresponding ring config
-        const color = ringConfig.color;
+        const ring = rings[i];
+        const alignResult = alignmentResults[i];
         
-        console.log(`[Controller] Processing ring ${i + 1}/${alignmentResults.length}: ${alignment.queryName}`);
+        console.log(`[Controller] Processing ring ${i + 1}/${alignmentResults.length}: ${ring.legendText}`);
         
         this.updateProgress(
           'Processing alignment data',
-          70 + (i / alignmentResults.length) * 25,
+          Math.round(70 + ((i + 1) / alignmentResults.length) * 25),
           `${i + 1}/${alignmentResults.length}`
         );
 
         const ringData = await this.processAlignmentToRing(
-          alignment,
+          alignResult.result,
           reference.length,
           params,
-          color,
-          rawOutput
+          ring.color,
+          alignResult.rawOutput
         );
         
-        console.log(`[Controller] Ring ${i + 1} processed, adding to array`);
         ringDataArray.push(ringData);
-        console.log(`[Controller] Total rings in array: ${ringDataArray.length}`);
+        console.log(`[Controller] Ring ${i + 1} processed: ${ringData.hits?.length || 0} hits, ${ringData.windows?.length || 0} windows`);
         
         // Send partial data after each ring is processed
         if (this.progressCallback) {
           this.progressCallback({
             step: `Ring ${i + 1}/${alignmentResults.length} processed`,
-            percent: 70 + ((i + 1) / alignmentResults.length) * 25,
+            percent: Math.round(70 + ((i + 1) / alignmentResults.length) * 25),
             partialData: {
               reference: {
                 name: reference.name,

@@ -23,7 +23,10 @@ export default function ParameterControls({
         <input
           type="number"
           value={params.windowSize}
-          onChange={(e) => setParams({ ...params, windowSize: parseInt(e.target.value) })}
+          onChange={(e) => {
+            const val = parseInt(e.target.value);
+            setParams({ ...params, windowSize: isNaN(val) ? 100 : val });
+          }}
           disabled={disabled}
           min="100"
           max="10000"
@@ -42,7 +45,10 @@ export default function ParameterControls({
         <input
           type="number"
           value={params.minIdentity}
-          onChange={(e) => setParams({ ...params, minIdentity: parseInt(e.target.value) })}
+          onChange={(e) => {
+            const val = parseInt(e.target.value);
+            setParams({ ...params, minIdentity: isNaN(val) ? 0 : val });
+          }}
           disabled={disabled}
           min="50"
           max="100"
@@ -60,7 +66,10 @@ export default function ParameterControls({
         <input
           type="number"
           value={params.minAlignmentLength}
-          onChange={(e) => setParams({ ...params, minAlignmentLength: parseInt(e.target.value) })}
+          onChange={(e) => {
+            const val = parseInt(e.target.value);
+            setParams({ ...params, minAlignmentLength: isNaN(val) ? 50 : val });
+          }}
           disabled={disabled}
           min="50"
           max="5000"
@@ -85,6 +94,23 @@ export default function ParameterControls({
         </label>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           Re-run alignment even if cached results exist
+        </p>
+      </div>
+
+      <div>
+        <label className="label">
+          LASTZ Options
+        </label>
+        <input
+          type="text"
+          value={params.lastzOptions || ''}
+          onChange={(e) => setParams({ ...params, lastzOptions: e.target.value })}
+          disabled={disabled}
+          placeholder="e.g., --step=20 --seed=match12"
+          className="input-field w-full disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm"
+        />
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Custom LASTZ parameters (default: --ambiguous=iupac --gapped --chain)
         </p>
       </div>
     </div>

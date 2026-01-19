@@ -105,8 +105,12 @@ export class CircularPlotRenderer {
     // Position GC skew as its own ring
     const ringWidth = this.config.gcRingWidth;
     const baseRadius = ringRadius + ringWidth / 2; // Middle of the ring
-    const maxBarHeight = ringWidth / 2; // Stay within ring boundaries
+    const maxBarHeight = ringWidth / 2; // Maximum height is half the ring width
     const windowSize = refLength / gcSkew.length;
+    
+    // Find the maximum absolute skew value for scaling
+    const maxSkew = Math.max(...gcSkew.map(Math.abs));
+    const scaleFactor = maxSkew > 0 ? 1 / maxSkew : 1; // Scale to use full ring height
     
     // Draw baseline circle (center of ring)
     const baseline = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -145,7 +149,8 @@ export class CircularPlotRenderer {
       const endAngle = (end / refLength) * 2 * Math.PI - Math.PI / 2;
       
       // Calculate bar height based on GC skew (ranges from -1 to +1)
-      const barHeight = Math.abs(skew) * maxBarHeight;
+      // Scale to use full ring height based on actual data range
+      const barHeight = Math.abs(skew) * scaleFactor * maxBarHeight;
       
       let innerRadius: number;
       let outerRadius: number;
@@ -219,8 +224,12 @@ export class CircularPlotRenderer {
     // Position GC ring as its own ring outside reference
     const ringWidth = this.config.gcRingWidth;
     const baseRadius = ringRadius + ringWidth / 2; // Middle of the ring (50% baseline)
-    const maxBarHeight = ringWidth / 2; // Stay within ring boundaries (50% baseline ± 50% of ring width)
+    const maxBarHeight = ringWidth / 2; // Maximum height is half the ring width
     const windowSize = refLength / gcContent.length;
+    
+    // Find the maximum absolute deviation from 50% for scaling
+    const maxDeviation = Math.max(...gcContent.map(gc => Math.abs(gc - 0.5)));
+    const scaleFactor = maxDeviation > 0 ? 0.5 / maxDeviation : 1; // Scale to use full ring height
     
     // Draw baseline circle (center of ring - 50% GC)
     const baseline = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -259,10 +268,9 @@ export class CircularPlotRenderer {
       const endAngle = (end / refLength) * 2 * Math.PI - Math.PI / 2;
       
       // Calculate bar height based on GC content deviation from 50%
-      // Map GC content (0-1) to deviation (-1 to +1) around 50% baseline
-      // Use full maxBarHeight for any deviation to match GC Skew scaling
-      const deviation = (gc - 0.5) * 2; // Range: -1 to +1
-      const barHeight = Math.abs(deviation) * maxBarHeight;
+      // Scale to use full ring height based on actual data range
+      const deviation = gc - 0.5; // Range: -0.5 to +0.5
+      const barHeight = Math.abs(deviation) * scaleFactor * maxBarHeight;
       
       let innerRadius: number;
       let outerRadius: number;
@@ -528,58 +536,85 @@ export class CircularPlotRenderer {
         group.appendChild(labelText);
         
       } else if (ann.shape === 'arrow-forward' || ann.shape === 'arrow-reverse') {
-        // Arrow shape (gene-like)
-        const midRadius = (innerRadius + outerRadius) / 2;
-        const arrowHeadSize = (outerRadius - innerRadius) / 2;
-        
-        // Determine arrow direction
+        // Arrow shape (gene-like) - adaptive based on feature length
+        const ringHeight = outerRadius - innerRadius;
         const isForward = ann.shape === 'arrow-forward';
-        const bodyEndAngle = isForward 
-          ? endAngle - (0.02 * (endAngle - startAngle)) 
-          : startAngle + (0.02 * (endAngle - startAngle));
-        const arrowTipAngle = isForward ? endAngle : startAngle;
         
-        // Create arrow body
-        const bodyPath = this.createArcPath(
-          cx, cy,
-          innerRadius, outerRadius,
-          isForward ? startAngle : bodyEndAngle,
-          isForward ? bodyEndAngle : endAngle
-        );
+        // Calculate total angle span in radians
+        const totalAngleSpan = endAngle - startAngle;
         
-        const bodyElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        bodyElement.setAttribute('d', bodyPath);
-        bodyElement.setAttribute('fill', color);
-        bodyElement.setAttribute('stroke', '#000');
-        bodyElement.setAttribute('stroke-width', '0.5');
-        bodyElement.setAttribute('opacity', '0.7');
+        // Adaptive rendering based on feature size:
+        // Small features: just triangle
+        // Medium features: triangle + some body
+        // Large features: triangle (10-15%) + rectangular body
         
-        group.appendChild(bodyElement);
+        let arrowHeadAngle: number;
+        let hasBody: boolean;
         
-        // Create arrow head
-        const tipX = cx + midRadius * Math.cos(arrowTipAngle);
-        const tipY = cy + midRadius * Math.sin(arrowTipAngle);
+        if (totalAngleSpan < 0.05) {
+          // Very small feature: entire thing is arrow head
+          arrowHeadAngle = totalAngleSpan;
+          hasBody = false;
+        } else if (totalAngleSpan < 0.15) {
+          // Medium feature: arrow head takes 50-70%
+          arrowHeadAngle = totalAngleSpan * 0.6;
+          hasBody = true;
+        } else {
+          // Large feature: arrow head takes 10-15%
+          arrowHeadAngle = Math.min(0.15, totalAngleSpan * 0.15);
+          hasBody = true;
+        }
         
-        const baseAngle = isForward ? bodyEndAngle : bodyEndAngle;
-        const innerBaseX = cx + innerRadius * Math.cos(baseAngle);
-        const innerBaseY = cy + innerRadius * Math.sin(baseAngle);
-        const outerBaseX = cx + outerRadius * Math.cos(baseAngle);
-        const outerBaseY = cy + outerRadius * Math.sin(baseAngle);
+        // Define body and head angles
+        const bodyStartAngle = isForward ? startAngle : startAngle + arrowHeadAngle;
+        const bodyEndAngle = isForward ? endAngle - arrowHeadAngle : endAngle;
+        const headTipAngle = isForward ? endAngle : startAngle;
+        const headBaseAngle = isForward ? bodyEndAngle : bodyStartAngle;
         
-        // Add extensions for sharper arrow
-        const extendRadius = midRadius + arrowHeadSize;
-        const extendedTipX = cx + extendRadius * Math.cos(arrowTipAngle);
-        const extendedTipY = cy + extendRadius * Math.sin(arrowTipAngle);
+        // Calculate triangle points
+        const midRadius = (innerRadius + outerRadius) / 2;
+        const tipX = cx + midRadius * Math.cos(headTipAngle);
+        const tipY = cy + midRadius * Math.sin(headTipAngle);
         
-        const arrowPath = `
-          M ${innerBaseX} ${innerBaseY}
-          L ${extendedTipX} ${extendedTipY}
-          L ${outerBaseX} ${outerBaseY}
-          Z
-        `.replace(/\s+/g, ' ').trim();
+        const innerBaseX = cx + innerRadius * Math.cos(headBaseAngle);
+        const innerBaseY = cy + innerRadius * Math.sin(headBaseAngle);
+        const outerBaseX = cx + outerRadius * Math.cos(headBaseAngle);
+        const outerBaseY = cy + outerRadius * Math.sin(headBaseAngle);
+        
+        let combinedPath: string;
+        
+        if (hasBody) {
+          // Draw as one continuous shape: body + arrow head
+          // Start at body start (inner), arc to body end (inner), 
+          // line to arrow tip, line back to body end (outer), arc back to start (outer)
+          
+          const bodyStartInnerX = cx + innerRadius * Math.cos(bodyStartAngle);
+          const bodyStartInnerY = cy + innerRadius * Math.sin(bodyStartAngle);
+          const bodyStartOuterX = cx + outerRadius * Math.cos(bodyStartAngle);
+          const bodyStartOuterY = cy + outerRadius * Math.sin(bodyStartAngle);
+          
+          const largeArcFlag = Math.abs(bodyEndAngle - bodyStartAngle) > Math.PI ? 1 : 0;
+          
+          combinedPath = `
+            M ${bodyStartInnerX} ${bodyStartInnerY}
+            A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} ${isForward ? 1 : 0} ${innerBaseX} ${innerBaseY}
+            L ${tipX} ${tipY}
+            L ${outerBaseX} ${outerBaseY}
+            A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} ${isForward ? 0 : 1} ${bodyStartOuterX} ${bodyStartOuterY}
+            Z
+          `.replace(/\s+/g, ' ').trim();
+        } else {
+          // Just the triangle
+          combinedPath = `
+            M ${innerBaseX} ${innerBaseY}
+            L ${tipX} ${tipY}
+            L ${outerBaseX} ${outerBaseY}
+            Z
+          `.replace(/\s+/g, ' ').trim();
+        }
         
         const arrowElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        arrowElement.setAttribute('d', arrowPath);
+        arrowElement.setAttribute('d', combinedPath);
         arrowElement.setAttribute('fill', color);
         arrowElement.setAttribute('stroke', '#000');
         arrowElement.setAttribute('stroke-width', '0.5');
@@ -587,26 +622,22 @@ export class CircularPlotRenderer {
         
         group.appendChild(arrowElement);
         
-        // Add hover effects to both elements
-        [bodyElement, arrowElement].forEach(el => {
-          el.addEventListener('mouseenter', () => {
-            bodyElement.setAttribute('opacity', '0.9');
-            arrowElement.setAttribute('opacity', '0.9');
-            if (this.tooltipCallback) {
-              this.tooltipCallback({
-                type: 'annotation',
-                label: ann.label,
-                start: ann.start,
-                end: ann.end,
-                strand: isForward ? '+' : '-'
-              });
-            }
-          });
-          
-          el.addEventListener('mouseleave', () => {
-            bodyElement.setAttribute('opacity', '0.7');
-            arrowElement.setAttribute('opacity', '0.7');
-          });
+        // Add hover effects
+        arrowElement.addEventListener('mouseenter', () => {
+          arrowElement.setAttribute('opacity', '0.9');
+          if (this.tooltipCallback) {
+            this.tooltipCallback({
+              type: 'annotation',
+              label: ann.label,
+              start: ann.start,
+              end: ann.end,
+              strand: isForward ? '+' : '-'
+            });
+          }
+        });
+        
+        arrowElement.addEventListener('mouseleave', () => {
+          arrowElement.setAttribute('opacity', '0.7');
         });
         
         // Add text label with leader line for arrow

@@ -129,6 +129,7 @@ export interface PipelineParams {
   minAlignmentLength: number;
   colorScheme: string;
   forceAlignment: boolean;
+  lastzOptions?: string;
 }
 
 export interface RingConfig {

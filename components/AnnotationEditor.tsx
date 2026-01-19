@@ -1,9 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
+import { HotTable } from '@handsontable/react';
+import Handsontable from 'handsontable';
+import { registerAllModules } from 'handsontable/registry';
+import 'handsontable/dist/handsontable.full.min.css';
 import type { Annotation } from '@/lib/types';
 import { parseAnnotationFile, exportAnnotationsToTSV } from '@/lib/annotationParser';
 import toast from 'react-hot-toast';
+
+// Register all Handsontable modules (including cell types)
+registerAllModules();
 
 interface AnnotationEditorProps {
   ringId: string;
@@ -23,8 +30,7 @@ export default function AnnotationEditor({
   onClose
 }: AnnotationEditorProps) {
   const [localAnnotations, setLocalAnnotations] = useState<Annotation[]>([...annotations]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const hotRef = useRef<Handsontable | null>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -65,54 +71,31 @@ export default function AnnotationEditor({
       color: '#666666'
     };
     setLocalAnnotations([...localAnnotations, newAnnotation]);
-    setEditingId(newAnnotation.id);
+    toast.success('Added new annotation');
   };
 
-  const handleDelete = () => {
-    if (selectedIds.size === 0) {
-      toast.error('No annotations selected');
+  const handleDeleteSelected = () => {
+    const hot = hotRef.current;
+    if (!hot) return;
+
+    const selected = hot.getSelected();
+    if (!selected || selected.length === 0) {
+      toast.error('No rows selected');
       return;
     }
-    setLocalAnnotations(localAnnotations.filter(ann => !selectedIds.has(ann.id)));
-    setSelectedIds(new Set());
-    toast.success(`Deleted ${selectedIds.size} annotation(s)`);
-  };
 
-  const handleFieldChange = (id: string, field: keyof Annotation, value: any) => {
-    setLocalAnnotations(localAnnotations.map(ann => {
-      if (ann.id === id) {
-        let updatedValue = value;
-        
-        // Clamp numeric values
-        if (field === 'start' || field === 'end') {
-          const num = parseInt(value, 10);
-          if (!isNaN(num)) {
-            updatedValue = Math.max(1, Math.min(num, referenceLength));
-          }
-        }
-        
-        return { ...ann, [field]: updatedValue };
+    // Get all selected row indices
+    const rowsToDelete = new Set<number>();
+    selected.forEach(([startRow, , endRow]) => {
+      for (let i = startRow; i <= endRow; i++) {
+        rowsToDelete.add(i);
       }
-      return ann;
-    }));
-  };
+    });
 
-  const handleToggleSelect = (id: string) => {
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedIds(newSelected);
-  };
-
-  const handleSelectAll = () => {
-    if (selectedIds.size === localAnnotations.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(localAnnotations.map(ann => ann.id)));
-    }
+    // Filter out selected rows
+    const newAnnotations = localAnnotations.filter((_, idx) => !rowsToDelete.has(idx));
+    setLocalAnnotations(newAnnotations);
+    toast.success(`Deleted ${rowsToDelete.size} annotation(s)`);
   };
 
   const handleSave = () => {
@@ -132,6 +115,43 @@ export default function AnnotationEditor({
     URL.revokeObjectURL(url);
     toast.success('Exported annotations');
   };
+
+  // Convert annotations to table data
+  const data = localAnnotations.map(ann => ({
+    start: ann.start,
+    end: ann.end,
+    label: ann.label,
+    shape: ann.shape,
+    color: ann.color || '#666666'
+  }));
+
+  // Handle data changes from Handsontable
+  const afterChange = useCallback((changes: Handsontable.CellChange[] | null) => {
+    if (!changes) return;
+
+    const newAnnotations = [...localAnnotations];
+    changes.forEach(([row, prop, oldValue, newValue]) => {
+      if (oldValue === newValue) return;
+      
+      const ann = newAnnotations[row];
+      if (!ann) return;
+
+      if (prop === 'start' || prop === 'end') {
+        const num = parseInt(String(newValue), 10);
+        if (!isNaN(num)) {
+          ann[prop] = Math.max(1, Math.min(num, referenceLength));
+        }
+      } else if (prop === 'label') {
+        ann.label = String(newValue);
+      } else if (prop === 'shape') {
+        ann.shape = newValue as 'block' | 'arrow-forward' | 'arrow-reverse';
+      } else if (prop === 'color') {
+        ann.color = String(newValue);
+      }
+    });
+
+    setLocalAnnotations(newAnnotations);
+  }, [localAnnotations, referenceLength]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -169,11 +189,10 @@ export default function AnnotationEditor({
             Add New
           </button>
           <button
-            onClick={handleDelete}
-            disabled={selectedIds.size === 0}
-            className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleDeleteSelected}
+            className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600"
           >
-            Delete Selected ({selectedIds.size})
+            Delete Selected
           </button>
           <button
             onClick={handleExport}
@@ -183,105 +202,39 @@ export default function AnnotationEditor({
             Export TSV
           </button>
           <div className="ml-auto text-sm text-gray-600 dark:text-gray-400 self-center">
-            {referenceLength > 0 
-              ? `Reference: ${referenceLength.toLocaleString()} bp`
-              : 'Reference: Not loaded (generate plot first)'}
+            {localAnnotations.length} annotation(s) | Reference: {referenceLength.toLocaleString()} bp
           </div>
         </div>
 
-        {/* Table */}
-        <div className="flex-1 overflow-auto p-4">
-          {localAnnotations.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-              No annotations. Click "Load File" to import or "Add New" to create one.
-            </div>
-          ) : (
-            <table className="w-full border-collapse">
-              <thead className="sticky top-0 bg-gray-100 dark:bg-gray-700">
-                <tr>
-                  <th className="p-2 text-left">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.size === localAnnotations.length && localAnnotations.length > 0}
-                      onChange={handleSelectAll}
-                      className="w-4 h-4"
-                    />
-                  </th>
-                  <th className="p-2 text-left text-gray-700 dark:text-gray-300">Start</th>
-                  <th className="p-2 text-left text-gray-700 dark:text-gray-300">End</th>
-                  <th className="p-2 text-left text-gray-700 dark:text-gray-300">Label</th>
-                  <th className="p-2 text-left text-gray-700 dark:text-gray-300">Shape</th>
-                  <th className="p-2 text-left text-gray-700 dark:text-gray-300">Color</th>
-                </tr>
-              </thead>
-              <tbody>
-                {localAnnotations.map((ann, idx) => (
-                  <tr
-                    key={ann.id}
-                    className={`border-b border-gray-200 dark:border-gray-700 ${
-                      selectedIds.has(ann.id) ? 'bg-blue-50 dark:bg-blue-900' : ''
-                    }`}
-                  >
-                    <td className="p-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(ann.id)}
-                        onChange={() => handleToggleSelect(ann.id)}
-                        className="w-4 h-4"
-                      />
-                    </td>
-                    <td className="p-2">
-                      <input
-                        type="number"
-                        value={ann.start}
-                        onChange={(e) => handleFieldChange(ann.id, 'start', e.target.value)}
-                        className="w-24 px-2 py-1 border rounded dark:bg-gray-700 dark:border-gray-600"
-                        min={1}
-                        max={referenceLength}
-                      />
-                    </td>
-                    <td className="p-2">
-                      <input
-                        type="number"
-                        value={ann.end}
-                        onChange={(e) => handleFieldChange(ann.id, 'end', e.target.value)}
-                        className="w-24 px-2 py-1 border rounded dark:bg-gray-700 dark:border-gray-600"
-                        min={1}
-                        max={referenceLength}
-                      />
-                    </td>
-                    <td className="p-2">
-                      <input
-                        type="text"
-                        value={ann.label}
-                        onChange={(e) => handleFieldChange(ann.id, 'label', e.target.value)}
-                        className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:border-gray-600"
-                      />
-                    </td>
-                    <td className="p-2">
-                      <select
-                        value={ann.shape}
-                        onChange={(e) => handleFieldChange(ann.id, 'shape', e.target.value)}
-                        className="px-2 py-1 border rounded dark:bg-gray-700 dark:border-gray-600"
-                      >
-                        <option value="block">Block</option>
-                        <option value="arrow-forward">Arrow →</option>
-                        <option value="arrow-reverse">Arrow ←</option>
-                      </select>
-                    </td>
-                    <td className="p-2">
-                      <input
-                        type="color"
-                        value={ann.color || '#666666'}
-                        onChange={(e) => handleFieldChange(ann.id, 'color', e.target.value)}
-                        className="w-12 h-8 border rounded cursor-pointer"
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+        {/* Spreadsheet */}
+        <div className="flex-1 overflow-hidden p-4" style={{ minHeight: '400px' }}>
+          <HotTable
+            ref={(ref) => { hotRef.current = ref?.hotInstance || null; }}
+            data={data}
+            colHeaders={['Start', 'End', 'Label', 'Shape', 'Color']}
+            columns={[
+              { data: 'start', type: 'numeric' },
+              { data: 'end', type: 'numeric' },
+              { data: 'label', type: 'text' },
+              {
+                data: 'shape',
+                type: 'dropdown',
+                source: ['block', 'arrow-forward', 'arrow-reverse']
+              },
+              { data: 'color', type: 'text' }
+            ]}
+            rowHeaders={true}
+            width="100%"
+            height={450}
+            licenseKey="non-commercial-and-evaluation"
+            afterChange={afterChange}
+            contextMenu={true}
+            manualRowResize={true}
+            manualColumnResize={true}
+            stretchH="all"
+            minRows={10}
+            minSpareRows={1}
+          />
         </div>
 
         {/* Footer */}

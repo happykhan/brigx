@@ -1,0 +1,17 @@
+[workspace]
+authors = ["Nabil-Fareed Alikhan <nabil@happykhan.com>"]
+channels = ["conda-forge", "bioconda"]
+name = "brigx"
+platforms = ["osx-64", "linux-64", "linux-aarch64"]
+version = "0.1.0"
+
+[tasks]
+benchmark = "python benchmark_alignment.py"
+quick-benchmark = "python quick_benchmark.py"
+test-lastz = "python quick_test_lastz.py"
+
+[dependencies]
+lastz = ">=1.4.52,<2"
+blast = ">=2.16.0,<3"
+python = ">=3.10"
+numpy = ">=1.24"

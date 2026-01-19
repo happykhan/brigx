@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import toast, { Toaster } from 'react-hot-toast';
 import RingConfiguration from '@/components/RingConfiguration';
@@ -12,16 +12,21 @@ import ConsoleLog from '@/components/ConsoleLog';
 import ImageProperties, { type ImagePropertiesConfig } from '@/components/ImageProperties';
 import AnnotationEditor from '@/components/AnnotationEditor';
 import type { CircularPlotData, PipelineParams, ProgressUpdate, RingConfig, Annotation } from '@/lib/types';
+import type { BRIGController as BRIGControllerType } from '@/lib/controller';
 
 export default function Home() {
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
   const [rings, setRings] = useState<RingConfig[]>([]);
+  
+  // Store controller instance in ref to persist alignment cache across runs
+  const controllerRef = useRef<BRIGControllerType | null>(null);
   const [params, setParams] = useState<PipelineParams>({
     windowSize: 1000,
     minIdentity: 70,
     minAlignmentLength: 100,
     colorScheme: 'blue-red',
-    forceAlignment: false
+    forceAlignment: false,
+    lastzOptions: ''
   });
   const [progress, setProgress] = useState<ProgressUpdate>({ step: 'idle', percent: 0 });
   const [plotData, setPlotData] = useState<CircularPlotData | null>(null);
@@ -181,6 +186,7 @@ export default function Home() {
   };
 
   // Auto-update plot when ring settings change (colors, thresholds, visibility, annotations)
+  // NOTE: This should NOT depend on cachedPlotData to avoid overwriting alignment results
   useEffect(() => {
     if (!cachedPlotData) return;
     
@@ -227,7 +233,7 @@ export default function Home() {
       ...cachedPlotData,
       rings: updatedRings
     });
-  }, [rings, cachedPlotData, ringAnnotations]);
+  }, [rings, ringAnnotations]); // Removed cachedPlotData from dependencies!
 
   const handleRun = async () => {
     console.log('[Page] === Generate Plot (Run Alignments) clicked ===');
@@ -253,10 +259,17 @@ export default function Home() {
     setProgress({ step: 'Starting alignments...', percent: 0 });
 
     try {
-      const { BRIGController } = await import('@/lib/controller');
-      const controller = new BRIGController();
+      // Reuse existing controller instance to preserve alignment cache
+      if (!controllerRef.current) {
+        const { BRIGController } = await import('@/lib/controller');
+        controllerRef.current = new BRIGController();
+        await controllerRef.current.initialize();
+        console.log('[Page] Created new BRIGController instance');
+      } else {
+        console.log('[Page] Reusing existing BRIGController instance (cache preserved)');
+      }
       
-      await controller.initialize();
+      const controller = controllerRef.current;
       
       const result = await controller.runFullPipeline(
         referenceFile,
@@ -267,9 +280,64 @@ export default function Home() {
           console.log('[Page] Progress update:', update);
           setProgress(update);
           
-          // During alignment runs, ignore all partial data updates
-          // We only want to merge the final alignment results at the end
-          // This prevents GC recalculation from wiping out the existing plot
+          // Update plot immediately as each ring completes
+          if (update.partialData?.rings && update.partialData.rings.length > 0) {
+            console.log('[Page] Received partial data with', update.partialData.rings.length, 'rings');
+            
+            // Merge new ring data with existing cached data (preserve all rings and annotations)
+            const hasExistingRings = cachedPlotData?.rings && cachedPlotData.rings.length > 0;
+            
+            let mergedRings;
+            if (hasExistingRings) {
+              // Start with all existing rings
+              mergedRings = cachedPlotData.rings.map(existingRing => {
+                const newRingData = update.partialData!.rings!.find(r => r.queryName === existingRing.queryName);
+                if (newRingData) {
+                  console.log(`[Page] Updating ring: ${existingRing.queryName}, hits: ${newRingData.hits?.length || 0}, preserving annotations: ${existingRing.annotations?.length || 0}`);
+                  return {
+                    ...existingRing,
+                    hits: newRingData.hits,
+                    windows: newRingData.windows,
+                    statistics: newRingData.statistics,
+                    lastzOutput: newRingData.lastzOutput,
+                    // CRITICAL: Preserve annotations from existing ring
+                    annotations: existingRing.annotations || []
+                  };
+                }
+                return existingRing;
+              });
+              
+              // Add any new rings that weren't in the cache
+              const newRingsToAdd = update.partialData!.rings!.filter(
+                newRing => !cachedPlotData.rings.some(existing => existing.queryName === newRing.queryName)
+              );
+              if (newRingsToAdd.length > 0) {
+                console.log(`[Page] Adding ${newRingsToAdd.length} new rings:`, newRingsToAdd.map(r => r.queryName));
+                // Add annotations from ringAnnotations state if they exist
+                const newRingsWithAnnotations = newRingsToAdd.map(ring => {
+                  const annotations = ringAnnotations[ring.queryId] || ring.annotations || [];
+                  if (annotations.length > 0) {
+                    console.log(`[Page] Adding annotations to new ring ${ring.queryName}:`, annotations.length);
+                  }
+                  return {
+                    ...ring,
+                    annotations
+                  };
+                });
+                mergedRings = [...mergedRings, ...newRingsWithAnnotations];
+              }
+            } else {
+              mergedRings = update.partialData!.rings;
+            }
+            
+            const updatedPlotData = {
+              reference: update.partialData.reference || cachedPlotData?.reference!,
+              rings: mergedRings,
+              config: update.partialData.config || cachedPlotData?.config!
+            };
+            
+            setPlotData(updatedPlotData);
+          }
         }
       );
       
@@ -279,21 +347,28 @@ export default function Home() {
       console.log('[Page] Existing rings:', cachedPlotData?.rings?.map(r => ({ name: r.queryName, annotations: r.annotations?.length || 0 })));
       
       // Merge final alignment results into existing plot data
-      const finalRings = cachedPlotData?.rings?.map(existingRing => {
-        const newRingData = result.rings?.find(r => r.queryName === existingRing.queryName);
-        if (newRingData) {
-          console.log(`[Page] Final merge for ring: ${existingRing.queryName}, keeping annotations: ${existingRing.annotations?.length || 0}`);
-          return {
-            ...existingRing,
-            hits: newRingData.hits,
-            windows: newRingData.windows,
-            statistics: newRingData.statistics,
-            lastzOutput: newRingData.lastzOutput
-          };
-        }
-        console.log(`[Page] Keeping existing ring without alignment: ${existingRing.queryName}`);
-        return existingRing;
-      }) || result.rings;
+      // CRITICAL: Check if existing rings array has any items, not just if it exists
+      const hasExistingRings = cachedPlotData?.rings && cachedPlotData.rings.length > 0;
+      
+      const finalRings = hasExistingRings
+        ? cachedPlotData.rings.map(existingRing => {
+            const newRingData = result.rings?.find(r => r.queryName === existingRing.queryName);
+            if (newRingData) {
+              console.log(`[Page] Final merge for ring: ${existingRing.queryName}, keeping annotations: ${existingRing.annotations?.length || 0}`);
+              return {
+                ...existingRing,
+                hits: newRingData.hits,
+                windows: newRingData.windows,
+                statistics: newRingData.statistics,
+                lastzOutput: newRingData.lastzOutput,
+                // CRITICAL: Preserve annotations from existing ring
+                annotations: existingRing.annotations || []
+              };
+            }
+            console.log(`[Page] Keeping existing ring without alignment: ${existingRing.queryName}`);
+            return existingRing;
+          })
+        : result.rings; // Use alignment results directly if no existing rings
       
       console.log('[Page] Final rings after merge:', finalRings?.map(r => ({ name: r.queryName, hits: r.hits?.length || 0, annotations: r.annotations?.length || 0 })));
       

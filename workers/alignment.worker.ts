@@ -152,9 +152,20 @@ async function alignGenomes(
   const args = [
     '/reference.fasta',
     '/query.fasta',
-    '--format=BLASTN',
-    '--ambiguous=iupac'
+    '--format=BLASTN'
   ];
+  
+  // Add custom LASTZ options if provided, otherwise use defaults
+  if (params.lastzOptions && params.lastzOptions.trim()) {
+    console.log(`[Alignment Worker] Using custom LASTZ options: ${params.lastzOptions}`);
+    const customArgs = params.lastzOptions.trim().split(/\s+/);
+    args.push(...customArgs);
+  } else {
+    // Default parameters
+    console.log('[Alignment Worker] Using default LASTZ options');
+    args.push('--ambiguous=iupac', '--gapped', '--chain');
+  }
+  
   console.log(`[Alignment Worker] Calling with args:`, args);
   
   // Call main function

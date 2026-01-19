@@ -32,6 +32,7 @@ export default function ExportPanel({ plotData, imageProperties }: ExportPanelPr
       legendFontSize: imageProperties.legendFontSize,
       scaleFontSize: imageProperties.scaleFontSize,
       titleFontSize: imageProperties.titleFontSize,
+      labelFontSize: imageProperties.labelFontSize,
       title: imageProperties.title
     });
 

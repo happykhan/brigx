@@ -91,10 +91,19 @@ function calculateStatistics(windows: WindowData[], referenceLength: number) {
 
 // Worker message handler
 self.onmessage = (e: MessageEvent) => {
+  console.log('[Processing Worker] Received message:', e.data.type);
   const { type, alignments, referenceLength, windowSize, minIdentity, minLength, queryId, queryName, color } = e.data;
   
   try {
     if (type === 'process') {
+      console.log(`[Processing Worker] Processing ${queryName}:`, {
+        alignmentsCount: alignments?.length || 0,
+        referenceLength,
+        windowSize,
+        minIdentity,
+        minLength
+      });
+      
       const windows = aggregateToWindows(
         alignments,
         referenceLength,
@@ -103,7 +112,11 @@ self.onmessage = (e: MessageEvent) => {
         minLength
       );
       
+      console.log(`[Processing Worker] Aggregated to ${windows.length} windows`);
+      
       const statistics = calculateStatistics(windows, referenceLength);
+      
+      console.log(`[Processing Worker] Statistics calculated:`, statistics);
       
       const ringData: RingData = {
         queryId,
@@ -114,9 +127,11 @@ self.onmessage = (e: MessageEvent) => {
         statistics
       };
       
+      console.log(`[Processing Worker] Sending processed ringData for ${queryName}`);
       self.postMessage({ type: 'processed', ringData });
     }
   } catch (error: any) {
+    console.error('[Processing Worker] Error:', error);
     self.postMessage({ type: 'error', error: error.message });
   }
 };

@@ -919,6 +919,16 @@ export class CircularPlotRenderer {
     this.svg.setAttribute('width', '100%');
     this.svg.setAttribute('height', '100%');
     
+    // Create main content group for zoom/pan transforms
+    const mainGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    mainGroup.setAttribute('class', 'main-content');
+    mainGroup.setAttribute('transform-origin', 'center');
+    this.svg.appendChild(mainGroup);
+    
+    // Now render everything into mainGroup instead of svg
+    const tempSvg = this.svg;
+    this.svg = mainGroup as any; // Temporarily use mainGroup as target
+    
     const cx = this.config.width / 2;
     const cy = this.config.height / 2;
     const refLength = data.reference.length;
@@ -980,6 +990,9 @@ export class CircularPlotRenderer {
     
     // Render title and reference size in center
     this.renderTitle(this.svg, cx, cy, refLength);
+    
+    // Restore svg reference
+    this.svg = tempSvg;
     
     // Clear and append to container
     container.innerHTML = '';

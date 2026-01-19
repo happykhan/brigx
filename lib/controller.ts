@@ -251,14 +251,23 @@ export class BRIGController {
       }, 300000); // 5 minutes
 
       worker.onmessage = (e) => {
+        console.log(`[Controller] Received message from worker for ${query.name}, type: ${e.data.type}`);
         if (e.data.type === 'aligned') {
           console.log(`[Controller] Alignment completed for ${query.name}`);
+          console.log(`[Controller] Alignment result:`, {
+            queryId: e.data.result.queryId,
+            queryName: e.data.result.queryName,
+            hitsCount: e.data.result.hits?.length || 0,
+            rawOutputLength: e.data.rawOutput?.length || 0
+          });
           clearTimeout(timeout);
           resolve({ result: e.data.result, rawOutput: e.data.rawOutput });
         } else if (e.data.type === 'error') {
           console.error(`[Controller] Alignment error for ${query.name}:`, e.data.error);
           clearTimeout(timeout);
           reject(new Error(e.data.error));
+        } else {
+          console.warn(`[Controller] Unexpected message type for ${query.name}:`, e.data.type);
         }
       };
 
@@ -281,24 +290,53 @@ export class BRIGController {
     color: string,
     lastzOutput: string
   ): Promise<RingData> {
+    console.log(`[Controller] Processing alignment to ring for ${alignment.queryName}`);
+    console.log(`[Controller] Input alignment data:`, {
+      queryId: alignment.queryId,
+      queryName: alignment.queryName,
+      hitsCount: alignment.hits?.length || 0,
+      referenceLength,
+      windowSize: params.windowSize,
+      color
+    });
+    
     return new Promise((resolve, reject) => {
       if (!this.processingWorker) {
+        console.error('[Controller] Processing worker not initialized');
         reject(new Error('Processing worker not initialized'));
         return;
       }
 
+      const timeout = setTimeout(() => {
+        console.error(`[Controller] Processing timeout for ${alignment.queryName}`);
+        reject(new Error(`Processing timeout for ${alignment.queryName}`));
+      }, 60000); // 60 second timeout
+
       this.processingWorker.onmessage = (e) => {
+        console.log(`[Controller] Received processing message, type: ${e.data.type}`);
         if (e.data.type === 'processed') {
+          clearTimeout(timeout);
           // Add raw hits and LASTZ output to ring data
           const ringData = e.data.ringData;
           ringData.hits = alignment.hits;
           ringData.lastzOutput = lastzOutput;
+          console.log(`[Controller] Ring processed successfully:`, {
+            queryId: ringData.queryId,
+            queryName: ringData.queryName,
+            windowsCount: ringData.windows?.length || 0,
+            hitsCount: ringData.hits?.length || 0,
+            coverage: ringData.statistics?.genomeCoverage,
+            meanIdentity: ringData.statistics?.meanIdentity
+          });
           resolve(ringData);
         } else if (e.data.type === 'error') {
+          clearTimeout(timeout);
+          console.error(`[Controller] Processing error for ${alignment.queryName}:`, e.data.error);
           reject(new Error(e.data.error));
         }
       };
 
+      console.log(`[Controller] Sending processing request for ${alignment.queryName}`);
       this.processingWorker.postMessage({
         type: 'process',
         alignments: alignment.hits,
@@ -470,7 +508,13 @@ export class BRIGController {
 
       await Promise.all(workerPool.map((_, i) => runNextAlignment(i)));
 
+      console.log(`[Controller] All alignments completed. Results: ${alignmentResults.length}`);
+      alignmentResults.forEach((ar, idx) => {
+        console.log(`[Controller]   Alignment ${idx + 1}: ${ar.result.queryName}, hits: ${ar.result.hits?.length || 0}`);
+      });
+
       // Process alignments to rings
+      console.log(`[Controller] Step 5: Processing ${alignmentResults.length} alignment results to rings`);
       this.updateProgress('Processing alignment data', 70);
       const ringDataArray: RingData[] = [];
       
@@ -478,6 +522,8 @@ export class BRIGController {
         const { result: alignment, rawOutput } = alignmentResults[i];
         const ringConfig = rings[i]; // Use the corresponding ring config
         const color = ringConfig.color;
+        
+        console.log(`[Controller] Processing ring ${i + 1}/${alignmentResults.length}: ${alignment.queryName}`);
         
         this.updateProgress(
           'Processing alignment data',
@@ -492,7 +538,10 @@ export class BRIGController {
           color,
           rawOutput
         );
+        
+        console.log(`[Controller] Ring ${i + 1} processed, adding to array`);
         ringDataArray.push(ringData);
+        console.log(`[Controller] Total rings in array: ${ringDataArray.length}`);
         
         // Send partial data after each ring is processed
         if (this.progressCallback) {
@@ -518,10 +567,17 @@ export class BRIGController {
         }
       }
 
+      console.log(`[Controller] All ${ringDataArray.length} rings processed successfully`);
+      console.log(`[Controller] Ring summary:`, ringDataArray.map(r => ({
+        name: r.queryName,
+        windows: r.windows?.length || 0,
+        hits: r.hits?.length || 0,
+        visible: r.visible
+      })));
+      
       this.updateProgress('Finalizing', 95);
 
-      // Return complete plot data
-      return {
+      const finalData: CircularPlotData = {
         reference: {
           name: reference.name,
           length: reference.length,
@@ -536,6 +592,18 @@ export class BRIGController {
           minAlignmentLength: params.minAlignmentLength
         }
       };
+      
+      console.log('[Controller] Returning final plot data with structure:', {
+        referenceName: finalData.reference.name,
+        referenceLength: finalData.reference.length,
+        ringsCount: finalData.rings.length,
+        gcContentWindows: finalData.reference.gcContent?.length || 0,
+        gcSkewWindows: finalData.reference.gcSkew?.length || 0
+      });
+      console.log('[Controller] === Pipeline Complete ===');
+      
+      // Return complete plot data
+      return finalData;
     } catch (error) {
       console.error('Pipeline error:', error);
       throw error;

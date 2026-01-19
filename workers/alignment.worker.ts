@@ -208,6 +208,7 @@ self.onmessage = async (e: MessageEvent) => {
       self.postMessage({ type: 'aligned', result: alignmentResult, rawOutput });
     }
   } catch (error: any) {
+    console.error('[Alignment Worker] Error caught:', error);
     self.postMessage({ type: 'error', error: error.message, stack: error.stack });
   }
 };

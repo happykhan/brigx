@@ -65,19 +65,21 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
   // Apply zoom and pan transform
   useEffect(() => {
     if (svgRef.current) {
-      const content = svgRef.current.querySelector('g');
-      if (content) {
-        content.setAttribute('transform', `translate(${pan.x}, ${pan.y}) scale(${zoom})`);
+      const mainGroup = svgRef.current.querySelector('g.main-content');
+      if (mainGroup) {
+        // Get the SVG center point
+        const viewBox = svgRef.current.viewBox.baseVal;
+        const cx = viewBox.width / 2;
+        const cy = viewBox.height / 2;
+        
+        // Apply transform with proper origin
+        mainGroup.setAttribute(
+          'transform',
+          `translate(${cx + pan.x}, ${cy + pan.y}) scale(${zoom}) translate(${-cx}, ${-cy})`
+        );
       }
     }
   }, [zoom, pan]);
-
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY * -0.001;
-    const newZoom = Math.min(Math.max(0.5, zoom + delta), 5);
-    setZoom(newZoom);
-  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button === 0) { // Left mouse button
@@ -115,8 +117,9 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
   return (
     <div className="relative">
       {/* Zoom Controls */}
-      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 border border-gray-200 dark:border-gray-700">
+      <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 border border-gray-200 dark:border-gray-700">
         <button
+          type="button"
           onClick={handleZoomIn}
           className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
           title="Zoom In"
@@ -126,6 +129,7 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
           </svg>
         </button>
         <button
+          type="button"
           onClick={handleZoomOut}
           className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
           title="Zoom Out"
@@ -135,6 +139,7 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
           </svg>
         </button>
         <button
+          type="button"
           onClick={handleResetView}
           className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
           title="Reset View"
@@ -151,7 +156,6 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
       <div 
         ref={containerRef} 
         className="w-full overflow-hidden cursor-move"
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

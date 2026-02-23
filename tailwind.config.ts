@@ -13,10 +13,13 @@ const config: Config = {
         gx: {
           bg: 'var(--gx-bg)',
           'bg-alt': 'var(--gx-bg-alt)',
-          'bg-elevated': 'var(--gx-bg-elevated)',
+          surface: 'var(--gx-surface)',
+          'surface-hover': 'var(--gx-surface-hover)',
+          'bg-elevated': 'var(--gx-bg-elevated)', /* backward compat alias for surface */
           text: 'var(--gx-text)',
           'text-muted': 'var(--gx-text-muted)',
-          'text-bright': 'var(--gx-text-bright)',
+          'text-bright': 'var(--gx-text-bright)', /* backward compat */
+          'text-inverted': 'var(--gx-text-inverted)',
           border: 'var(--gx-border)',
           accent: 'var(--gx-accent)',
           'accent-hover': 'var(--gx-accent-hover)',

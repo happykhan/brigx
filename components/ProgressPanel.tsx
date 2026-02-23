@@ -10,7 +10,7 @@ export default function ProgressPanel({ progress }: ProgressPanelProps) {
   return (
     <div className="card animate-fade-in">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium" style={{ color: 'var(--gx-text-bright)' }}>{progress.step}</span>
+        <span className="text-sm font-medium" style={{ color: 'var(--gx-text)' }}>{progress.step}</span>
         <span className="text-sm" style={{ color: 'var(--gx-text-muted)' }}>{progress.percent}%</span>
       </div>
       <div className="progress-bg">

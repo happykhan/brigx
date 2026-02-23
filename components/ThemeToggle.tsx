@@ -5,11 +5,11 @@ import { useEffect, useState } from 'react';
 type Theme = 'dark' | 'light';
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>('light');
 
   useEffect(() => {
     const saved = localStorage.getItem('gx-theme') as Theme | null;
-    const current = saved || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    const current = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     setTheme(current);
     document.documentElement.setAttribute('data-theme', current);
   }, []);
@@ -26,7 +26,7 @@ export default function ThemeToggle() {
         onClick={() => applyTheme('dark')}
         className={`px-3 py-1.5 transition-colors ${
           theme === 'dark'
-            ? 'bg-gx-accent text-[#0F172A]'
+            ? 'bg-gx-accent text-gx-text-inverted'
             : 'text-gx-text-muted hover:text-gx-text'
         }`}
         aria-label="Dark theme"
@@ -39,7 +39,7 @@ export default function ThemeToggle() {
         onClick={() => applyTheme('light')}
         className={`px-3 py-1.5 transition-colors ${
           theme === 'light'
-            ? 'bg-gx-accent text-[#0F172A]'
+            ? 'bg-gx-accent text-gx-text-inverted'
             : 'text-gx-text-muted hover:text-gx-text'
         }`}
         aria-label="Light theme"

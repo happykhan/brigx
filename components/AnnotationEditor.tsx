@@ -158,7 +158,7 @@ export default function AnnotationEditor({
       <div className="rounded-lg max-w-6xl w-full max-h-[90vh] flex flex-col" style={{ background: 'var(--gx-bg-alt)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
         {/* Header */}
         <div className="p-4 flex justify-between items-center" style={{ borderBottom: '1px solid var(--gx-border)' }}>
-          <h2 className="text-xl font-bold" style={{ color: 'var(--gx-text-bright)' }}>
+          <h2 className="text-xl font-bold" style={{ color: 'var(--gx-text)' }}>
             Annotations for {ringName}
           </h2>
           <button

@@ -4,44 +4,50 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── GenomicX Design Tokens ── */
+/* ── GenomicX Design Tokens (ronaQC standard) ── */
 :root {
-  /* Dark theme (default) */
-  --gx-bg: #0F172A;
-  --gx-bg-alt: #1E293B;
-  --gx-bg-elevated: #253349;
-  --gx-text: #E2E8F0;
-  --gx-text-muted: #94A3B8;
-  --gx-text-bright: #F1F5F9;
-  --gx-border: #334155;
-  --gx-accent: #14B8A6;
-  --gx-accent-hover: #2DD4BF;
-  --gx-accent-dim: rgba(20, 184, 166, 0.1);
-  --gx-accent-15: rgba(20, 184, 166, 0.15);
+  /* Light theme (default) */
+  --gx-bg: #f8fafc;
+  --gx-bg-alt: #f1f5f9;
+  --gx-surface: #ffffff;
+  --gx-surface-hover: #f1f5f9;
+  --gx-bg-elevated: #ffffff; /* alias for --gx-surface */
+  --gx-text: #0f172a;
+  --gx-text-muted: #64748b;
+  --gx-text-bright: #0f172a;
+  --gx-text-inverted: #ffffff;
+  --gx-border: #e2e8f0;
+  --gx-accent: #0d9488;
+  --gx-accent-hover: #0f766e;
   --gx-indigo: #6366F1;
-  --gx-indigo-dim: rgba(99, 102, 241, 0.1);
-  --gx-success: #14B8A6;
+  --gx-success: #0d9488;
   --gx-warning: #F59E0B;
   --gx-error: #EF4444;
-  --gx-nav-bg: rgba(15, 23, 42, 0.9);
-  --gx-code-bg: #0F172A;
-  --gx-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --gx-nav-bg: rgba(255, 255, 255, 0.9);
+  --gx-code-bg: #f1f5f9;
+  --gx-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   --gx-transition: 0.2s ease;
   --gx-radius: 8px;
   --gx-radius-lg: 12px;
 }
 
-[data-theme="light"] {
-  --gx-bg: #FFFFFF;
-  --gx-bg-alt: #F8FAFC;
-  --gx-bg-elevated: #F1F5F9;
-  --gx-text: #334155;
-  --gx-text-muted: #64748B;
-  --gx-text-bright: #0F172A;
-  --gx-border: #E2E8F0;
-  --gx-nav-bg: rgba(255, 255, 255, 0.9);
-  --gx-code-bg: #F1F5F9;
-  --gx-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+[data-theme="dark"] {
+  --gx-bg: #0f172a;
+  --gx-bg-alt: #1e293b;
+  --gx-surface: #1e293b;
+  --gx-surface-hover: #334155;
+  --gx-bg-elevated: #1e293b; /* alias for --gx-surface */
+  --gx-text: #f1f5f9;
+  --gx-text-muted: #94a3b8;
+  --gx-text-bright: #f1f5f9;
+  --gx-text-inverted: #0f172a;
+  --gx-border: #334155;
+  --gx-accent: #2dd4bf;
+  --gx-accent-hover: #14b8a6;
+  --gx-indigo: #818cf8;
+  --gx-nav-bg: rgba(15, 23, 42, 0.9);
+  --gx-code-bg: #0f172a;
+  --gx-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 @layer base {
@@ -88,7 +94,7 @@
     justify-content: center;
     gap: 0.5rem;
     background: var(--gx-accent);
-    color: #0F172A;
+    color: var(--gx-text-inverted);
     font-weight: 600;
     font-size: 0.875rem;
     padding: 0.7rem 1.4rem;
@@ -147,14 +153,14 @@
     display: block;
     font-size: 0.8125rem;
     font-weight: 500;
-    color: var(--gx-text-bright);
+    color: var(--gx-text);
     margin-bottom: 0.5rem;
   }
 
   .section-title {
     font-size: 1.25rem;
     font-weight: 700;
-    color: var(--gx-text-bright);
+    color: var(--gx-text);
     margin-bottom: 1rem;
     letter-spacing: -0.01em;
   }

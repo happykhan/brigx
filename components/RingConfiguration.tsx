@@ -83,7 +83,7 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-sm font-semibold" style={{ color: 'var(--gx-text-bright)' }}>Ring Configuration</h3>
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--gx-text)' }}>Ring Configuration</h3>
         <button
           type="button"
           onClick={addNewRing}
@@ -105,7 +105,7 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
           <div
             key={ring.id}
             className="rounded-lg p-4"
-            style={{ border: '1px solid var(--gx-border)', background: 'var(--gx-bg-elevated)' }}
+            style={{ border: '1px solid var(--gx-border)', background: 'var(--gx-surface)' }}
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2 flex-1">

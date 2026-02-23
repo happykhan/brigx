@@ -51,7 +51,7 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
           >
             {isOpen ? '\u25BC' : '\u25B6'}
           </button>
-          <h3 className="font-semibold" style={{ color: 'var(--gx-text-bright)' }}>Image Properties</h3>
+          <h3 className="font-semibold" style={{ color: 'var(--gx-text)' }}>Image Properties</h3>
         </div>
       </div>
 
@@ -59,7 +59,7 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
         <div className="space-y-4">
           {/* Ring Dimensions */}
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold pb-1" style={{ color: 'var(--gx-text-bright)', borderBottom: '1px solid var(--gx-border)' }}>
+            <h4 className="text-sm font-semibold pb-1" style={{ color: 'var(--gx-text)', borderBottom: '1px solid var(--gx-border)' }}>
               Ring Dimensions
             </h4>
 
@@ -132,7 +132,7 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
 
           {/* Font Sizes */}
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold pb-1" style={{ color: 'var(--gx-text-bright)', borderBottom: '1px solid var(--gx-border)' }}>
+            <h4 className="text-sm font-semibold pb-1" style={{ color: 'var(--gx-text)', borderBottom: '1px solid var(--gx-border)' }}>
               Font Sizes
             </h4>
 

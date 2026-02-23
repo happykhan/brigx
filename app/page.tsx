@@ -461,7 +461,7 @@ export default function Home() {
                   <circle cx="12" cy="12" r="1" fill="var(--gx-accent)" />
                 </svg>
                 <div>
-                  <h1 className="text-lg font-bold" style={{ color: 'var(--gx-text-bright)' }}>BRIGX</h1>
+                  <h1 className="text-lg font-bold" style={{ color: 'var(--gx-text)' }}>BRIGX</h1>
                   <p className="text-xs" style={{ color: 'var(--gx-text-muted)' }}>Browser-based Ring Image Generator</p>
                 </div>
               </div>
@@ -591,33 +591,33 @@ export default function Home() {
                   <div className="mt-6 card animate-fade-in">
                     <h2 className="section-title">Statistics</h2>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="p-4 rounded-lg" style={{ background: 'var(--gx-accent-dim)', border: '1px solid var(--gx-border)' }}>
+                      <div className="p-4 rounded-lg" style={{ background: 'color-mix(in srgb, var(--gx-accent) 10%, transparent)', border: '1px solid var(--gx-border)' }}>
                         <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--gx-text-muted)' }}>Reference</div>
-                        <div className="text-base font-semibold truncate mt-1" style={{ color: 'var(--gx-text-bright)' }}>{plotData.reference.name}</div>
+                        <div className="text-base font-semibold truncate mt-1" style={{ color: 'var(--gx-text)' }}>{plotData.reference.name}</div>
                         <div className="text-sm" style={{ color: 'var(--gx-text-muted)' }}>{(plotData.reference.length / 1000).toFixed(1)} kb</div>
                       </div>
-                      <div className="p-4 rounded-lg" style={{ background: 'var(--gx-accent-dim)', border: '1px solid var(--gx-border)' }}>
+                      <div className="p-4 rounded-lg" style={{ background: 'color-mix(in srgb, var(--gx-accent) 10%, transparent)', border: '1px solid var(--gx-border)' }}>
                         <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--gx-text-muted)' }}>Query Genomes</div>
-                        <div className="text-2xl font-bold mt-1" style={{ color: 'var(--gx-text-bright)' }}>{plotData.rings?.length || 0}</div>
+                        <div className="text-2xl font-bold mt-1" style={{ color: 'var(--gx-text)' }}>{plotData.rings?.length || 0}</div>
                       </div>
-                      <div className="p-4 rounded-lg" style={{ background: 'var(--gx-indigo-dim)', border: '1px solid var(--gx-border)' }}>
+                      <div className="p-4 rounded-lg" style={{ background: 'color-mix(in srgb, var(--gx-indigo) 10%, transparent)', border: '1px solid var(--gx-border)' }}>
                         <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--gx-text-muted)' }}>Window Size</div>
-                        <div className="text-2xl font-bold mt-1" style={{ color: 'var(--gx-text-bright)' }}>{plotData.config?.windowSize || 0} bp</div>
+                        <div className="text-2xl font-bold mt-1" style={{ color: 'var(--gx-text)' }}>{plotData.config?.windowSize || 0} bp</div>
                       </div>
-                      <div className="p-4 rounded-lg" style={{ background: 'var(--gx-indigo-dim)', border: '1px solid var(--gx-border)' }}>
+                      <div className="p-4 rounded-lg" style={{ background: 'color-mix(in srgb, var(--gx-indigo) 10%, transparent)', border: '1px solid var(--gx-border)' }}>
                         <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--gx-text-muted)' }}>Min Identity</div>
-                        <div className="text-2xl font-bold mt-1" style={{ color: 'var(--gx-text-bright)' }}>{plotData.config?.minIdentity || 0}%</div>
+                        <div className="text-2xl font-bold mt-1" style={{ color: 'var(--gx-text)' }}>{plotData.config?.minIdentity || 0}%</div>
                       </div>
                     </div>
 
                     {plotData.rings && plotData.rings.length > 0 && (
                       <div className="mt-6">
-                        <h3 className="font-semibold mb-3" style={{ color: 'var(--gx-text-bright)' }}>Query Genome Coverage</h3>
+                        <h3 className="font-semibold mb-3" style={{ color: 'var(--gx-text)' }}>Query Genome Coverage</h3>
                         <div className="space-y-2">
                           {plotData.rings.map((ring) => (
-                            <div key={ring.queryId} className="flex items-center justify-between p-3 rounded-lg transition-colors" style={{ background: 'var(--gx-bg-elevated)', border: '1px solid var(--gx-border)' }}>
+                            <div key={ring.queryId} className="flex items-center justify-between p-3 rounded-lg transition-colors" style={{ background: 'var(--gx-surface)', border: '1px solid var(--gx-border)' }}>
                               <div className="flex-1">
-                                <div className="font-medium" style={{ color: 'var(--gx-text-bright)' }}>{ring.queryName}</div>
+                                <div className="font-medium" style={{ color: 'var(--gx-text)' }}>{ring.queryName}</div>
                                 <div className="text-sm" style={{ color: 'var(--gx-text-muted)' }}>
                                   Coverage: {ring.statistics.genomeCoverage.toFixed(1)}% |
                                   Avg Identity: {ring.statistics.meanIdentity.toFixed(1)}%

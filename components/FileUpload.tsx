@@ -75,7 +75,7 @@ export default function FileUpload({
         {queryFiles.length > 0 && (
           <div className="mt-2 space-y-1">
             {queryFiles.map((file, index) => (
-              <div key={index} className="flex items-center justify-between text-sm p-2 rounded-lg" style={{ background: 'var(--gx-bg-elevated)', border: '1px solid var(--gx-border)' }}>
+              <div key={index} className="flex items-center justify-between text-sm p-2 rounded-lg" style={{ background: 'var(--gx-surface)', border: '1px solid var(--gx-border)' }}>
                 <span className="truncate" style={{ color: 'var(--gx-text)' }}>{file.name}</span>
                 <button
                   onClick={() => removeQueryFile(index)}

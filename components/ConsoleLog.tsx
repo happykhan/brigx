@@ -29,7 +29,7 @@ export default function ConsoleLog({ logs, progress }: ConsoleLogProps) {
       {progress && progress.step !== 'idle' && progress.step !== 'Complete!' && (
         <div className="mb-4 pb-4" style={{ borderBottom: '1px solid var(--gx-border)' }}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium" style={{ color: 'var(--gx-text-bright)' }}>{progress.step}</span>
+            <span className="text-sm font-medium" style={{ color: 'var(--gx-text)' }}>{progress.step}</span>
             <span className="text-sm" style={{ color: 'var(--gx-text-muted)' }}>{progress.percent}%</span>
           </div>
           <div className="progress-bg">
@@ -52,7 +52,7 @@ export default function ConsoleLog({ logs, progress }: ConsoleLogProps) {
           >
             {isOpen ? '\u25BC' : '\u25B6'}
           </button>
-          <h3 className="font-semibold" style={{ color: 'var(--gx-text-bright)' }}>Debug Console</h3>
+          <h3 className="font-semibold" style={{ color: 'var(--gx-text)' }}>Debug Console</h3>
           <span className="text-xs" style={{ color: 'var(--gx-text-muted)' }}>({logs.length} messages)</span>
         </div>
         <button

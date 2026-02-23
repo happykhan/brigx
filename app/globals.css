@@ -1,66 +1,177 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── GenomicX Design Tokens ── */
+:root {
+  /* Dark theme (default) */
+  --gx-bg: #0F172A;
+  --gx-bg-alt: #1E293B;
+  --gx-bg-elevated: #253349;
+  --gx-text: #E2E8F0;
+  --gx-text-muted: #94A3B8;
+  --gx-text-bright: #F1F5F9;
+  --gx-border: #334155;
+  --gx-accent: #14B8A6;
+  --gx-accent-hover: #2DD4BF;
+  --gx-accent-dim: rgba(20, 184, 166, 0.1);
+  --gx-accent-15: rgba(20, 184, 166, 0.15);
+  --gx-indigo: #6366F1;
+  --gx-indigo-dim: rgba(99, 102, 241, 0.1);
+  --gx-success: #14B8A6;
+  --gx-warning: #F59E0B;
+  --gx-error: #EF4444;
+  --gx-nav-bg: rgba(15, 23, 42, 0.9);
+  --gx-code-bg: #0F172A;
+  --gx-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --gx-transition: 0.2s ease;
+  --gx-radius: 8px;
+  --gx-radius-lg: 12px;
+}
+
+[data-theme="light"] {
+  --gx-bg: #FFFFFF;
+  --gx-bg-alt: #F8FAFC;
+  --gx-bg-elevated: #F1F5F9;
+  --gx-text: #334155;
+  --gx-text-muted: #64748B;
+  --gx-text-bright: #0F172A;
+  --gx-border: #E2E8F0;
+  --gx-nav-bg: rgba(255, 255, 255, 0.9);
+  --gx-code-bg: #F1F5F9;
+  --gx-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
 
 @layer base {
   html {
     @apply antialiased;
   }
-  
+
   body {
-    @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background-color: var(--gx-bg);
+    color: var(--gx-text);
+    line-height: 1.7;
+    transition: background-color var(--gx-transition), color var(--gx-transition);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
   }
-  
+
   * {
-    @apply transition-colors duration-200;
+    transition: background-color var(--gx-transition), border-color var(--gx-transition), color var(--gx-transition);
+  }
+
+  code {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
   }
 }
 
 @layer components {
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-xl shadow-md dark:shadow-xl border border-gray-200 dark:border-gray-700 p-6;
+    background: var(--gx-bg-alt);
+    border: 1px solid var(--gx-border);
+    border-radius: var(--gx-radius-lg);
+    padding: 1.5rem;
+    transition: border-color var(--gx-transition);
   }
-  
+
+  .card:hover {
+    border-color: var(--gx-accent);
+  }
+
   .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: var(--gx-accent);
+    color: #0F172A;
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.7rem 1.4rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: all var(--gx-transition);
   }
-  
+
+  .btn-primary:hover {
+    background: var(--gx-accent-hover);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   .btn-secondary {
-    @apply bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium px-4 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-200;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: transparent;
+    color: var(--gx-text);
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.7rem 1.4rem;
+    border-radius: 6px;
+    border: 1px solid var(--gx-border);
+    cursor: pointer;
+    transition: all var(--gx-transition);
   }
-  
+
+  .btn-secondary:hover {
+    border-color: var(--gx-accent);
+    color: var(--gx-accent);
+  }
+
   .input-field {
-    @apply bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent;
+    background: var(--gx-bg);
+    border: 1px solid var(--gx-border);
+    color: var(--gx-text);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    transition: border-color var(--gx-transition);
+    outline: none;
   }
-  
+
+  .input-field:focus {
+    border-color: var(--gx-accent);
+  }
+
   .label {
-    @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2;
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--gx-text-bright);
+    margin-bottom: 0.5rem;
   }
-  
+
   .section-title {
-    @apply text-xl font-bold text-gray-900 dark:text-gray-100 mb-4;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--gx-text-bright);
+    margin-bottom: 1rem;
+    letter-spacing: -0.01em;
   }
-  
+
   .progress-bar {
-    @apply bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-300;
+    background: var(--gx-accent);
+    height: 6px;
+    border-radius: 999px;
+    transition: width 0.3s ease;
   }
-  
+
   .progress-bg {
-    @apply bg-gray-200 dark:bg-gray-700 h-2 rounded-full overflow-hidden;
+    background: var(--gx-bg);
+    height: 6px;
+    border-radius: 999px;
+    overflow: hidden;
   }
-}
-
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
 /* Smooth scrolling */
@@ -75,13 +186,14 @@ html {
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-100 dark:bg-gray-800;
+  background: var(--gx-bg);
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 dark:bg-gray-600 rounded-full;
+  background: var(--gx-border);
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400 dark:bg-gray-500;
+  background: var(--gx-text-muted);
 }

@@ -54,7 +54,7 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
 
     renderer.setTooltipCallback((info) => setTooltip(info));
     renderer.render(containerRef.current, data);
-    
+
     // Get the SVG element
     const svg = containerRef.current.querySelector('svg');
     if (svg) {
@@ -71,7 +71,7 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
         const viewBox = svgRef.current.viewBox.baseVal;
         const cx = viewBox.width / 2;
         const cy = viewBox.height / 2;
-        
+
         // Apply transform with proper origin
         mainGroup.setAttribute(
           'transform',
@@ -117,11 +117,12 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
   return (
     <div className="relative">
       {/* Zoom Controls */}
-      <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 border border-gray-200 dark:border-gray-700">
+      <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2 rounded-lg p-2" style={{ background: 'var(--gx-bg-alt)', border: '1px solid var(--gx-border)', boxShadow: 'var(--gx-shadow)' }}>
         <button
           type="button"
           onClick={handleZoomIn}
-          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+          className="p-2 rounded transition-colors"
+          style={{ color: 'var(--gx-text)' }}
           title="Zoom In"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -131,7 +132,8 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
         <button
           type="button"
           onClick={handleZoomOut}
-          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+          className="p-2 rounded transition-colors"
+          style={{ color: 'var(--gx-text)' }}
           title="Zoom Out"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -141,20 +143,21 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
         <button
           type="button"
           onClick={handleResetView}
-          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+          className="p-2 rounded transition-colors"
+          style={{ color: 'var(--gx-text)' }}
           title="Reset View"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
         </button>
-        <div className="text-xs text-center text-gray-600 dark:text-gray-400 py-1 border-t border-gray-200 dark:border-gray-700">
+        <div className="text-xs text-center py-1" style={{ color: 'var(--gx-text-muted)', borderTop: '1px solid var(--gx-border)' }}>
           {Math.round(zoom * 100)}%
         </div>
       </div>
 
-      <div 
-        ref={containerRef} 
+      <div
+        ref={containerRef}
         className="w-full overflow-hidden cursor-move"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -162,26 +165,30 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
         onMouseLeave={handleMouseUp}
         style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
       />
-      
-      
+
+
       {tooltip && tooltip.x != null && tooltip.y != null && (
         <div
-          className="fixed bg-black bg-opacity-90 text-white text-sm rounded px-3 py-2 pointer-events-none z-50"
+          className="fixed text-sm rounded px-3 py-2 pointer-events-none z-50"
           style={{
             left: tooltip.x + 10,
-            top: tooltip.y + 10
+            top: tooltip.y + 10,
+            background: 'var(--gx-bg)',
+            color: 'var(--gx-text)',
+            border: '1px solid var(--gx-border)',
+            boxShadow: 'var(--gx-shadow)',
           }}
         >
           {tooltip.type === 'gc-content' ? (
             <>
-              <div className="font-semibold">GC Content</div>
+              <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>GC Content</div>
               <div>Position: {tooltip.position?.toLocaleString()}</div>
               <div>Window: {tooltip.windowSize?.toLocaleString()} bp</div>
               <div>GC: {tooltip.gc}%</div>
             </>
           ) : (
             <>
-              <div className="font-semibold">{tooltip.queryName}</div>
+              <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>{tooltip.queryName}</div>
               {tooltip.start != null && tooltip.end != null && (
                 <div>Position: {tooltip.start.toLocaleString()} - {tooltip.end.toLocaleString()}</div>
               )}

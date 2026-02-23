@@ -33,7 +33,7 @@ export default function ParameterControls({
           step="100"
           className="input-field w-full disabled:opacity-50 disabled:cursor-not-allowed"
         />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-1 text-xs" style={{ color: 'var(--gx-text-muted)' }}>
           Resolution of the circular plot (100-10000)
         </p>
       </div>
@@ -54,7 +54,7 @@ export default function ParameterControls({
           max="100"
           className="input-field w-full disabled:opacity-50 disabled:cursor-not-allowed"
         />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-1 text-xs" style={{ color: 'var(--gx-text-muted)' }}>
           Filter alignments below this identity (50-100)
         </p>
       </div>
@@ -76,7 +76,7 @@ export default function ParameterControls({
           step="50"
           className="input-field w-full disabled:opacity-50 disabled:cursor-not-allowed"
         />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-1 text-xs" style={{ color: 'var(--gx-text-muted)' }}>
           Filter short alignments (50-5000)
         </p>
       </div>
@@ -88,11 +88,12 @@ export default function ParameterControls({
             checked={params.forceAlignment}
             onChange={(e) => setParams({ ...params, forceAlignment: e.target.checked })}
             disabled={disabled}
-            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-4 h-4 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ accentColor: 'var(--gx-accent)' }}
           />
           <span className="label mb-0">Force Re-alignment</span>
         </label>
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-1 text-xs" style={{ color: 'var(--gx-text-muted)' }}>
           Re-run alignment even if cached results exist
         </p>
       </div>
@@ -109,7 +110,7 @@ export default function ParameterControls({
           placeholder="e.g., --step=20 --seed=match12"
           className="input-field w-full disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm"
         />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-1 text-xs" style={{ color: 'var(--gx-text-muted)' }}>
           Custom LASTZ parameters (default: --ambiguous=iupac --gapped --chain)
         </p>
       </div>

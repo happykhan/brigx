@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import ThemeToggle from '@/components/ThemeToggle'
 
 export const metadata: Metadata = {
   title: 'BRIGX - Browser-Based Ring Image Generator',
@@ -13,9 +12,19 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            var theme = localStorage.getItem('gx-theme');
+            if (!theme) {
+              theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+            }
+            document.documentElement.setAttribute('data-theme', theme);
+          })();
+        `}} />
+      </head>
       <body className="h-full">
-        <ThemeToggle />
         {children}
       </body>
     </html>

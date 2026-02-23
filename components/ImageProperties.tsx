@@ -39,30 +39,30 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
           value={config.title}
           onChange={(e) => handleChange('title', e.target.value)}
           placeholder="Enter plot title..."
-          className="input"
+          className="input-field w-full"
         />
       </div>
 
-      <div className="flex items-center justify-between mb-3 border-t border-gray-200 dark:border-gray-700 pt-4">
+      <div className="flex items-center justify-between mb-3 pt-4" style={{ borderTop: '1px solid var(--gx-border)' }}>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+            style={{ color: 'var(--gx-text-muted)' }}
           >
-            {isOpen ? '▼' : '▶'}
+            {isOpen ? '\u25BC' : '\u25B6'}
           </button>
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100">Image Properties</h3>
+          <h3 className="font-semibold" style={{ color: 'var(--gx-text-bright)' }}>Image Properties</h3>
         </div>
       </div>
-      
+
       {isOpen && (
         <div className="space-y-4">
           {/* Ring Dimensions */}
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-1">
+            <h4 className="text-sm font-semibold pb-1" style={{ color: 'var(--gx-text-bright)', borderBottom: '1px solid var(--gx-border)' }}>
               Ring Dimensions
             </h4>
-            
+
             <div>
               <label className="label">
                 Inner Radius: {config.innerRadius}px
@@ -74,7 +74,8 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
                 step="10"
                 value={config.innerRadius}
                 onChange={(e) => handleChange('innerRadius', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                style={{ accentColor: 'var(--gx-accent)', background: 'var(--gx-bg)' }}
               />
             </div>
 
@@ -89,9 +90,10 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
                 step="5"
                 value={config.ringWidth}
                 onChange={(e) => handleChange('ringWidth', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                style={{ accentColor: 'var(--gx-accent)', background: 'var(--gx-bg)' }}
               />
-              <span className="text-xs text-gray-500 dark:text-gray-400">Alignment rings</span>
+              <span className="text-xs" style={{ color: 'var(--gx-text-muted)' }}>Alignment rings</span>
             </div>
 
             <div>
@@ -105,9 +107,10 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
                 step="5"
                 value={config.gcRingWidth}
                 onChange={(e) => handleChange('gcRingWidth', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                style={{ accentColor: 'var(--gx-accent)', background: 'var(--gx-bg)' }}
               />
-              <span className="text-xs text-gray-500 dark:text-gray-400">GC Content & Skew rings</span>
+              <span className="text-xs" style={{ color: 'var(--gx-text-muted)' }}>GC Content & Skew rings</span>
             </div>
 
             <div>
@@ -121,17 +124,18 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
                 step="1"
                 value={config.ringSpacing}
                 onChange={(e) => handleChange('ringSpacing', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                style={{ accentColor: 'var(--gx-accent)', background: 'var(--gx-bg)' }}
               />
             </div>
           </div>
 
           {/* Font Sizes */}
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-1">
+            <h4 className="text-sm font-semibold pb-1" style={{ color: 'var(--gx-text-bright)', borderBottom: '1px solid var(--gx-border)' }}>
               Font Sizes
             </h4>
-            
+
             <div>
               <label className="label">
                 Legend Font: {config.legendFontSize}px
@@ -143,7 +147,8 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
                 step="1"
                 value={config.legendFontSize}
                 onChange={(e) => handleChange('legendFontSize', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                style={{ accentColor: 'var(--gx-accent)', background: 'var(--gx-bg)' }}
               />
             </div>
 
@@ -158,7 +163,8 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
                 step="1"
                 value={config.scaleFontSize}
                 onChange={(e) => handleChange('scaleFontSize', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                style={{ accentColor: 'var(--gx-accent)', background: 'var(--gx-bg)' }}
               />
             </div>
 
@@ -173,7 +179,8 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
                 step="2"
                 value={config.titleFontSize}
                 onChange={(e) => handleChange('titleFontSize', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                style={{ accentColor: 'var(--gx-accent)', background: 'var(--gx-bg)' }}
               />
             </div>
             <div>
@@ -187,9 +194,11 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
                 step="1"
                 value={config.labelFontSize}
                 onChange={(e) => handleChange('labelFontSize', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                style={{ accentColor: 'var(--gx-accent)', background: 'var(--gx-bg)' }}
               />
-            </div>          </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

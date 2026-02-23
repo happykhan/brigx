@@ -59,7 +59,7 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
     if (!files) return;
     const ring = rings.find(r => r.id === id);
     if (!ring) return;
-    
+
     const newFiles = Array.from(files);
     updateRing(id, { files: [...ring.files, ...newFiles] });
   };
@@ -67,7 +67,7 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
   const removeFileFromRing = (ringId: string, fileIndex: number) => {
     const ring = rings.find(r => r.id === ringId);
     if (!ring) return;
-    
+
     updateRing(ringId, { files: ring.files.filter((_, i) => i !== fileIndex) });
   };
 
@@ -75,7 +75,7 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
     const newRings = [...rings];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= rings.length) return;
-    
+
     [newRings[index], newRings[targetIndex]] = [newRings[targetIndex], newRings[index]];
     setRings(newRings);
   };
@@ -83,20 +83,20 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Ring Configuration</h3>
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--gx-text-bright)' }}>Ring Configuration</h3>
         <button
           type="button"
           onClick={addNewRing}
-          className="text-sm btn-secondary px-3 py-1"
+          className="btn-secondary text-xs px-3 py-1"
         >
           + Add New Ring
         </button>
       </div>
 
       {rings.length === 0 && (
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+        <div className="text-center py-8 rounded-lg" style={{ color: 'var(--gx-text-muted)', border: '2px dashed var(--gx-border)' }}>
           <p className="mb-2">No rings configured</p>
-          <p className="text-sm">Click "Add New Ring" to start</p>
+          <p className="text-sm">Click &quot;Add New Ring&quot; to start</p>
         </div>
       )}
 
@@ -104,7 +104,8 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
         {rings.map((ring, index) => (
           <div
             key={ring.id}
-            className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700/50"
+            className="rounded-lg p-4"
+            style={{ border: '1px solid var(--gx-border)', background: 'var(--gx-bg-elevated)' }}
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2 flex-1">
@@ -113,17 +114,19 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
                     type="button"
                     onClick={() => moveRing(index, 'up')}
                     disabled={index === 0}
-                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="disabled:opacity-30 disabled:cursor-not-allowed"
+                    style={{ color: 'var(--gx-text-muted)' }}
                   >
-                    ▲
+                    &#9650;
                   </button>
                   <button
                     type="button"
                     onClick={() => moveRing(index, 'down')}
                     disabled={index === rings.length - 1}
-                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="disabled:opacity-30 disabled:cursor-not-allowed"
+                    style={{ color: 'var(--gx-text-muted)' }}
                   >
-                    ▼
+                    &#9660;
                   </button>
                 </div>
                 <input
@@ -137,12 +140,12 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
                   <button
                     type="button"
                     onClick={() => setColorPickerOpen(colorPickerOpen === ring.id ? null : ring.id)}
-                    className="w-10 h-8 rounded border-2 border-gray-300 dark:border-gray-500 cursor-pointer"
-                    style={{ backgroundColor: ring.color }}
+                    className="w-10 h-8 rounded cursor-pointer"
+                    style={{ backgroundColor: ring.color, border: '2px solid var(--gx-border)' }}
                     title="Ring color"
                   />
                   {colorPickerOpen === ring.id && (
-                    <div className="absolute top-10 right-0 z-10 p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg">
+                    <div className="absolute top-10 right-0 z-10 p-2 rounded-lg" style={{ background: 'var(--gx-bg-alt)', border: '1px solid var(--gx-border)', boxShadow: 'var(--gx-shadow)' }}>
                       <input
                         type="color"
                         value={ring.color}
@@ -156,16 +159,17 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
               <button
                 type="button"
                 onClick={() => removeRing(ring.id)}
-                className="text-red-500 hover:text-red-700 dark:hover:text-red-400 ml-2"
+                className="ml-2"
+                style={{ color: 'var(--gx-error)' }}
                 title="Remove ring"
               >
-                ✕
+                &#10005;
               </button>
             </div>
 
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Upper Threshold (%)</label>
+                <label className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>Upper Threshold (%)</label>
                 <input
                   type="number"
                   min="50"
@@ -176,7 +180,7 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Lower Threshold (%)</label>
+                <label className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>Lower Threshold (%)</label>
                 <input
                   type="number"
                   min="50"
@@ -189,9 +193,9 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
             </div>
 
             <div className="mb-3">
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                Custom Ring Width (px) 
-                <span className="text-gray-500 ml-1">(leave empty for default)</span>
+              <label className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>
+                Custom Ring Width (px)
+                <span className="ml-1" style={{ color: 'var(--gx-text-muted)', opacity: 0.7 }}>(leave empty for default)</span>
               </label>
               <input
                 type="number"
@@ -206,7 +210,7 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                <label className="block text-xs font-medium" style={{ color: 'var(--gx-text-muted)' }}>
                   Files ({ring.files.length})
                 </label>
                 <div className="flex gap-2">
@@ -214,12 +218,13 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
                     <button
                       type="button"
                       onClick={() => onEditAnnotations(ring.id)}
-                      className="text-xs text-purple-600 dark:text-purple-400 hover:underline"
+                      className="text-xs hover:underline"
+                      style={{ color: 'var(--gx-indigo)' }}
                     >
-                      📝 Annotations
+                      Annotations
                     </button>
                   )}
-                  <label className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
+                  <label className="text-xs cursor-pointer hover:underline" style={{ color: 'var(--gx-accent)' }}>
                     + Add Files
                     <input
                       type="file"
@@ -231,21 +236,23 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
                   </label>
                 </div>
               </div>
-              
+
               {ring.files.length > 0 && (
                 <div className="space-y-1">
                   {ring.files.map((file, fileIndex) => (
                     <div
                       key={fileIndex}
-                      className="flex items-center justify-between text-xs bg-white dark:bg-gray-800 px-2 py-1 rounded border border-gray-200 dark:border-gray-600"
+                      className="flex items-center justify-between text-xs px-2 py-1 rounded"
+                      style={{ background: 'var(--gx-bg-alt)', border: '1px solid var(--gx-border)' }}
                     >
-                      <span className="truncate flex-1" title={file.name}>{file.name}</span>
+                      <span className="truncate flex-1" title={file.name} style={{ color: 'var(--gx-text)' }}>{file.name}</span>
                       <button
                         type="button"
                         onClick={() => removeFileFromRing(ring.id, fileIndex)}
-                        className="text-red-500 hover:text-red-700 ml-2"
+                        className="ml-2"
+                        style={{ color: 'var(--gx-error)' }}
                       >
-                        ✕
+                        &#10005;
                       </button>
                     </div>
                   ))}

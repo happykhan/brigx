@@ -1,7 +1,7 @@
 import type { Config } from 'tailwindcss'
 
 const config: Config = {
-  darkMode: 'class',
+  darkMode: ['selector', '[data-theme="dark"]'],
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -10,14 +10,25 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        primary: {
-          light: '#3b82f6',
-          dark: '#60a5fa',
+        gx: {
+          bg: 'var(--gx-bg)',
+          'bg-alt': 'var(--gx-bg-alt)',
+          'bg-elevated': 'var(--gx-bg-elevated)',
+          text: 'var(--gx-text)',
+          'text-muted': 'var(--gx-text-muted)',
+          'text-bright': 'var(--gx-text-bright)',
+          border: 'var(--gx-border)',
+          accent: 'var(--gx-accent)',
+          'accent-hover': 'var(--gx-accent-hover)',
+          indigo: 'var(--gx-indigo)',
+          success: 'var(--gx-success)',
+          warning: 'var(--gx-warning)',
+          error: 'var(--gx-error)',
         },
-        background: {
-          light: '#f9fafb',
-          dark: '#111827',
-        },
+      },
+      fontFamily: {
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in',

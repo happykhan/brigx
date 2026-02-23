@@ -27,10 +27,10 @@ export default function ConsoleLog({ logs, progress }: ConsoleLogProps) {
     <div className="card mt-6">
       {/* Progress Bar */}
       {progress && progress.step !== 'idle' && progress.step !== 'Complete!' && (
-        <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="mb-4 pb-4" style={{ borderBottom: '1px solid var(--gx-border)' }}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{progress.step}</span>
-            <span className="text-sm text-gray-500 dark:text-gray-400">{progress.percent}%</span>
+            <span className="text-sm font-medium" style={{ color: 'var(--gx-text-bright)' }}>{progress.step}</span>
+            <span className="text-sm" style={{ color: 'var(--gx-text-muted)' }}>{progress.percent}%</span>
           </div>
           <div className="progress-bg">
             <div
@@ -39,25 +39,25 @@ export default function ConsoleLog({ logs, progress }: ConsoleLogProps) {
             />
           </div>
           {progress.message && (
-            <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">{progress.message}</div>
+            <div className="mt-2 text-xs" style={{ color: 'var(--gx-text-muted)' }}>{progress.message}</div>
           )}
         </div>
       )}
-      
+
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+            style={{ color: 'var(--gx-text-muted)' }}
           >
-            {isOpen ? '▼' : '▶'}
+            {isOpen ? '\u25BC' : '\u25B6'}
           </button>
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100">Debug Console</h3>
-          <span className="text-xs text-gray-500 dark:text-gray-400">({logs.length} messages)</span>
+          <h3 className="font-semibold" style={{ color: 'var(--gx-text-bright)' }}>Debug Console</h3>
+          <span className="text-xs" style={{ color: 'var(--gx-text-muted)' }}>({logs.length} messages)</span>
         </div>
         <button
           onClick={copyToClipboard}
-          className="btn-secondary text-xs px-3 py-1 flex items-center gap-1"
+          className="btn-secondary text-xs px-3 py-1"
           disabled={logs.length === 0}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -66,14 +66,15 @@ export default function ConsoleLog({ logs, progress }: ConsoleLogProps) {
           Copy
         </button>
       </div>
-      
+
       {isOpen && (
         <div
           ref={logRef}
-          className="bg-gray-900 dark:bg-black text-green-400 font-mono text-xs p-4 rounded max-h-96 overflow-y-auto"
+          className="font-mono text-xs p-4 rounded max-h-96 overflow-y-auto"
+          style={{ background: 'var(--gx-code-bg)', color: 'var(--gx-accent)', border: '1px solid var(--gx-border)' }}
         >
           {logs.length === 0 ? (
-            <div className="text-gray-500">No logs yet...</div>
+            <div style={{ color: 'var(--gx-text-muted)' }}>No logs yet...</div>
           ) : (
             logs.map((log, index) => (
               <div key={index} className="mb-1 whitespace-pre-wrap break-all">

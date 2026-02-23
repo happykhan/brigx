@@ -39,24 +39,24 @@ export default function AnnotationEditor({
     try {
       const content = await file.text();
       const result = parseAnnotationFile(content, referenceLength);
-      
+
       if (result.errors.length > 0) {
         toast.error(`Parsed with ${result.errors.length} warning(s)`);
         console.warn('Annotation parsing warnings:', result.errors);
       }
-      
+
       if (result.annotations.length === 0) {
         toast.error('No valid annotations found in file');
         return;
       }
-      
+
       setLocalAnnotations([...localAnnotations, ...result.annotations]);
       toast.success(`Loaded ${result.annotations.length} annotation(s)`);
     } catch (error) {
       toast.error('Failed to parse annotation file');
       console.error('Parse error:', error);
     }
-    
+
     // Reset input
     e.target.value = '';
   };
@@ -132,7 +132,7 @@ export default function AnnotationEditor({
     const newAnnotations = [...localAnnotations];
     changes.forEach(([row, prop, oldValue, newValue]) => {
       if (oldValue === newValue) return;
-      
+
       const ann = newAnnotations[row];
       if (!ann) return;
 
@@ -154,16 +154,16 @@ export default function AnnotationEditor({
   }, [localAnnotations, referenceLength]);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(0, 0, 0, 0.6)' }}>
+      <div className="rounded-lg max-w-6xl w-full max-h-[90vh] flex flex-col" style={{ background: 'var(--gx-bg-alt)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
         {/* Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+        <div className="p-4 flex justify-between items-center" style={{ borderBottom: '1px solid var(--gx-border)' }}>
+          <h2 className="text-xl font-bold" style={{ color: 'var(--gx-text-bright)' }}>
             Annotations for {ringName}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            style={{ color: 'var(--gx-text-muted)' }}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -172,8 +172,8 @@ export default function AnnotationEditor({
         </div>
 
         {/* Toolbar */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex gap-2 flex-wrap">
-          <label className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 cursor-pointer">
+        <div className="p-4 flex gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--gx-border)' }}>
+          <label className="btn-primary cursor-pointer text-sm">
             <input
               type="file"
               accept=".csv,.tsv,.txt"
@@ -184,24 +184,25 @@ export default function AnnotationEditor({
           </label>
           <button
             onClick={handleAddNew}
-            className="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+            className="btn-secondary text-sm"
           >
             Add New
           </button>
           <button
             onClick={handleDeleteSelected}
-            className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+            className="btn-secondary text-sm"
+            style={{ borderColor: 'var(--gx-error)', color: 'var(--gx-error)' }}
           >
             Delete Selected
           </button>
           <button
             onClick={handleExport}
             disabled={localAnnotations.length === 0}
-            className="px-3 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50"
+            className="btn-secondary text-sm disabled:opacity-50"
           >
             Export TSV
           </button>
-          <div className="ml-auto text-sm text-gray-600 dark:text-gray-400 self-center">
+          <div className="ml-auto text-sm self-center" style={{ color: 'var(--gx-text-muted)' }}>
             {localAnnotations.length} annotation(s) | Reference: {referenceLength.toLocaleString()} bp
           </div>
         </div>
@@ -238,16 +239,16 @@ export default function AnnotationEditor({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+        <div className="p-4 flex justify-end gap-2" style={{ borderTop: '1px solid var(--gx-border)' }}>
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="btn-secondary"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="btn-primary"
           >
             Save & Close
           </button>

@@ -58,7 +58,7 @@ export default function AboutPage() {
 
               <h2 className="text-2xl font-semibold mt-8 mb-4" style={{ color: 'var(--gx-text)' }}>How It Works</h2>
               <p className="mb-4" style={{ color: 'var(--gx-text)' }}>
-                BRIGX uses LASTZ, a powerful DNA sequence alignment tool, compiled to WebAssembly. This allows
+                BRIGX uses BLAST (Basic Local Alignment Search Tool), compiled to WebAssembly. This allows
                 sophisticated bioinformatics analysis to run directly in your web browser without requiring any
                 server-side processing or data upload.
               </p>
@@ -71,7 +71,7 @@ export default function AboutPage() {
 
               <h2 className="text-2xl font-semibold mt-8 mb-4" style={{ color: 'var(--gx-text)' }}>Technology Stack</h2>
               <ul className="list-disc pl-6 space-y-2 mb-4" style={{ color: 'var(--gx-text)' }}>
-                <li><strong style={{ color: 'var(--gx-text)' }}>LASTZ:</strong> DNA sequence alignment tool (v1.04.52)</li>
+                <li><strong style={{ color: 'var(--gx-text)' }}>BLAST:</strong> Sequence alignment (formatdb + blastn)</li>
                 <li><strong style={{ color: 'var(--gx-text)' }}>WebAssembly:</strong> High-performance browser execution</li>
                 <li><strong style={{ color: 'var(--gx-text)' }}>Next.js:</strong> React framework for the user interface</li>
                 <li><strong style={{ color: 'var(--gx-text)' }}>Web Workers:</strong> Parallel processing for faster alignments</li>

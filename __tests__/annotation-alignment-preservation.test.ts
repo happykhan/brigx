@@ -57,7 +57,7 @@ function createMockRingData(queryId: string, queryName: string): RingData {
       genomeCoverage: 50,
       totalAlignedBases: 1000
     },
-    lastzOutput: 'mock lastz output',
+    alignmentOutput: 'mock alignment output',
     annotations: []
   };
 }
@@ -128,7 +128,7 @@ describe('Annotation and Alignment Preservation', () => {
         hits: partialAlignmentResult.hits,
         windows: partialAlignmentResult.windows,
         statistics: partialAlignmentResult.statistics,
-        lastzOutput: partialAlignmentResult.lastzOutput,
+        alignmentOutput: partialAlignmentResult.alignmentOutput,
         annotations: ringWithAnnotations.annotations || []
       };
 
@@ -164,7 +164,7 @@ describe('Annotation and Alignment Preservation', () => {
         hits: finalAlignmentResult.hits,
         windows: finalAlignmentResult.windows,
         statistics: finalAlignmentResult.statistics,
-        lastzOutput: finalAlignmentResult.lastzOutput,
+        alignmentOutput: finalAlignmentResult.alignmentOutput,
         annotations: cachedRing.annotations || []
       };
 
@@ -190,7 +190,7 @@ describe('Annotation and Alignment Preservation', () => {
           genomeCoverage: 60,
           totalAlignedBases: 2000
         },
-        lastzOutput: 'existing lastz output',
+        alignmentOutput: 'existing alignment output',
         annotations: mockAnnotations
       };
 
@@ -215,7 +215,7 @@ describe('Annotation and Alignment Preservation', () => {
         hits: ringWithBoth.hits || [],
         windows: ringWithBoth.windows || [],
         statistics: ringWithBoth.statistics || { meanIdentity: 0, genomeCoverage: 0, totalAlignedBases: 0 },
-        lastzOutput: ringWithBoth.lastzOutput || ''
+        alignmentOutput: ringWithBoth.alignmentOutput || ''
       };
 
       // Assertions
@@ -225,7 +225,7 @@ describe('Annotation and Alignment Preservation', () => {
       expect(updatedRing.hits[0].identity).toBe(92);
       expect(updatedRing.windows).toHaveLength(1);
       expect(updatedRing.statistics.meanIdentity).toBe(92);
-      expect(updatedRing.lastzOutput).toBe('existing lastz output');
+      expect(updatedRing.alignmentOutput).toBe('existing alignment output');
     });
 
     it('should handle annotation deletion without losing alignment data', () => {
@@ -243,7 +243,7 @@ describe('Annotation and Alignment Preservation', () => {
         hits: ringWithBoth.hits || [],
         windows: ringWithBoth.windows || [],
         statistics: ringWithBoth.statistics || { meanIdentity: 0, genomeCoverage: 0, totalAlignedBases: 0 },
-        lastzOutput: ringWithBoth.lastzOutput || ''
+        alignmentOutput: ringWithBoth.alignmentOutput || ''
       };
 
       expect(updatedRing.annotations).toHaveLength(1);

@@ -20,7 +20,7 @@ export interface AlignmentResult {
   hits: AlignmentHit[];
   metadata: {
     timestamp: number;
-    lastzVersion: string;
+    alignerVersion: string;
     parameters: Record<string, any>;
   };
 }
@@ -52,7 +52,7 @@ export interface RingData {
   windows: WindowData[];
   annotations?: Annotation[]; // Custom annotations for this ring
   customWidth?: number; // Optional custom width override
-  lastzOutput?: string; // Raw LASTZ output for download
+  alignmentOutput?: string; // Raw alignment output for download
   statistics: {
     meanIdentity: number;
     genomeCoverage: number;
@@ -129,7 +129,7 @@ export interface PipelineParams {
   minAlignmentLength: number;
   colorScheme: string;
   forceAlignment: boolean;
-  lastzOptions?: string;
+  alignerOptions?: string;
 }
 
 export interface RingConfig {

@@ -27,7 +27,7 @@ export default function Home() {
     minAlignmentLength: 100,
     colorScheme: 'blue-red',
     forceAlignment: false,
-    lastzOptions: ''
+    alignerOptions: ''
   });
   const [progress, setProgress] = useState<ProgressUpdate>({ step: 'idle', percent: 0 });
   const [plotData, setPlotData] = useState<CircularPlotData | null>(null);
@@ -116,7 +116,7 @@ export default function Home() {
             hits: ringData.hits || [],
             windows: ringData.windows || [],
             statistics: ringData.statistics || { meanIdentity: 0, genomeCoverage: 0, totalAlignedBases: 0 },
-            lastzOutput: ringData.lastzOutput || ''
+            alignmentOutput: ringData.alignmentOutput || ''
           };
         }
         return ringData;
@@ -307,7 +307,7 @@ export default function Home() {
                     hits: newRingData.hits,
                     windows: newRingData.windows,
                     statistics: newRingData.statistics,
-                    lastzOutput: newRingData.lastzOutput,
+                    alignmentOutput: newRingData.alignmentOutput,
                     // CRITICAL: Preserve annotations from existing ring
                     annotations: existingRing.annotations || []
                   };
@@ -379,7 +379,7 @@ export default function Home() {
                 hits: newRingData.hits,
                 windows: newRingData.windows,
                 statistics: newRingData.statistics,
-                lastzOutput: newRingData.lastzOutput,
+                alignmentOutput: newRingData.alignmentOutput,
                 // CRITICAL: Preserve annotations from existing ring OR ringAnnotations state
                 annotations: existingRing.annotations || ringAnnotations[existingRing.queryId] || []
               };
@@ -624,10 +624,10 @@ export default function Home() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-3">
-                                {ring.lastzOutput && (
+                                {ring.alignmentOutput && (
                                   <button
                                     onClick={() => {
-                                      const blob = new Blob([ring.lastzOutput!], { type: 'text/plain' });
+                                      const blob = new Blob([ring.alignmentOutput!], { type: 'text/plain' });
                                       const url = URL.createObjectURL(blob);
                                       const a = document.createElement('a');
                                       a.href = url;
@@ -666,7 +666,7 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div className="flex flex-col md:flex-row justify-between items-center">
               <div className="text-sm mb-4 md:mb-0" style={{ color: 'var(--gx-text-muted)' }}>
-                <p className="font-semibold" style={{ color: 'var(--gx-text)' }}>BRIGX - Powered by LASTZ & WebAssembly</p>
+                <p className="font-semibold" style={{ color: 'var(--gx-text)' }}>BRIGX - Powered by BLAST & WebAssembly</p>
                 <p className="mt-1">All processing runs locally in your browser - no data leaves your computer</p>
               </div>
               <div className="flex gap-6 text-sm">

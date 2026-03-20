@@ -1,102 +1,142 @@
-// Alignment Worker - Runs LASTZ alignments
+// Alignment Worker - Runs BLAST (formatdb + blastall) alignments
 import type { AlignmentResult, AlignmentHit } from '../lib/types';
 
-let lastzModule: any = null;
+// Cache module factories and WASM binaries
+let formatdbFactory: any = null;
+let formatdbWasmBinary: ArrayBuffer | null = null;
+let blastallFactory: any = null;
+let blastallWasmBinary: ArrayBuffer | null = null;
 
-async function initializeLastz() {
-  if (lastzModule) {
-    console.log('[Alignment Worker] LASTZ already initialized');
-    return;
-  }
-  
-  console.log('[Alignment Worker] Starting LASTZ initialization...');
-  try {
-    console.log('[Alignment Worker] Loading LASTZ module directly...');
-    
-    // Load LASTZ module script as text and execute it
-    const response = await fetch('/wasm/lastz/1.04.52/lastz.js');
-    if (!response.ok) {
-      throw new Error(`Failed to fetch lastz.js: ${response.status}`);
-    }
-    
-    const moduleText = await response.text();
-    console.log('[LASTZ Worker] Module text loaded, length:', moduleText.length);
-    
-    // Create a function from the module text
-    const moduleFactory = new Function('Module', moduleText + '; return Module;');
-    
-    // Initialize the module with our configuration
-    const Module = moduleFactory({});
-    
-    // Initialize module with stdout/stderr capture
-    lastzModule = await Module({
-      locateFile: (path: string) => {
-        console.log('[LASTZ Worker] locateFile:', path);
-        if (path.endsWith('.wasm')) {
-          return '/wasm/lastz/1.04.52/lastz.wasm';
-        }
-        return '/wasm/lastz/1.04.52/' + path;
-      },
-      print: (text: string) => {
-        console.log('[LASTZ]', text);
-        if (!lastzModule) {
-          // During initialization, store in temp variable
-          if (!Module.out) Module.out = '';
-          Module.out += text + '\n';
-        } else {
-          // After initialization, append to module
-          lastzModule.out = (lastzModule.out || '') + text + '\n';
-        }
-      },
-      printErr: (text: string) => {
-        console.error('[LASTZ Error]', text);
-        if (!lastzModule) {
-          if (!Module.err) Module.err = '';
-          Module.err += text + '\n';
-        } else {
-          lastzModule.err = (lastzModule.err || '') + text + '\n';
-        }
-      }
-    });
-    
-    // Copy any initialization output
-    lastzModule.out = Module.out || '';
-    lastzModule.err = Module.err || '';
-    
-    console.log('[Alignment Worker] LASTZ initialized successfully');
-  } catch (error) {
-    console.error('[Alignment Worker] LASTZ initialization failed:', error);
-    throw error;
-  }
+// Cache the formatdb index for the current reference
+let cachedRefName: string | null = null;
+let cachedDbFiles: Map<string, Uint8Array> | null = null;
+
+async function loadModuleFactory(name: string): Promise<{ factory: any; wasmBinary: ArrayBuffer }> {
+  const [jsResponse, wasmResponse] = await Promise.all([
+    fetch(`/wasm/blast/${name}.js`),
+    fetch(`/wasm/blast/${name}.wasm`)
+  ]);
+
+  if (!jsResponse.ok) throw new Error(`Failed to fetch ${name}.js: ${jsResponse.status}`);
+  if (!wasmResponse.ok) throw new Error(`Failed to fetch ${name}.wasm: ${wasmResponse.status}`);
+
+  const [moduleText, wasmBinary] = await Promise.all([
+    jsResponse.text(),
+    wasmResponse.arrayBuffer()
+  ]);
+
+  const moduleWrapper = new Function('Module', moduleText + '; return Module;');
+  const factory = moduleWrapper({});
+  return { factory, wasmBinary };
 }
 
-function parseLastzOutput(output: string, queryName: string): AlignmentResult {
+async function initializeBlast() {
+  if (formatdbFactory && blastallFactory) {
+    return;
+  }
+
+  console.log('[Alignment Worker] Loading BLAST modules...');
+  const [formatdb, blastall] = await Promise.all([
+    loadModuleFactory('formatdb'),
+    loadModuleFactory('blastall')
+  ]);
+
+  formatdbFactory = formatdb.factory;
+  formatdbWasmBinary = formatdb.wasmBinary;
+  blastallFactory = blastall.factory;
+  blastallWasmBinary = blastall.wasmBinary;
+
+  console.log('[Alignment Worker] BLAST modules ready');
+}
+
+async function createModuleInstance(factory: any, wasmBinary: ArrayBuffer): Promise<any> {
+  let stdout: string[] = [];
+  let stderr: string[] = [];
+  const mod = await factory({
+    wasmBinary: wasmBinary.slice(0),
+    print: (text: string) => { stdout.push(text); },
+    printErr: (text: string) => { stderr.push(text); },
+    noInitialRun: true
+  });
+  mod._stdout = stdout;
+  mod._stderr = stderr;
+  return mod;
+}
+
+async function buildDatabase(referenceName: string, referenceSeq: string): Promise<Map<string, Uint8Array>> {
+  // Return cached index if reference hasn't changed
+  if (cachedRefName === referenceName && cachedDbFiles) {
+    console.log('[Alignment Worker] Using cached formatdb index');
+    return cachedDbFiles;
+  }
+
+  console.log('[Alignment Worker] Building formatdb index...');
+  const t1 = performance.now();
+
+  const db = await createModuleInstance(formatdbFactory!, formatdbWasmBinary!);
+  db.FS.writeFile('/ref.fna', `>${referenceName}\n${referenceSeq}\n`);
+
+  try {
+    db.callMain(['-i', '/ref.fna', '-p', 'F', '-n', '/ref']);
+  } catch (e) {
+    // formatdb calls exit() which may throw
+  }
+
+  const errOutput = db._stderr.join('\n');
+  if (errOutput.includes('FATAL') || errOutput.includes('ERROR')) {
+    throw new Error(`formatdb failed: ${errOutput}`);
+  }
+
+  // Collect database files
+  const dbFiles = new Map<string, Uint8Array>();
+  const allFiles = db.FS.readdir('/') as string[];
+  for (const f of allFiles) {
+    if (f.startsWith('ref.')) {
+      dbFiles.set(f, db.FS.readFile('/' + f));
+    }
+  }
+
+  const t2 = performance.now();
+  console.log(`[Alignment Worker] formatdb: ${dbFiles.size} files, ${Math.round(t2 - t1)}ms`);
+
+  if (dbFiles.size === 0) {
+    throw new Error('formatdb produced no output files');
+  }
+
+  // Cache for reuse with other queries against same reference
+  cachedRefName = referenceName;
+  cachedDbFiles = dbFiles;
+
+  return dbFiles;
+}
+
+function parseBlast6Output(output: string, queryName: string, refLength: number): AlignmentResult {
   const hits: AlignmentHit[] = [];
   const lines = output.trim().split('\n').filter(Boolean);
-  
-  console.log(`[Alignment Worker] Parsing ${lines.length} lines of BLASTN output`);
-  
+
   for (const line of lines) {
-    // Skip header lines and empty lines
     if (line.startsWith('#') || line.trim() === '') continue;
-    
-    // BLASTN format is space-separated with columns:
-    // Query_id Subject_id %_identity alignment_length mismatches gap_opens q_start q_end s_start s_end e-value bit_score
+
     const fields = line.trim().split(/\s+/);
-    if (fields.length < 12) {
-      console.log('[Alignment Worker] Skipping line with insufficient fields:', line);
-      continue;
-    }
-    
-    const [queryId, refId, identity, alignLen, , , qStart, qEnd, sStart, sEnd] = fields;
-    
-    // Determine strand based on coordinate order
-    const strand = parseInt(qStart) <= parseInt(qEnd) ? '+' : '-';
-    const queryStart = Math.min(parseInt(qStart), parseInt(qEnd)) - 1; // Convert to 0-based
-    const queryEnd = Math.max(parseInt(qStart), parseInt(qEnd));
-    const refStart = Math.min(parseInt(sStart), parseInt(sEnd)) - 1;
-    const refEnd = Math.max(parseInt(sStart), parseInt(sEnd));
-    
+    if (fields.length < 12) continue;
+
+    const [, , identity, alignLen, , , qStart, qEnd, sStart, sEnd, , bitScore] = fields;
+
+    // BLAST m8: coordinates are 1-based
+    // Strand is determined by whether sstart > send
+    const sS = parseInt(sStart);
+    const sE = parseInt(sEnd);
+    const qS = parseInt(qStart);
+    const qE = parseInt(qEnd);
+
+    const strand = sS <= sE ? '+' : '-';
+    const refStart = Math.min(sS, sE) - 1; // Convert to 0-based
+    const refEnd = Math.max(sS, sE);
+    const queryStart = Math.min(qS, qE) - 1;
+    const queryEnd = Math.max(qS, qE);
+
+    if (refEnd > refLength) continue;
+
     hits.push({
       queryName,
       refStart,
@@ -105,21 +145,22 @@ function parseLastzOutput(output: string, queryName: string): AlignmentResult {
       queryEnd,
       percentIdentity: parseFloat(identity),
       alignmentLength: parseInt(alignLen),
-      strand: strand as '+' | '-'
+      strand: strand as '+' | '-',
+      score: parseFloat(bitScore)
     });
   }
-  
-  console.log(`[Alignment Worker] Parsed ${hits.length} hits from BLASTN output`);
-  
+
+  console.log(`[Alignment Worker] Parsed ${hits.length} hits from ${lines.length} BLAST6 lines`);
+
   return {
     queryId: `query_${Date.now()}`,
     queryName,
-    queryLength: 0, // Will be filled later
+    queryLength: 0,
     totalHits: hits.length,
     hits,
     metadata: {
       timestamp: Date.now(),
-      lastzVersion: '1.04.52',
+      alignerVersion: 'BLAST',
       parameters: {}
     }
   };
@@ -132,67 +173,55 @@ async function alignGenomes(
   querySeq: string,
   params: any
 ): Promise<{ alignmentResult: AlignmentResult; rawOutput: string }> {
-  console.log(`[Alignment Worker] alignGenomes called for ${queryName}`);
-  await initializeLastz();
-  
-  // Reset stdout/stderr
-  lastzModule.out = '';
-  lastzModule.err = '';
-  
-  console.log('[Alignment Worker] Writing sequences to virtual filesystem...');
-  // Write sequences to virtual filesystem using Emscripten FS API
-  const refFasta = `>${referenceName}\n${referenceSeq}\n`;
-  const queryFasta = `>${queryName}\n${querySeq}\n`;
-  
-  lastzModule.FS.writeFile('/reference.fasta', refFasta);
-  lastzModule.FS.writeFile('/query.fasta', queryFasta);
-  console.log('[Alignment Worker] Files written, executing LASTZ...');
-  
-  // Run LASTZ with BLASTN format for parsing
-  const args = [
-    '/reference.fasta',
-    '/query.fasta',
-    '--format=BLASTN'
-  ];
-  
-  // Add custom LASTZ options if provided, otherwise use defaults
-  if (params.lastzOptions && params.lastzOptions.trim()) {
-    console.log(`[Alignment Worker] Using custom LASTZ options: ${params.lastzOptions}`);
-    const customArgs = params.lastzOptions.trim().split(/\s+/);
+  console.log(`[Alignment Worker] alignGenomes: ${queryName} (${querySeq.length}bp query, ${referenceSeq.length}bp ref)`);
+  await initializeBlast();
+
+  const refUpper = referenceSeq.toUpperCase();
+  const queryUpper = querySeq.toUpperCase();
+
+  // Step 1: Build formatdb index (cached if same reference)
+  const dbFiles = await buildDatabase(referenceName, refUpper);
+
+  // Step 2: Run blastall (blastn) alignment
+  console.log('[Alignment Worker] Running blastn...');
+  const t1 = performance.now();
+
+  const al = await createModuleInstance(blastallFactory!, blastallWasmBinary!);
+
+  // Write database files into blastall's filesystem
+  for (const [name, data] of dbFiles) {
+    al.FS.writeFile('/' + name, data);
+  }
+  al.FS.writeFile('/query.fna', `>${queryName}\n${queryUpper}\n`);
+
+  const args = ['-p', 'blastn', '-d', '/ref', '-i', '/query.fna', '-m', '8', '-e', '1e-5', '-F', 'F', '-W', '28', '-b', '1000000', '-v', '0'];
+
+  // Add custom blastall options if provided
+  if (params?.alignerOptions?.trim()) {
+    const customArgs = params.alignerOptions.trim().split(/\s+/);
     args.push(...customArgs);
-  } else {
-    // Default parameters
-    console.log('[Alignment Worker] Using default LASTZ options');
-    args.push('--ambiguous=iupac', '--gapped', '--chain');
   }
-  
-  console.log(`[Alignment Worker] Calling with args:`, args);
-  
-  // Call main function
+
   try {
-    lastzModule.callMain(args);
-    console.log(`[Alignment Worker] LASTZ execution complete`);
+    al.callMain(args);
   } catch (e) {
-    // LASTZ exits with code 0 but throws, capture stdout anyway
-    console.log(`[Alignment Worker] LASTZ execution finished (exit throw caught)`);
+    // blastall calls exit() which may throw
   }
-  
-  // Check for errors
-  const errorOutput = lastzModule.err || '';
-  if (errorOutput && errorOutput.toLowerCase().includes('failure')) {
-    console.error('[Alignment Worker] LASTZ error detected:', errorOutput);
-    throw new Error(`LASTZ execution failed: ${errorOutput}`);
+
+  const t2 = performance.now();
+  console.log(`[Alignment Worker] blastn: ${Math.round(t2 - t1)}ms`);
+
+  const errOutput = al._stderr.join('\n');
+  if (errOutput.includes('FATAL') || errOutput.includes('ERROR')) {
+    throw new Error(`blastall failed: ${errOutput}`);
   }
-  
-  // Get the captured stdout
-  const output = lastzModule.out || '';
-  console.log(`[Alignment Worker] Output length: ${output.length}, first 500 chars:`, output.substring(0, 500));
-  
-  // Parse output
-  const alignmentResult = parseLastzOutput(output, queryName);
+
+  const output = al._stdout.join('\n');
+
+  const alignmentResult = parseBlast6Output(output, queryName, refUpper.length);
   alignmentResult.queryLength = querySeq.length;
-  console.log(`[Alignment Worker] Alignment complete: ${alignmentResult.totalHits} hits`);
-  
+  console.log(`[Alignment Worker] ${alignmentResult.totalHits} hits`);
+
   return { alignmentResult, rawOutput: output };
 }
 
@@ -200,12 +229,10 @@ async function alignGenomes(
 self.onmessage = async (e: MessageEvent) => {
   console.log('[Alignment Worker] Received message:', e.data.type);
   const { type, referenceName, referenceSeq, queryName, querySeq, params } = e.data;
-  
+
   try {
     if (type === 'init') {
-      console.log('[Alignment Worker] Init request received');
-      await initializeLastz();
-      console.log('[Alignment Worker] Sending initialized message');
+      await initializeBlast();
       self.postMessage({ type: 'initialized' });
     } else if (type === 'align') {
       console.log(`[Alignment Worker] Starting alignment: ${queryName}`);

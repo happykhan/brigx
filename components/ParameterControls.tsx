@@ -100,18 +100,18 @@ export default function ParameterControls({
 
       <div>
         <label className="label">
-          LASTZ Options
+          BLAST Options
         </label>
         <input
           type="text"
-          value={params.lastzOptions || ''}
-          onChange={(e) => setParams({ ...params, lastzOptions: e.target.value })}
+          value={params.alignerOptions || ''}
+          onChange={(e) => setParams({ ...params, alignerOptions: e.target.value })}
           disabled={disabled}
-          placeholder="e.g., --step=20 --seed=match12"
+          placeholder="e.g., -W 11 -e 1e-3"
           className="input-field w-full disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm"
         />
         <p className="mt-1 text-xs" style={{ color: 'var(--gx-text-muted)' }}>
-          Custom LASTZ parameters (default: --ambiguous=iupac --gapped --chain)
+          Custom blastall parameters (default: megablast -W 28)
         </p>
       </div>
     </div>

@@ -52,12 +52,12 @@ export class BRIGController {
       );
       this.alignmentWorkers.push(worker);
       
-      // Initialize LASTZ in each worker
-      console.log(`[Controller] Initializing LASTZ in worker ${i + 1}...`);
+      // Initialize BLAST aligner in each worker
+      console.log(`[Controller] Initializing BLAST in worker ${i + 1}...`);
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error(`Worker ${i + 1} initialization timeout`));
-        }, 30000); // 30 second timeout
+        }, 30000);
         
         worker.onmessage = (e) => {
           if (e.data.type === 'initialized') {
@@ -288,7 +288,7 @@ export class BRIGController {
     referenceLength: number,
     params: PipelineParams,
     color: string,
-    lastzOutput: string
+    alignmentOutput: string
   ): Promise<RingData> {
     console.log(`[Controller] Processing alignment to ring for ${alignment.queryName}`);
     console.log(`[Controller] Input alignment data:`, {
@@ -316,10 +316,10 @@ export class BRIGController {
         console.log(`[Controller] Received processing message, type: ${e.data.type}`);
         if (e.data.type === 'processed') {
           clearTimeout(timeout);
-          // Add raw hits and LASTZ output to ring data
+          // Add raw hits and alignment output to ring data
           const ringData = e.data.ringData;
           ringData.hits = alignment.hits;
-          ringData.lastzOutput = lastzOutput;
+          ringData.alignmentOutput = alignmentOutput;
           console.log(`[Controller] Ring processed successfully:`, {
             queryId: ringData.queryId,
             queryName: ringData.queryName,
@@ -515,7 +515,7 @@ export class BRIGController {
                 queryLength: query.length,
                 totalHits: 0,
                 hits: [],
-                metadata: { timestamp: Date.now(), lastzVersion: '1.04.52', parameters: params }
+                metadata: { timestamp: Date.now(), alignerVersion: 'BLAST', parameters: params }
               },
               rawOutput: ''
             });
@@ -554,7 +554,10 @@ export class BRIGController {
           ring.color,
           alignResult.rawOutput
         );
-        
+
+        // Use the ring config ID so it matches the skeleton placeholder
+        ringData.queryId = ring.id;
+
         ringDataArray.push(ringData);
         console.log(`[Controller] Ring ${i + 1} processed: ${ringData.hits?.length || 0} hits, ${ringData.windows?.length || 0} windows`);
         

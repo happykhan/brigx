@@ -1,6 +1,6 @@
 /**
  * Tests for annotation and alignment data preservation
- * 
+ *
  * Critical scenarios:
  * 1. Annotations must be preserved when alignments complete
  * 2. Alignments must be preserved when annotations are updated
@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import type { PlotData, RingData, Annotation } from '@/lib/types';
+import type { CircularPlotData, RingData, Annotation } from '@/lib/types';
 
 // Mock data helpers
 function createMockAnnotations(): Annotation[] {
@@ -37,20 +37,18 @@ function createMockRingData(queryId: string, queryName: string): RingData {
     queryId,
     queryName,
     color: '#666666',
-    upper: 0,
-    lower: 100,
+    visible: true,
     hits: [
       {
+        queryName: 'query1',
         refStart: 100,
         refEnd: 200,
         queryStart: 100,
         queryEnd: 200,
-        identity: 95,
+        percentIdentity: 95,
+        alignmentLength: 100,
         strand: '+'
       }
-    ],
-    windows: [
-      { position: 100, value: 95 }
     ],
     statistics: {
       meanIdentity: 95,
@@ -62,35 +60,24 @@ function createMockRingData(queryId: string, queryName: string): RingData {
   };
 }
 
-function createMockPlotData(): PlotData {
+function createMockPlotData(): CircularPlotData {
   return {
     reference: {
       name: 'Reference',
       length: 5000000,
-      sequence: 'ATCG',
       gcContent: [0.5, 0.5],
       gcSkew: [0.1, -0.1]
     },
     rings: [],
     config: {
-      windowSize: 100,
-      stepSize: 50,
       minIdentity: 70,
-      minAlignmentLength: 50,
-      ringHeight: 20,
-      ringSpacing: 5,
-      labelFontSize: 12,
-      showGCContent: true,
-      showGCSkew: true,
-      gcContentColor: '#00ff00',
-      gcSkewPosColor: '#ff0000',
-      gcSkewNegColor: '#0000ff'
+      minAlignmentLength: 50
     }
   };
 }
 
 describe('Annotation and Alignment Preservation', () => {
-  let mockPlotData: PlotData;
+  let mockPlotData: CircularPlotData;
   let mockRing: RingData;
   let mockAnnotations: Annotation[];
 
@@ -106,7 +93,6 @@ describe('Annotation and Alignment Preservation', () => {
       const ringWithAnnotations: RingData = {
         ...mockRing,
         hits: [],
-        windows: [],
         annotations: mockAnnotations
       };
       mockPlotData.rings = [ringWithAnnotations];
@@ -115,10 +101,9 @@ describe('Annotation and Alignment Preservation', () => {
       const partialAlignmentResult: RingData = {
         ...mockRing,
         hits: [
-          { refStart: 100, refEnd: 200, queryStart: 100, queryEnd: 200, identity: 95, strand: '+' },
-          { refStart: 300, refEnd: 400, queryStart: 300, queryEnd: 400, identity: 90, strand: '+' }
+          { queryName: 'q1', refStart: 100, refEnd: 200, queryStart: 100, queryEnd: 200, percentIdentity: 95, alignmentLength: 100, strand: '+' },
+          { queryName: 'q1', refStart: 300, refEnd: 400, queryStart: 300, queryEnd: 400, percentIdentity: 90, alignmentLength: 100, strand: '+' }
         ],
-        windows: [{ position: 100, value: 95 }, { position: 300, value: 90 }],
         annotations: [] // Worker doesn't include annotations
       };
 
@@ -126,7 +111,6 @@ describe('Annotation and Alignment Preservation', () => {
       const mergedRing = {
         ...ringWithAnnotations,
         hits: partialAlignmentResult.hits,
-        windows: partialAlignmentResult.windows,
         statistics: partialAlignmentResult.statistics,
         alignmentOutput: partialAlignmentResult.alignmentOutput,
         annotations: ringWithAnnotations.annotations || []
@@ -136,7 +120,6 @@ describe('Annotation and Alignment Preservation', () => {
       expect(mergedRing.annotations).toHaveLength(2);
       expect(mergedRing.annotations[0].label).toBe('Sp 12');
       expect(mergedRing.hits).toHaveLength(2);
-      expect(mergedRing.windows).toHaveLength(2);
     });
 
     it('should preserve annotations during final alignment merge', () => {
@@ -145,7 +128,7 @@ describe('Annotation and Alignment Preservation', () => {
         ...mockRing,
         annotations: mockAnnotations
       };
-      const cachedPlotData: PlotData = {
+      const cachedPlotData: CircularPlotData = {
         ...mockPlotData,
         rings: [cachedRing]
       };
@@ -153,8 +136,7 @@ describe('Annotation and Alignment Preservation', () => {
       // Final alignment result (no annotations from worker)
       const finalAlignmentResult: RingData = {
         ...mockRing,
-        hits: [{ refStart: 500, refEnd: 600, queryStart: 500, queryEnd: 600, identity: 98, strand: '+' }],
-        windows: [{ position: 500, value: 98 }],
+        hits: [{ queryName: 'q1', refStart: 500, refEnd: 600, queryStart: 500, queryEnd: 600, percentIdentity: 98, alignmentLength: 100, strand: '+' }],
         annotations: []
       };
 
@@ -162,7 +144,6 @@ describe('Annotation and Alignment Preservation', () => {
       const finalRing = {
         ...cachedRing,
         hits: finalAlignmentResult.hits,
-        windows: finalAlignmentResult.windows,
         statistics: finalAlignmentResult.statistics,
         alignmentOutput: finalAlignmentResult.alignmentOutput,
         annotations: cachedRing.annotations || []
@@ -172,7 +153,7 @@ describe('Annotation and Alignment Preservation', () => {
       expect(finalRing.annotations).toHaveLength(2);
       expect(finalRing.annotations).toEqual(mockAnnotations);
       expect(finalRing.hits).toHaveLength(1);
-      expect(finalRing.hits[0].identity).toBe(98);
+      expect(finalRing.hits[0].percentIdentity).toBe(98);
     });
   });
 
@@ -182,9 +163,8 @@ describe('Annotation and Alignment Preservation', () => {
       const ringWithBoth: RingData = {
         ...mockRing,
         hits: [
-          { refStart: 1000, refEnd: 2000, queryStart: 1000, queryEnd: 2000, identity: 92, strand: '+' }
+          { queryName: 'q1', refStart: 1000, refEnd: 2000, queryStart: 1000, queryEnd: 2000, percentIdentity: 92, alignmentLength: 1000, strand: '+' }
         ],
-        windows: [{ position: 1000, value: 92 }],
         statistics: {
           meanIdentity: 92,
           genomeCoverage: 60,
@@ -213,7 +193,6 @@ describe('Annotation and Alignment Preservation', () => {
         annotations: newAnnotations,
         // CRITICAL: Explicitly preserve alignment data
         hits: ringWithBoth.hits || [],
-        windows: ringWithBoth.windows || [],
         statistics: ringWithBoth.statistics || { meanIdentity: 0, genomeCoverage: 0, totalAlignedBases: 0 },
         alignmentOutput: ringWithBoth.alignmentOutput || ''
       };
@@ -222,8 +201,7 @@ describe('Annotation and Alignment Preservation', () => {
       expect(updatedRing.annotations).toHaveLength(3);
       expect(updatedRing.annotations[2].label).toBe('Sp 14');
       expect(updatedRing.hits).toHaveLength(1);
-      expect(updatedRing.hits[0].identity).toBe(92);
-      expect(updatedRing.windows).toHaveLength(1);
+      expect(updatedRing.hits[0].percentIdentity).toBe(92);
       expect(updatedRing.statistics.meanIdentity).toBe(92);
       expect(updatedRing.alignmentOutput).toBe('existing alignment output');
     });
@@ -241,7 +219,6 @@ describe('Annotation and Alignment Preservation', () => {
         ...ringWithBoth,
         annotations: updatedAnnotations,
         hits: ringWithBoth.hits || [],
-        windows: ringWithBoth.windows || [],
         statistics: ringWithBoth.statistics || { meanIdentity: 0, genomeCoverage: 0, totalAlignedBases: 0 },
         alignmentOutput: ringWithBoth.alignmentOutput || ''
       };
@@ -265,8 +242,7 @@ describe('Annotation and Alignment Preservation', () => {
       // Step 1: Run alignment (should keep annotations)
       currentRing = {
         ...currentRing,
-        hits: [{ refStart: 100, refEnd: 200, queryStart: 100, queryEnd: 200, identity: 95, strand: '+' }],
-        windows: [{ position: 100, value: 95 }],
+        hits: [{ queryName: 'q1', refStart: 100, refEnd: 200, queryStart: 100, queryEnd: 200, percentIdentity: 95, alignmentLength: 100, strand: '+' }],
         annotations: currentRing.annotations || []
       };
 
@@ -277,8 +253,7 @@ describe('Annotation and Alignment Preservation', () => {
       currentRing = {
         ...currentRing,
         annotations: [...currentRing.annotations, mockAnnotations[1]],
-        hits: currentRing.hits || [],
-        windows: currentRing.windows || []
+        hits: currentRing.hits || []
       };
 
       expect(currentRing.annotations).toHaveLength(2);
@@ -289,11 +264,7 @@ describe('Annotation and Alignment Preservation', () => {
         ...currentRing,
         hits: [
           ...currentRing.hits,
-          { refStart: 300, refEnd: 400, queryStart: 300, queryEnd: 400, identity: 90, strand: '+' }
-        ],
-        windows: [
-          ...currentRing.windows,
-          { position: 300, value: 90 }
+          { queryName: 'q1', refStart: 300, refEnd: 400, queryStart: 300, queryEnd: 400, percentIdentity: 90, alignmentLength: 100, strand: '+' }
         ],
         annotations: currentRing.annotations || []
       };
@@ -301,7 +272,6 @@ describe('Annotation and Alignment Preservation', () => {
       // Final check: Everything should still be there
       expect(currentRing.annotations).toHaveLength(2);
       expect(currentRing.hits).toHaveLength(2);
-      expect(currentRing.windows).toHaveLength(2);
     });
   });
 
@@ -325,20 +295,17 @@ describe('Annotation and Alignment Preservation', () => {
       const ringWithEmptyArrays: RingData = {
         ...mockRing,
         hits: [],
-        windows: [],
         annotations: []
       };
 
       const updated = {
         ...ringWithEmptyArrays,
         annotations: mockAnnotations,
-        hits: ringWithEmptyArrays.hits || [],
-        windows: ringWithEmptyArrays.windows || []
+        hits: ringWithEmptyArrays.hits || []
       };
 
       expect(updated.annotations).toHaveLength(2);
       expect(updated.hits).toEqual([]);
-      expect(updated.windows).toEqual([]);
     });
 
     it('should handle missing statistics gracefully', () => {

@@ -163,7 +163,7 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+        style={{ cursor: isDragging ? 'grabbing' : 'grab', background: 'white' }}
       />
 
 

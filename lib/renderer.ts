@@ -1,5 +1,5 @@
 // Circular Plot SVG Renderer
-import type { CircularPlotData, RingData, WindowData, Feature, Annotation } from './types';
+import type { CircularPlotData, RingData, Feature, Annotation } from './types';
 
 export interface RenderConfig {
   width: number;
@@ -1062,6 +1062,13 @@ export class CircularPlotRenderer {
     this.svg.setAttribute('width', '100%');
     this.svg.setAttribute('height', '100%');
     
+    // Add white background rect so exports also have white background
+    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bgRect.setAttribute('width', String(this.config.width));
+    bgRect.setAttribute('height', String(this.config.height));
+    bgRect.setAttribute('fill', 'white');
+    this.svg.appendChild(bgRect);
+
     // Create main content group for zoom/pan transforms
     const mainGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     mainGroup.setAttribute('class', 'main-content');

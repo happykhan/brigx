@@ -22,7 +22,6 @@ export default function Home() {
   // Store controller instance in ref to persist alignment cache across runs
   const controllerRef = useRef<BRIGControllerType | null>(null);
   const [params, setParams] = useState<PipelineParams>({
-    windowSize: 1000,
     minIdentity: 70,
     minAlignmentLength: 100,
     colorScheme: 'blue-red',
@@ -108,13 +107,12 @@ export default function Home() {
     if (cachedPlotData && cachedPlotData.rings) {
       const updatedRings = cachedPlotData.rings.map(ringData => {
         if (ringData.queryId === ringId) {
-          console.log(`[Page] Updating annotations for ring ${ringData.queryName}, preserving hits: ${ringData.hits?.length || 0}, windows: ${ringData.windows?.length || 0}`);
+          console.log(`[Page] Updating annotations for ring ${ringData.queryName}, preserving hits: ${ringData.hits?.length || 0}`);
           return {
             ...ringData,
             annotations,
             // CRITICAL: Explicitly preserve alignment data
             hits: ringData.hits || [],
-            windows: ringData.windows || [],
             statistics: ringData.statistics || { meanIdentity: 0, genomeCoverage: 0, totalAlignedBases: 0 },
             alignmentOutput: ringData.alignmentOutput || ''
           };
@@ -170,7 +168,6 @@ export default function Home() {
         visible: true,
         customWidth: ringConfig.customWidth,
         hits: [],
-        windows: [],
         annotations: ringAnnotations[ringConfig.id] || [],
         statistics: {
           meanIdentity: 0,
@@ -226,7 +223,6 @@ export default function Home() {
           visible: true,
           customWidth: ringConfig.customWidth,
           hits: [],
-          windows: [],
           annotations: ringAnnotations[ringConfig.id] || [],
           statistics: {
             meanIdentity: 0,
@@ -305,7 +301,6 @@ export default function Home() {
                   return {
                     ...existingRing,
                     hits: newRingData.hits,
-                    windows: newRingData.windows,
                     statistics: newRingData.statistics,
                     alignmentOutput: newRingData.alignmentOutput,
                     // CRITICAL: Preserve annotations from existing ring
@@ -377,7 +372,6 @@ export default function Home() {
               return {
                 ...existingRing,
                 hits: newRingData.hits,
-                windows: newRingData.windows,
                 statistics: newRingData.statistics,
                 alignmentOutput: newRingData.alignmentOutput,
                 // CRITICAL: Preserve annotations from existing ring OR ringAnnotations state
@@ -599,10 +593,6 @@ export default function Home() {
                       <div className="p-4 rounded-lg" style={{ background: 'color-mix(in srgb, var(--gx-accent) 10%, transparent)', border: '1px solid var(--gx-border)' }}>
                         <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--gx-text-muted)' }}>Query Genomes</div>
                         <div className="text-2xl font-bold mt-1" style={{ color: 'var(--gx-text)' }}>{plotData.rings?.length || 0}</div>
-                      </div>
-                      <div className="p-4 rounded-lg" style={{ background: 'color-mix(in srgb, var(--gx-indigo) 10%, transparent)', border: '1px solid var(--gx-border)' }}>
-                        <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--gx-text-muted)' }}>Window Size</div>
-                        <div className="text-2xl font-bold mt-1" style={{ color: 'var(--gx-text)' }}>{plotData.config?.windowSize || 0} bp</div>
                       </div>
                       <div className="p-4 rounded-lg" style={{ background: 'color-mix(in srgb, var(--gx-indigo) 10%, transparent)', border: '1px solid var(--gx-border)' }}>
                         <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--gx-text-muted)' }}>Min Identity</div>

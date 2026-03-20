@@ -33,23 +33,12 @@ export interface AlignmentDataset {
   created: number;
 }
 
-export interface WindowData {
-  start: number;
-  end: number;
-  avgIdentity: number;
-  coverage: number;
-  hitCount: number;
-  maxIdentity: number;
-  strand: '+' | '-' | 'both';
-}
-
 export interface RingData {
   queryId: string;
   queryName: string;
   color: string;
   visible: boolean;
   hits: AlignmentHit[]; // Raw alignment hits for direct rendering
-  windows: WindowData[];
   annotations?: Annotation[]; // Custom annotations for this ring
   customWidth?: number; // Optional custom width override
   alignmentOutput?: string; // Raw alignment output for download
@@ -107,7 +96,6 @@ export interface CircularPlotData {
   };
   rings: RingData[];
   config: {
-    windowSize: number;
     minIdentity: number;
     minAlignmentLength: number;
   };
@@ -124,7 +112,6 @@ export interface ParsedGenome {
 }
 
 export interface PipelineParams {
-  windowSize: number;
   minIdentity: number;
   minAlignmentLength: number;
   colorScheme: string;

@@ -18,28 +18,6 @@ export default function ParameterControls({
     <div className="space-y-4">
       <div>
         <label className="label">
-          Window Size (bp)
-        </label>
-        <input
-          type="number"
-          value={params.windowSize}
-          onChange={(e) => {
-            const val = parseInt(e.target.value);
-            setParams({ ...params, windowSize: isNaN(val) ? 100 : val });
-          }}
-          disabled={disabled}
-          min="100"
-          max="10000"
-          step="100"
-          className="input-field w-full disabled:opacity-50 disabled:cursor-not-allowed"
-        />
-        <p className="mt-1 text-xs" style={{ color: 'var(--gx-text-muted)' }}>
-          Resolution of the circular plot (100-10000)
-        </p>
-      </div>
-
-      <div>
-        <label className="label">
           Minimum Identity (%)
         </label>
         <input
@@ -111,7 +89,7 @@ export default function ParameterControls({
           className="input-field w-full disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm"
         />
         <p className="mt-1 text-xs" style={{ color: 'var(--gx-text-muted)' }}>
-          Custom blastall parameters (default: megablast -W 28)
+          Custom blastall parameters (default: megablast -e 1e-5)
         </p>
       </div>
     </div>

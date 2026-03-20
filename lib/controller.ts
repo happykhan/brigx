@@ -1,6 +1,7 @@
 // Application Controller - Orchestrates the entire pipeline
 import type {
   ParsedGenome,
+  AlignmentHit,
   AlignmentResult,
   CircularPlotData,
   RingData,
@@ -17,7 +18,6 @@ const COLORS = [
 export class BRIGController {
   private parserWorker?: Worker;
   private alignmentWorkers: Worker[] = [];
-  private processingWorker?: Worker;
   private progressCallback?: (update: ProgressUpdate) => void;
   private alignmentCache: Map<string, AlignmentResult> = new Map();
 
@@ -31,14 +31,6 @@ export class BRIGController {
       { type: 'module' }
     );
     console.log('[Controller] Parser worker created');
-
-    // Initialize processing worker
-    console.log('[Controller] Creating processing worker...');
-    this.processingWorker = new Worker(
-      new URL('../workers/processing.worker.ts', import.meta.url),
-      { type: 'module' }
-    );
-    console.log('[Controller] Processing worker created');
 
     // Initialize alignment workers (4 workers for balanced performance)
     const numWorkers = 4;
@@ -283,72 +275,46 @@ export class BRIGController {
     });
   }
 
-  private async processAlignmentToRing(
-    alignment: AlignmentResult,
+  private computeRingStats(
+    hits: AlignmentHit[],
     referenceLength: number,
-    params: PipelineParams,
-    color: string,
-    alignmentOutput: string
-  ): Promise<RingData> {
-    console.log(`[Controller] Processing alignment to ring for ${alignment.queryName}`);
-    console.log(`[Controller] Input alignment data:`, {
-      queryId: alignment.queryId,
-      queryName: alignment.queryName,
-      hitsCount: alignment.hits?.length || 0,
-      referenceLength,
-      windowSize: params.windowSize,
-      color
-    });
-    
-    return new Promise((resolve, reject) => {
-      if (!this.processingWorker) {
-        console.error('[Controller] Processing worker not initialized');
-        reject(new Error('Processing worker not initialized'));
-        return;
+    minIdentity: number,
+    minLength: number
+  ): { meanIdentity: number; genomeCoverage: number; totalAlignedBases: number } {
+    const filtered = hits.filter(
+      h => h.percentIdentity >= minIdentity && h.alignmentLength >= minLength
+    );
+
+    if (filtered.length === 0) {
+      return { meanIdentity: 0, genomeCoverage: 0, totalAlignedBases: 0 };
+    }
+
+    // Track covered bases on reference using a boolean array for accuracy
+    const covered = new Uint8Array(referenceLength);
+    let totalWeightedIdentity = 0;
+    let totalAlignedBases = 0;
+
+    for (const hit of filtered) {
+      const start = Math.max(0, hit.refStart);
+      const end = Math.min(referenceLength, hit.refEnd);
+      const len = end - start;
+      if (len > 0) {
+        covered.fill(1, start, end);
+        totalWeightedIdentity += hit.percentIdentity * len;
+        totalAlignedBases += len;
       }
+    }
 
-      const timeout = setTimeout(() => {
-        console.error(`[Controller] Processing timeout for ${alignment.queryName}`);
-        reject(new Error(`Processing timeout for ${alignment.queryName}`));
-      }, 60000); // 60 second timeout
+    let coveredBases = 0;
+    for (let i = 0; i < referenceLength; i++) {
+      if (covered[i]) coveredBases++;
+    }
 
-      this.processingWorker.onmessage = (e) => {
-        console.log(`[Controller] Received processing message, type: ${e.data.type}`);
-        if (e.data.type === 'processed') {
-          clearTimeout(timeout);
-          // Add raw hits and alignment output to ring data
-          const ringData = e.data.ringData;
-          ringData.hits = alignment.hits;
-          ringData.alignmentOutput = alignmentOutput;
-          console.log(`[Controller] Ring processed successfully:`, {
-            queryId: ringData.queryId,
-            queryName: ringData.queryName,
-            windowsCount: ringData.windows?.length || 0,
-            hitsCount: ringData.hits?.length || 0,
-            coverage: ringData.statistics?.genomeCoverage,
-            meanIdentity: ringData.statistics?.meanIdentity
-          });
-          resolve(ringData);
-        } else if (e.data.type === 'error') {
-          clearTimeout(timeout);
-          console.error(`[Controller] Processing error for ${alignment.queryName}:`, e.data.error);
-          reject(new Error(e.data.error));
-        }
-      };
-
-      console.log(`[Controller] Sending processing request for ${alignment.queryName}`);
-      this.processingWorker.postMessage({
-        type: 'process',
-        alignments: alignment.hits,
-        referenceLength,
-        windowSize: params.windowSize,
-        minIdentity: params.minIdentity,
-        minLength: params.minAlignmentLength,
-        queryId: alignment.queryId,
-        queryName: alignment.queryName,
-        color
-      });
-    });
+    return {
+      meanIdentity: totalAlignedBases > 0 ? totalWeightedIdentity / totalAlignedBases : 0,
+      genomeCoverage: (coveredBases / referenceLength) * 100,
+      totalAlignedBases: coveredBases
+    };
   }
 
   async runFullPipeline(
@@ -385,13 +351,14 @@ export class BRIGController {
       // Calculate GC content
       console.log('[Controller] Step 2: Calculating GC content');
       this.updateProgress('Calculating GC content', 10);
-      const gcContent = await this.calculateGC(reference.sequence, params.windowSize);
+      const gcWindowSize = 1000; // Fixed window size for GC resolution
+      const gcContent = await this.calculateGC(reference.sequence, gcWindowSize);
       console.log(`[Controller] GC content calculated: ${gcContent.length} windows`);
 
       // Calculate GC Skew
       console.log('[Controller] Step 2b: Calculating GC Skew');
       this.updateProgress('Calculating GC Skew', 11);
-      const gcSkew = await this.calculateGCSkew(reference.sequence, params.windowSize);
+      const gcSkew = await this.calculateGCSkew(reference.sequence, gcWindowSize);
       console.log(`[Controller] GC Skew calculated: ${gcSkew.length} windows`);
 
       // Send partial data with reference and GC content
@@ -409,7 +376,6 @@ export class BRIGController {
             },
             rings: [], // Empty rings array initially
             config: {
-              windowSize: params.windowSize,
               minIdentity: params.minIdentity,
               minAlignmentLength: params.minAlignmentLength
             }
@@ -530,36 +496,42 @@ export class BRIGController {
       
       console.log(`[Controller] All ${alignmentResults.length} alignments completed`);
 
-      // Process alignments to rings
-      console.log(`[Controller] Step 5: Processing alignments to rings`);
+      // Build ring data with inline stats computation
+      console.log(`[Controller] Step 5: Building ring data`);
       this.updateProgress('Processing alignment data', 70);
       const ringDataArray: RingData[] = [];
-      
+
       for (let i = 0; i < alignmentResults.length; i++) {
         const ring = rings[i];
         const alignResult = alignmentResults[i];
-        
+
         console.log(`[Controller] Processing ring ${i + 1}/${alignmentResults.length}: ${ring.legendText}`);
-        
+
         this.updateProgress(
           'Processing alignment data',
           Math.round(70 + ((i + 1) / alignmentResults.length) * 25),
           `${i + 1}/${alignmentResults.length}`
         );
 
-        const ringData = await this.processAlignmentToRing(
-          alignResult.result,
+        const statistics = this.computeRingStats(
+          alignResult.result.hits,
           reference.length,
-          params,
-          ring.color,
-          alignResult.rawOutput
+          params.minIdentity,
+          params.minAlignmentLength
         );
 
-        // Use the ring config ID so it matches the skeleton placeholder
-        ringData.queryId = ring.id;
+        const ringData: RingData = {
+          queryId: ring.id,
+          queryName: alignResult.result.queryName,
+          color: ring.color,
+          visible: true,
+          hits: alignResult.result.hits,
+          alignmentOutput: alignResult.rawOutput,
+          statistics
+        };
 
         ringDataArray.push(ringData);
-        console.log(`[Controller] Ring ${i + 1} processed: ${ringData.hits?.length || 0} hits, ${ringData.windows?.length || 0} windows`);
+        console.log(`[Controller] Ring ${i + 1} processed: ${ringData.hits?.length || 0} hits`);
         
         // Send partial data after each ring is processed
         if (this.progressCallback) {
@@ -576,7 +548,6 @@ export class BRIGController {
               },
               rings: [...ringDataArray], // Send all rings processed so far
               config: {
-                windowSize: params.windowSize,
                 minIdentity: params.minIdentity,
                 minAlignmentLength: params.minAlignmentLength
               }
@@ -588,7 +559,6 @@ export class BRIGController {
       console.log(`[Controller] All ${ringDataArray.length} rings processed successfully`);
       console.log(`[Controller] Ring summary:`, ringDataArray.map(r => ({
         name: r.queryName,
-        windows: r.windows?.length || 0,
         hits: r.hits?.length || 0,
         visible: r.visible
       })));
@@ -605,12 +575,11 @@ export class BRIGController {
         },
         rings: ringDataArray,
         config: {
-          windowSize: params.windowSize,
           minIdentity: params.minIdentity,
           minAlignmentLength: params.minAlignmentLength
         }
       };
-      
+
       console.log('[Controller] Returning final plot data with structure:', {
         referenceName: finalData.reference.name,
         referenceLength: finalData.reference.length,
@@ -630,7 +599,6 @@ export class BRIGController {
 
   cleanup() {
     this.parserWorker?.terminate();
-    this.processingWorker?.terminate();
     this.alignmentWorkers.forEach(w => w.terminate());
   }
 }

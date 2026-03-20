@@ -194,7 +194,7 @@ async function alignGenomes(
   }
   al.FS.writeFile('/query.fna', `>${queryName}\n${queryUpper}\n`);
 
-  const args = ['-p', 'blastn', '-d', '/ref', '-i', '/query.fna', '-m', '8', '-e', '1e-5', '-F', 'F', '-W', '28', '-b', '1000000', '-v', '0'];
+  const args = ['-p', 'blastn', '-d', '/ref', '-i', '/query.fna', '-m', '8', '-e', '1e-5', '-F', 'F', '-b', '1000000', '-v', '0'];
 
   // Add custom blastall options if provided
   if (params?.alignerOptions?.trim()) {

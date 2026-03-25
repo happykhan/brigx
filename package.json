@@ -17,7 +17,6 @@
   "dependencies": {
     "@biowasm/aioli": "^3.2.1",
     "@handsontable/react": "^16.2.0",
-    "@vercel/analytics": "^2.0.1",
     "comlink": "^4.4.1",
     "handsontable": "^16.2.0",
     "idb": "^8.0.0",

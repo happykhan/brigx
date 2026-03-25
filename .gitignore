@@ -45,7 +45,6 @@ coverage/
 CLAUDE.md
 
 # Large test data files
-*.ace
 examples/brig_examples/BRIG_examples/BRIGMANUAL.pdf
 *.nhr
 *.nin

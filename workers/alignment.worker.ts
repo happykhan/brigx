@@ -50,8 +50,8 @@ async function initializeBlast() {
 }
 
 async function createModuleInstance(factory: any, wasmBinary: ArrayBuffer): Promise<any> {
-  let stdout: string[] = [];
-  let stderr: string[] = [];
+  const stdout: string[] = [];
+  const stderr: string[] = [];
   const mod = await factory({
     wasmBinary: wasmBinary.slice(0),
     print: (text: string) => { stdout.push(text); },
@@ -78,7 +78,7 @@ async function buildDatabase(referenceName: string, referenceSeq: string): Promi
 
   try {
     db.callMain(['-i', '/ref.fna', '-p', 'F', '-n', '/ref']);
-  } catch (e) {
+  } catch {
     // formatdb calls exit() which may throw
   }
 
@@ -204,7 +204,7 @@ async function alignGenomes(
 
   try {
     al.callMain(args);
-  } catch (e) {
+  } catch {
     // blastall calls exit() which may throw
   }
 

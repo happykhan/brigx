@@ -1,5 +1,5 @@
 // Circular Plot SVG Renderer
-import type { CircularPlotData, RingData, Feature, Annotation } from './types';
+import type { CircularPlotData, RingData, Annotation } from './types';
 
 export interface RenderConfig {
   width: number;
@@ -74,7 +74,7 @@ export class CircularPlotRenderer {
     svg: SVGSVGElement,
     cx: number,
     cy: number,
-    refLength: number
+    _refLength: number
   ) {
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('class', 'reference-ring');
@@ -187,8 +187,8 @@ export class CircularPlotRenderer {
       const skewFormatted = skew.toFixed(3);
       arcElement.setAttribute('data-gc-skew', skewFormatted);
       arcElement.style.cursor = 'pointer';
-      
-      arcElement.addEventListener('mouseenter', (e) => {
+
+      arcElement.addEventListener('mouseenter', (_e) => {
         arcElement.setAttribute('opacity', '1.0');
         if (this.tooltipCallback) {
           this.tooltipCallback({
@@ -309,8 +309,8 @@ export class CircularPlotRenderer {
       const gcPercent = (gc * 100).toFixed(1);
       arcElement.setAttribute('data-gc', gcPercent);
       arcElement.style.cursor = 'pointer';
-      
-      arcElement.addEventListener('mouseenter', (e) => {
+
+      arcElement.addEventListener('mouseenter', (_e) => {
         arcElement.setAttribute('opacity', '1.0');
         if (this.tooltipCallback) {
           this.tooltipCallback({
@@ -648,7 +648,6 @@ export class CircularPlotRenderer {
         
       } else if (ann.shape === 'arrow-forward' || ann.shape === 'arrow-reverse') {
         // Arrow shape (gene-like) - adaptive based on feature length
-        const ringHeight = outerRadius - innerRadius;
         const isForward = ann.shape === 'arrow-forward';
         
         // Calculate total angle span in radians
@@ -835,8 +834,6 @@ export class CircularPlotRenderer {
   private renderGCLegend(svg: SVGSVGElement, hasGCSkew: boolean) {
     const legendX = 20;
     const legendY = 20;
-    const lineHeight = 22;
-    
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('class', 'gc-legend');
     

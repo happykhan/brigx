@@ -15,7 +15,6 @@ const PRESET_COLORS = [
 ];
 
 export default function RingConfiguration({ rings, setRings, onEditAnnotations }: RingConfigurationProps) {
-  const [editingRing, setEditingRing] = useState<string | null>(null);
   const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null);
   const colorPickerRef = useRef<HTMLDivElement>(null);
 

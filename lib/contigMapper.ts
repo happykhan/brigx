@@ -1,6 +1,6 @@
 // Contig mapping: order contigs from a draft assembly onto a reference
 // Uses alignment hits to find the best position for each contig
-import type { AlignmentHit, ContigBoundary } from './types';
+import type { AlignmentHit } from './types';
 
 export interface MappedContig {
   name: string;

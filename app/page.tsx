@@ -5,7 +5,6 @@ import Link from 'next/link';
 import toast, { Toaster } from 'react-hot-toast';
 import RingConfiguration from '@/components/RingConfiguration';
 import ParameterControls from '@/components/ParameterControls';
-import ProgressPanel from '@/components/ProgressPanel';
 import CircularPlot from '@/components/CircularPlot';
 import ExportPanel from '@/components/ExportPanel';
 import ConsoleLog from '@/components/ConsoleLog';
@@ -356,9 +355,9 @@ export default function Home() {
             }
 
             const updatedPlotData = {
-              reference: update.partialData.reference || cachedPlotData?.reference!,
+              reference: update.partialData.reference || cachedPlotData?.reference || { name: '', length: 0 },
               rings: mergedRings,
-              config: update.partialData.config || cachedPlotData?.config!
+              config: update.partialData.config || cachedPlotData?.config || { minIdentity: 70, minAlignmentLength: 100 }
             };
 
             setPlotData(updatedPlotData);

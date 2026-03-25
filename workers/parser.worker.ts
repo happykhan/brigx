@@ -13,7 +13,7 @@ function decompressGzip(bytes: Uint8Array): string {
     const decompressed = pako.inflate(bytes);
     return new TextDecoder('utf-8').decode(decompressed);
   } catch (error) {
-    throw new Error(`Failed to decompress gzip file: ${error}`);
+    throw new Error(`Failed to decompress gzip file: ${error}`, { cause: error });
   }
 }
 
@@ -276,7 +276,6 @@ export function extractGenBankFeatures(
       // Extract qualifiers
       const geneMatch = qualifierBlock.match(/\/gene="([^"]+)"/);
       const productMatch = qualifierBlock.match(/\/product="([^"]+)"/);
-      const noteMatch = qualifierBlock.match(/\/note="([^"]+)"/);
       const locusTagMatch = qualifierBlock.match(/\/locus_tag="([^"]+)"/);
 
       const label = geneMatch?.[1] || locusTagMatch?.[1] || productMatch?.[1] || `${type}`;

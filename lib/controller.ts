@@ -11,10 +11,6 @@ import type {
   ContigBoundary
 } from './types';
 
-const COLORS = [
-  '#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6',
-  '#1abc9c', '#e67e22', '#34495e', '#16a085', '#c0392b'
-];
 
 export class BRIGController {
   private parserWorker?: Worker;
@@ -461,7 +457,6 @@ export class BRIGController {
       const alignmentResults: Array<{ result: AlignmentResult; rawOutput: string }> = [];
       
       // Process rings with worker pool (max 4 concurrent)
-      let activeWorkers = 0;
       let nextRingIndex = 0;
       const maxConcurrent = Math.min(4, this.alignmentWorkers.length);
       

@@ -13,7 +13,7 @@ function decompressGzip(bytes: Uint8Array): string {
     const decompressed = pako.inflate(bytes);
     return new TextDecoder('utf-8').decode(decompressed);
   } catch (error) {
-    throw new Error(`Failed to decompress gzip file: ${error}`, { cause: error });
+    throw new Error(`Failed to decompress gzip file: ${error}`);
   }
 }
 

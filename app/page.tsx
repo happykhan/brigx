@@ -12,7 +12,8 @@ import ConsoleLog from '@/components/ConsoleLog';
 import ImageProperties, { type ImagePropertiesConfig } from '@/components/ImageProperties';
 import AnnotationEditor from '@/components/AnnotationEditor';
 import ThemeToggle from '@/components/ThemeToggle';
-import type { CircularPlotData, PipelineParams, ProgressUpdate, RingConfig, Annotation } from '@/lib/types';
+import type { CircularPlotData, PipelineParams, ProgressUpdate, RingConfig, Annotation, RingData } from '@/lib/types';
+import { APP_VERSION } from '@/lib/version';
 import type { BRIGController as BRIGControllerType } from '@/lib/controller';
 
 export default function Home() {
@@ -35,7 +36,7 @@ export default function Home() {
   const [cachedPlotData, setCachedPlotData] = useState<CircularPlotData | null>(null);
   const [imageProperties, setImageProperties] = useState<ImagePropertiesConfig>({
     innerRadius: 200,
-    ringWidth: 30,
+    ringWidth: 24,
     gcRingWidth: 30,
     ringSpacing: 8,
     legendFontSize: 12,
@@ -57,34 +58,44 @@ export default function Home() {
     const originalError = console.error;
     const originalWarn = console.warn;
 
-    console.log = (...args: any[]) => {
-      const message = args.map(arg => {
-        if (typeof arg === 'object') {
-          // Don't log huge arrays like gcContent
-          if (arg && typeof arg === 'object' && 'partialData' in arg) {
-            const { partialData, ...rest } = arg;
-            return JSON.stringify({ ...rest, partialData: '[...]' }, null, 2);
-          }
-          return JSON.stringify(arg, null, 2);
+    // Summarize objects for display - avoid dumping raw arrays
+    const summarizeArg = (arg: any): string => {
+      if (arg == null) return String(arg);
+      if (typeof arg !== 'object') return String(arg);
+      if (Array.isArray(arg)) {
+        if (arg.length > 5) return `[Array(${arg.length})]`;
+        return JSON.stringify(arg);
+      }
+      // Summarize known large fields
+      const clone: any = {};
+      for (const [k, v] of Object.entries(arg)) {
+        if (Array.isArray(v) && (v as any[]).length > 5) {
+          clone[k] = `[${(v as any[]).length} items]`;
+        } else if (k === 'partialData' || k === 'sequence') {
+          clone[k] = '[omitted]';
+        } else if (typeof v === 'object' && v !== null) {
+          clone[k] = summarizeArg(v);
+        } else {
+          clone[k] = v;
         }
-        return String(arg);
-      }).join(' ');
+      }
+      return JSON.stringify(clone);
+    };
+
+    console.log = (...args: any[]) => {
+      const message = args.map(summarizeArg).join(' ');
       setConsoleLogs(prev => [...prev, `[LOG] ${message}`]);
       originalLog.apply(console, args);
     };
 
     console.error = (...args: any[]) => {
-      const message = args.map(arg =>
-        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-      ).join(' ');
+      const message = args.map(summarizeArg).join(' ');
       setConsoleLogs(prev => [...prev, `[ERROR] ${message}`]);
       originalError.apply(console, args);
     };
 
     console.warn = (...args: any[]) => {
-      const message = args.map(arg =>
-        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-      ).join(' ');
+      const message = args.map(summarizeArg).join(' ');
       setConsoleLogs(prev => [...prev, `[WARN] ${message}`]);
       originalWarn.apply(console, args);
     };
@@ -240,7 +251,7 @@ export default function Home() {
   }, [rings, ringAnnotations]); // Removed cachedPlotData from dependencies!
 
   const handleRun = async () => {
-    console.log('[Page] === Generate Plot (Run Alignments) clicked ===');
+    console.log(`[BRIGX v${APP_VERSION}] Starting alignment pipeline`);
 
     // Clear console logs on each run
     setConsoleLogs([]);
@@ -281,7 +292,7 @@ export default function Home() {
         [],
         params,
         (update) => {
-          console.log('[Page] Progress update:', update);
+          console.log(`[Page] ${update.step} (${update.percent}%)${update.message ? ' - ' + update.message : ''}`);
           setProgress(update);
 
           // Update plot immediately as each ring completes
@@ -355,39 +366,50 @@ export default function Home() {
         }
       );
 
-      console.log('[Page] Alignments complete! Merging results...');
-      console.log('[Page] Result rings:', result.rings?.map(r => r.queryName).join(', '));
-      console.log('[Page] Cached plot data:', cachedPlotData);
-      console.log('[Page] Existing rings:', cachedPlotData?.rings?.map(r => ({ name: r.queryName, annotations: r.annotations?.length || 0 })));
+      console.log(`[Page] Alignments complete. ${result.rings?.length || 0} rings: ${result.rings?.map(r => r.queryName).join(', ')}`);
 
       // Merge final alignment results into existing plot data
       // CRITICAL: Check if existing rings array has any items, not just if it exists
       const hasExistingRings = cachedPlotData?.rings && cachedPlotData.rings.length > 0;
 
-      const finalRings = hasExistingRings
-        ? cachedPlotData.rings.map(existingRing => {
-            const newRingData = result.rings?.find(r => r.queryName === existingRing.queryName);
-            if (newRingData) {
-              console.log(`[Page] Final merge for ring: ${existingRing.queryName}, keeping annotations: ${existingRing.annotations?.length || 0}`);
-              return {
-                ...existingRing,
-                hits: newRingData.hits,
-                statistics: newRingData.statistics,
-                alignmentOutput: newRingData.alignmentOutput,
-                // CRITICAL: Preserve annotations from existing ring OR ringAnnotations state
-                annotations: existingRing.annotations || ringAnnotations[existingRing.queryId] || []
-              };
-            }
-            console.log(`[Page] Keeping existing ring without alignment: ${existingRing.queryName}`);
-            return existingRing;
-          })
-        : result.rings?.map(ring => ({
-            ...ring,
-            // Add annotations from ringAnnotations state if they exist
-            annotations: ring.annotations || ringAnnotations[ring.queryId] || []
-          })) || []; // Use alignment results directly with annotations from state if no existing rings
+      let finalRings: RingData[];
+      if (hasExistingRings) {
+        // Update existing cached rings with new alignment data
+        finalRings = cachedPlotData.rings.map(existingRing => {
+          const newRingData = result.rings?.find(r => r.queryName === existingRing.queryName);
+          if (newRingData) {
+            console.log(`[Page] Final merge - updating ring: ${existingRing.queryName}`);
+            return {
+              ...existingRing,
+              hits: newRingData.hits,
+              statistics: newRingData.statistics,
+              alignmentOutput: newRingData.alignmentOutput,
+              annotations: existingRing.annotations || ringAnnotations[existingRing.queryId] || []
+            };
+          }
+          return existingRing;
+        });
 
-      console.log('[Page] Final rings after merge:', finalRings?.map(r => ({ name: r.queryName, hits: r.hits?.length || 0, annotations: r.annotations?.length || 0 })));
+        // Append any NEW rings from result that weren't in the cache
+        const newRingsToAdd = (result.rings || []).filter(
+          newRing => !cachedPlotData.rings.some(existing => existing.queryName === newRing.queryName)
+        );
+        if (newRingsToAdd.length > 0) {
+          console.log(`[Page] Final merge - adding ${newRingsToAdd.length} new rings: ${newRingsToAdd.map(r => r.queryName).join(', ')}`);
+          const newRingsWithAnnotations = newRingsToAdd.map(ring => ({
+            ...ring,
+            annotations: ring.annotations || ringAnnotations[ring.queryId] || []
+          }));
+          finalRings = [...finalRings, ...newRingsWithAnnotations];
+        }
+      } else {
+        finalRings = (result.rings || []).map(ring => ({
+          ...ring,
+          annotations: ring.annotations || ringAnnotations[ring.queryId] || []
+        }));
+      }
+
+      console.log(`[Page] Final merge: ${finalRings?.length || 0} rings`);
 
       // Keep existing skeleton (reference, GC data), only update rings with alignment data
       if (cachedPlotData) {
@@ -455,7 +477,7 @@ export default function Home() {
                   <circle cx="12" cy="12" r="1" fill="var(--gx-accent)" />
                 </svg>
                 <div>
-                  <h1 className="text-lg font-bold" style={{ color: 'var(--gx-text)' }}>BRIGX</h1>
+                  <h1 className="text-lg font-bold" style={{ color: 'var(--gx-text)' }}>BRIGX <span className="text-xs font-normal" style={{ color: 'var(--gx-text-muted)' }}>v{APP_VERSION}</span></h1>
                   <p className="text-xs" style={{ color: 'var(--gx-text-muted)' }}>Browser-based Ring Image Generator</p>
                 </div>
               </div>

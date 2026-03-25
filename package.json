@@ -1,6 +1,6 @@
 {
   "name": "brig-web",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,6 +10,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "build:check": "next build && echo '\n✅ Build successful! Safe to push to Vercel.'",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
     "deploy": "npm run build:check && git add -A && git commit -m 'Deploy: build verified' && git push"
   },
   "dependencies": {

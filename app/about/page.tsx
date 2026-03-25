@@ -84,11 +84,28 @@ export default function AboutPage() {
               <blockquote className="pl-4 italic mb-4" style={{ borderLeft: '4px solid var(--gx-accent)', color: 'var(--gx-text-muted)' }}>
                 Alikhan NF, Petty NK, Ben Zakour NL, Beatson SA (2011) BLAST Ring Image Generator (BRIG):
                 simple prokaryote genome comparisons. BMC Genomics 12:402.
+                {' '}
+                <a
+                  href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3163573/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: 'var(--gx-accent)', textDecoration: 'underline' }}
+                >
+                  Read the paper
+                </a>
               </blockquote>
 
               <h2 className="text-2xl font-semibold mt-8 mb-4" style={{ color: 'var(--gx-text)' }}>Contributing</h2>
               <p className="mb-4" style={{ color: 'var(--gx-text)' }}>
-                BRIGX is an open-source project. You can edit this page and contribute to the project on GitHub.
+                BRIGX is an open-source project. You can contribute to the project on{' '}
+                <a
+                  href="https://github.com/happykhan/brigx"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: 'var(--gx-accent)', textDecoration: 'underline' }}
+                >
+                  GitHub
+                </a>.
               </p>
 
               <div className="mt-8 pt-8" style={{ borderTop: '1px solid var(--gx-border)' }}>

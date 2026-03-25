@@ -61,12 +61,14 @@ export interface Feature {
 }
 
 // Custom annotations for rings
+export type AnnotationShape = 'arrow-forward' | 'arrow-reverse' | 'block' | 'arc' | 'hidden';
+
 export interface Annotation {
   id: string;
   start: number;
   end: number;
   label: string;
-  shape: 'arrow-forward' | 'arrow-reverse' | 'block';
+  shape: AnnotationShape;
   color?: string;
 }
 
@@ -86,6 +88,14 @@ export interface AnnotationTrack {
   };
 }
 
+// Contig boundary for multi-FASTA reference visualization
+export interface ContigBoundary {
+  name: string;
+  start: number; // 0-based position in merged sequence
+  end: number;
+  index: number;
+}
+
 export interface CircularPlotData {
   reference: {
     name: string;
@@ -93,6 +103,7 @@ export interface CircularPlotData {
     gcContent?: number[];
     gcSkew?: number[];
     features?: Feature[];
+    contigs?: ContigBoundary[]; // Contig boundaries for multi-FASTA reference
   };
   rings: RingData[];
   config: {
@@ -117,6 +128,30 @@ export interface PipelineParams {
   colorScheme: string;
   forceAlignment: boolean;
   alignerOptions?: string;
+  spacerSize?: number; // Spacer between sequences in multi-FASTA reference (default: 0)
+}
+
+// Graph ring data (for .graph files - coverage, expression, etc.)
+export interface GraphPoint {
+  start: number;
+  end: number;
+  value: number;
+}
+
+export interface GraphRingData {
+  queryId: string;
+  queryName: string;
+  color: string;
+  visible: boolean;
+  points: GraphPoint[];
+  maxValue: number;
+  isGraphRing: true;
+  annotations?: Annotation[];
+  statistics: {
+    meanIdentity: number;
+    genomeCoverage: number;
+    totalAlignedBases: number;
+  };
 }
 
 export interface RingConfig {
@@ -127,6 +162,7 @@ export interface RingConfig {
   upperThreshold: number;
   lowerThreshold: number;
   customWidth?: number; // Optional custom width for this ring
+  blastType?: 'blastn' | 'blastx'; // Per-ring BLAST program (default: blastn)
 }
 
 export interface ProgressUpdate {

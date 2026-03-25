@@ -7,7 +7,8 @@ import type {
   RingData,
   RingConfig,
   PipelineParams,
-  ProgressUpdate
+  ProgressUpdate,
+  ContigBoundary
 } from './types';
 
 const COLORS = [
@@ -245,13 +246,7 @@ export class BRIGController {
       worker.onmessage = (e) => {
         console.log(`[Controller] Received message from worker for ${query.name}, type: ${e.data.type}`);
         if (e.data.type === 'aligned') {
-          console.log(`[Controller] Alignment completed for ${query.name}`);
-          console.log(`[Controller] Alignment result:`, {
-            queryId: e.data.result.queryId,
-            queryName: e.data.result.queryName,
-            hitsCount: e.data.result.hits?.length || 0,
-            rawOutputLength: e.data.rawOutput?.length || 0
-          });
+          console.log(`[Controller] Alignment completed for ${query.name}: ${e.data.result.hits?.length || 0} hits`);
           clearTimeout(timeout);
           resolve({ result: e.data.result, rawOutput: e.data.rawOutput });
         } else if (e.data.type === 'error') {
@@ -337,16 +332,47 @@ export class BRIGController {
       this.updateProgress('Parsing reference genome', 5);
       const referenceGenomes = await this.parseGenomes(referenceFile);
       
-      // Validate reference has only one sequence
       if (referenceGenomes.length === 0) {
         throw new Error('Reference file contains no sequences');
       }
+
+      // Support multi-FASTA reference: merge with spacers and track contig boundaries
+      let reference: ParsedGenome;
+      let contigBoundaries: ContigBoundary[] | undefined;
+
       if (referenceGenomes.length > 1) {
-        throw new Error(`Reference file must contain exactly ONE sequence, but found ${referenceGenomes.length}. Please use a single-sequence FASTA file as reference.`);
+        const spacerSize = params.spacerSize || 0;
+        const spacer = spacerSize > 0 ? 'N'.repeat(spacerSize) : '';
+        const sequences: string[] = [];
+        contigBoundaries = [];
+        let pos = 0;
+
+        for (let i = 0; i < referenceGenomes.length; i++) {
+          if (i > 0 && spacerSize > 0) pos += spacerSize;
+          contigBoundaries.push({
+            name: referenceGenomes[i].name,
+            start: pos,
+            end: pos + referenceGenomes[i].length,
+            index: i
+          });
+          sequences.push(referenceGenomes[i].sequence);
+          pos += referenceGenomes[i].length;
+        }
+
+        const mergedSeq = sequences.join(spacer);
+        reference = {
+          id: `merged-ref-${Date.now()}`,
+          name: referenceGenomes[0].name,
+          sequence: mergedSeq,
+          length: mergedSeq.length,
+          gcContent: 0,
+          isCircular: false
+        };
+        console.log(`[Controller] Multi-FASTA reference: ${referenceGenomes.length} contigs merged (spacer: ${spacerSize}bp), total: ${reference.length} bp`);
+      } else {
+        reference = referenceGenomes[0];
       }
-      
-      const reference = referenceGenomes[0];
-      console.log(`[Controller] Reference parsed: ${reference.name}, length: ${reference.length}`);
+      console.log(`[Controller] Reference: ${reference.name}, ${(reference.length / 1_000_000).toFixed(2)} Mbp`);
       
       // Calculate GC content
       console.log('[Controller] Step 2: Calculating GC content');
@@ -372,7 +398,8 @@ export class BRIGController {
               length: reference.length,
               gcContent,
               gcSkew,
-              features: []
+              features: [],
+              contigs: contigBoundaries
             },
             rings: [], // Empty rings array initially
             config: {
@@ -544,7 +571,8 @@ export class BRIGController {
                 length: reference.length,
                 gcContent,
                 gcSkew,
-                features: []
+                features: [],
+                contigs: contigBoundaries
               },
               rings: [...ringDataArray], // Send all rings processed so far
               config: {
@@ -556,12 +584,7 @@ export class BRIGController {
         }
       }
 
-      console.log(`[Controller] All ${ringDataArray.length} rings processed successfully`);
-      console.log(`[Controller] Ring summary:`, ringDataArray.map(r => ({
-        name: r.queryName,
-        hits: r.hits?.length || 0,
-        visible: r.visible
-      })));
+      console.log(`[Controller] All ${ringDataArray.length} rings processed: ${ringDataArray.map(r => `${r.queryName} (${r.hits?.length || 0} hits, ${r.statistics.genomeCoverage.toFixed(1)}% coverage)`).join(', ')}`);
       
       this.updateProgress('Finalizing', 95);
 
@@ -571,7 +594,8 @@ export class BRIGController {
           length: reference.length,
           gcContent,
           gcSkew,
-          features: []
+          features: [],
+          contigs: contigBoundaries
         },
         rings: ringDataArray,
         config: {
@@ -580,14 +604,7 @@ export class BRIGController {
         }
       };
 
-      console.log('[Controller] Returning final plot data with structure:', {
-        referenceName: finalData.reference.name,
-        referenceLength: finalData.reference.length,
-        ringsCount: finalData.rings.length,
-        gcContentWindows: finalData.reference.gcContent?.length || 0,
-        gcSkewWindows: finalData.reference.gcSkew?.length || 0
-      });
-      console.log('[Controller] === Pipeline Complete ===');
+      console.log(`[Controller] Pipeline complete: ${finalData.reference.name} (${(finalData.reference.length / 1_000_000).toFixed(2)} Mbp), ${finalData.rings.length} rings`);
       
       // Return complete plot data
       return finalData;

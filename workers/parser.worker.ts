@@ -239,6 +239,70 @@ export function mergeGenomes(genomes: ParsedGenome[]): ParsedGenome {
   };
 }
 
+// Extract features from GenBank FEATURES section
+// Returns annotations suitable for ring display
+import type { Annotation, AnnotationShape } from '../lib/types';
+
+export function extractGenBankFeatures(
+  text: string,
+  featureType: string,
+  textContains?: string
+): Annotation[] {
+  const annotations: Annotation[] = [];
+
+  // Find FEATURES section(s) - may span multiple records
+  const records = text.split(/^LOCUS/m).filter(r => r.trim().length > 0);
+
+  for (const record of records) {
+    const featuresMatch = record.match(/FEATURES[\s\S]*?(?=ORIGIN|CONTIG|BASE COUNT|$)/);
+    if (!featuresMatch) continue;
+
+    const featuresBlock = featuresMatch[0];
+    // Split into individual feature entries
+    // Each feature starts with a line like "     CDS             100..500"
+    // (5 spaces, feature key, spaces, location)
+    const featureRegex = /^ {5}(\S+)\s+(complement\()?(\d+)\.\.(\d+)\)?\s*\n((?:^ {21}\S.*\n)*)/gm;
+
+    let match;
+    while ((match = featureRegex.exec(featuresBlock)) !== null) {
+      const type = match[1];
+      const isComplement = !!match[2];
+      const start = parseInt(match[3], 10);
+      const end = parseInt(match[4], 10);
+      const qualifierBlock = match[5] || '';
+
+      if (type !== featureType) continue;
+
+      // Extract qualifiers
+      const geneMatch = qualifierBlock.match(/\/gene="([^"]+)"/);
+      const productMatch = qualifierBlock.match(/\/product="([^"]+)"/);
+      const noteMatch = qualifierBlock.match(/\/note="([^"]+)"/);
+      const locusTagMatch = qualifierBlock.match(/\/locus_tag="([^"]+)"/);
+
+      const label = geneMatch?.[1] || locusTagMatch?.[1] || productMatch?.[1] || `${type}`;
+      const fullText = qualifierBlock.toLowerCase();
+
+      // Apply text filter if specified
+      if (textContains && !fullText.includes(textContains.toLowerCase())) {
+        continue;
+      }
+
+      const shape: AnnotationShape = isComplement ? 'arrow-reverse' : 'arrow-forward';
+
+      annotations.push({
+        id: `gbk-${annotations.length}-${start}`,
+        start,
+        end,
+        label,
+        shape,
+        color: '#000000'
+      });
+    }
+  }
+
+  return annotations;
+}
+
 // Worker message handler
 self.onmessage = async (e: MessageEvent) => {
   console.log('[Parser Worker] Received message:', e.data.type);

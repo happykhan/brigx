@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
   webpack: (config, { isServer }) => {
     // Enable WebAssembly support
     config.experiments = {

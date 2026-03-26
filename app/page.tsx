@@ -39,7 +39,7 @@ export default function Home() {
     ringWidth: 20,
     gcRingWidth: 40,
     ringSpacing: 4,
-    legendFontSize: 12,
+    legendFontSize: 16,
     scaleFontSize: 12,
     titleFontSize: 24,
     labelFontSize: 14,
@@ -219,23 +219,25 @@ export default function Home() {
       const existingRingData = ringDataMap.get(ringConfig.id);
 
       if (existingRingData) {
-        // Ring has alignment data - update it
         return {
           ...existingRingData,
           queryName: ringConfig.legendText,
           color: ringConfig.color,
           visible: true,
           customWidth: ringConfig.customWidth,
+          upperThreshold: ringConfig.upperThreshold,
+          lowerThreshold: ringConfig.lowerThreshold,
           annotations: ringAnnotations[ringConfig.id] || existingRingData.annotations || []
         };
       } else {
-        // Ring has no alignment data yet (placeholder or annotation-only ring)
         return {
           queryId: ringConfig.id,
           queryName: ringConfig.legendText,
           color: ringConfig.color,
           visible: true,
           customWidth: ringConfig.customWidth,
+          upperThreshold: ringConfig.upperThreshold,
+          lowerThreshold: ringConfig.lowerThreshold,
           hits: [],
           annotations: ringAnnotations[ringConfig.id] || [],
           statistics: {
@@ -247,10 +249,9 @@ export default function Home() {
       }
     });
 
-    setPlotData({
-      ...cachedPlotData,
-      rings: updatedRings
-    });
+    const updated = { ...cachedPlotData, rings: updatedRings };
+    setPlotData(updated);
+    setCachedPlotData(updated);
   }, [rings, ringAnnotations]); // Removed cachedPlotData from dependencies!
 
   const handleRun = async () => {
@@ -545,10 +546,10 @@ export default function Home() {
                 </div>
               </div>
               <div className="hidden md:flex items-center gap-6">
-                <button onClick={handleSaveSession} className="btn-secondary text-xs px-3 py-1">
+                <button onClick={handleSaveSession} className="btn-secondary text-xs px-3 py-1" title="Save current session (rings, annotations, settings) as JSON">
                   Save Session
                 </button>
-                <label className="btn-secondary text-xs px-3 py-1 cursor-pointer">
+                <label className="btn-secondary text-xs px-3 py-1 cursor-pointer" title="Load a previously saved session from JSON file">
                   Load Session
                   <input type="file" accept=".json" onChange={handleLoadSession} className="hidden" />
                 </label>
@@ -621,6 +622,7 @@ export default function Home() {
                     params={params}
                     setParams={setParams}
                     disabled={isProcessing}
+                    isMultiFasta={!!(plotData?.reference?.contigs && plotData.reference.contigs.length > 1)}
                   />
                 </div>
 
@@ -653,7 +655,7 @@ export default function Home() {
                   />
                 </div>
 
-                <div className={`card ${plotExpanded ? 'fixed inset-4 z-50 overflow-auto' : ''}`} style={plotExpanded ? { background: 'var(--gx-bg-alt)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' } : undefined}>
+                <div className={`card ${plotExpanded ? 'fixed inset-0 z-50 flex flex-col' : ''}`} style={plotExpanded ? { background: 'var(--gx-bg-alt)', borderRadius: 0 } : undefined}>
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="section-title mb-0">Circular Plot</h2>
                     <div className="flex items-center gap-2">
@@ -677,7 +679,19 @@ export default function Home() {
                   </div>
 
                   {plotData ? (
-                    <CircularPlot data={plotData} imageProperties={imageProperties} />
+                    <div className={plotExpanded ? 'flex-1 min-h-0' : ''}>
+                    <CircularPlot
+                      data={{
+                        ...plotData,
+                        reference: {
+                          ...plotData.reference,
+                          gcContent: params.showGCContent !== false ? plotData.reference.gcContent : undefined,
+                          gcSkew: params.showGCSkew !== false ? plotData.reference.gcSkew : undefined
+                        }
+                      }}
+                      imageProperties={imageProperties}
+                    />
+                    </div>
                   ) : (
                     <div className="flex items-center justify-center h-96" style={{ color: 'var(--gx-text-muted)' }}>
                       <div className="text-center">
@@ -686,7 +700,7 @@ export default function Home() {
                           <circle cx="12" cy="12" r="6" strokeWidth="1.5" />
                           <circle cx="12" cy="12" r="2" strokeWidth="1.5" />
                         </svg>
-                        <p className="text-lg">Upload a reference genome to begin</p>
+                        <p className="text-lg">Load a reference genome to begin</p>
                         <p className="text-sm mt-2">The plot will generate automatically with GC content/skew rings</p>
                       </div>
                     </div>
@@ -734,7 +748,8 @@ export default function Home() {
                                 {ring.alignmentOutput && (
                                   <button
                                     onClick={() => {
-                                      const blob = new Blob([ring.alignmentOutput!], { type: 'text/plain' });
+                                      const header = '#query\tsubject\t%identity\talignment_length\tmismatches\tgap_opens\tq.start\tq.end\ts.start\ts.end\tevalue\tbit_score\n';
+                                      const blob = new Blob([header + ring.alignmentOutput!], { type: 'text/plain' });
                                       const url = URL.createObjectURL(blob);
                                       const a = document.createElement('a');
                                       a.href = url;

@@ -604,6 +604,8 @@ export class BRIGController {
           visible: true,
           hits: alignResult.result.hits,
           alignmentOutput: alignResult.rawOutput,
+          upperThreshold: ring.upperThreshold,
+          lowerThreshold: ring.lowerThreshold,
           statistics
         };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import type { CircularPlotData } from '@/lib/types';
 import type { ImagePropertiesConfig } from './ImageProperties';
 import { CircularPlotRenderer } from '@/lib/renderer';
@@ -55,7 +55,6 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
     renderer.setTooltipCallback((info) => setTooltip(info));
     renderer.render(containerRef.current, data);
 
-    // Get the SVG element
     const svg = containerRef.current.querySelector('svg');
     if (svg) {
       svgRef.current = svg;
@@ -67,12 +66,9 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
     if (svgRef.current) {
       const mainGroup = svgRef.current.querySelector('g.main-content');
       if (mainGroup) {
-        // Get the SVG center point
         const viewBox = svgRef.current.viewBox.baseVal;
         const cx = viewBox.width / 2;
         const cy = viewBox.height / 2;
-
-        // Apply transform with proper origin
         mainGroup.setAttribute(
           'transform',
           `translate(${cx + pan.x}, ${cy + pan.y}) scale(${zoom}) translate(${-cx}, ${-cy})`
@@ -82,7 +78,7 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
   }, [zoom, pan]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 0) { // Left mouse button
+    if (e.button === 0) {
       setIsDragging(true);
       setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
     }
@@ -90,82 +86,58 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (isDragging) {
-      setPan({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
-      });
+      setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
     }
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+  const handleMouseUp = () => setIsDragging(false);
 
-  const handleZoomIn = () => {
-    setZoom(prev => Math.min(prev * 1.2, 5));
-  };
+  const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.2, 5));
+  const handleZoomOut = () => setZoom(prev => Math.max(prev / 1.2, 0.3));
+  const handleResetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
 
-  const handleZoomOut = () => {
-    setZoom(prev => Math.max(prev / 1.2, 0.5));
-  };
-
-  const handleResetView = () => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
+  // Scroll to zoom
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    setZoom(prev => Math.max(0.3, Math.min(5, prev * delta)));
+  }, []);
 
   return (
-    <div className="relative">
-      {/* Zoom Controls */}
-      <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2 rounded-lg p-2" style={{ background: 'var(--gx-bg-alt)', border: '1px solid var(--gx-border)', boxShadow: 'var(--gx-shadow)' }}>
-        <button
-          type="button"
-          onClick={handleZoomIn}
-          className="p-2 rounded transition-colors"
-          style={{ color: 'var(--gx-text)' }}
-          title="Zoom In"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          onClick={handleZoomOut}
-          className="p-2 rounded transition-colors"
-          style={{ color: 'var(--gx-text)' }}
-          title="Zoom Out"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          onClick={handleResetView}
-          className="p-2 rounded transition-colors"
-          style={{ color: 'var(--gx-text)' }}
-          title="Reset View"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </button>
-        <div className="text-xs text-center py-1" style={{ color: 'var(--gx-text-muted)', borderTop: '1px solid var(--gx-border)' }}>
-          {Math.round(zoom * 100)}%
+    <div className="relative h-full flex flex-col">
+      {/* Toolbar - horizontal, always visible */}
+      <div className="flex items-center justify-between px-3 py-1.5 rounded-t-lg" style={{ background: 'var(--gx-surface)', borderBottom: '1px solid var(--gx-border)' }}>
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={handleZoomOut} className="p-1.5 rounded hover:opacity-80" style={{ color: 'var(--gx-text)' }} title="Zoom out (or scroll down)">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+            </svg>
+          </button>
+          <div className="text-xs font-mono w-12 text-center" style={{ color: 'var(--gx-text-muted)' }}>
+            {Math.round(zoom * 100)}%
+          </div>
+          <button type="button" onClick={handleZoomIn} className="p-1.5 rounded hover:opacity-80" style={{ color: 'var(--gx-text)' }} title="Zoom in (or scroll up)">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
         </div>
+        <button type="button" onClick={handleResetView} className="text-xs px-2 py-1 rounded hover:opacity-80" style={{ color: 'var(--gx-text-muted)' }} title="Reset zoom to 100% and centre the plot">
+          Reset
+        </button>
       </div>
 
+      {/* Plot area */}
       <div
         ref={containerRef}
-        className="w-full overflow-hidden cursor-move"
+        className="flex-1 min-h-0 overflow-hidden"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onWheel={handleWheel}
         style={{ cursor: isDragging ? 'grabbing' : 'grab', background: 'white' }}
       />
-
 
       {tooltip && tooltip.x != null && tooltip.y != null && (
         <div

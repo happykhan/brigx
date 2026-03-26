@@ -44,6 +44,8 @@ export interface RingData {
   alignmentOutput?: string; // Raw alignment output for download
   graphPoints?: GraphPoint[]; // Graph ring data (from .graph or .sam files)
   graphMaxValue?: number; // Maximum value for graph ring scaling
+  upperThreshold?: number; // Per-ring upper identity threshold (default: 90)
+  lowerThreshold?: number; // Per-ring lower identity threshold (default: 70)
   statistics: {
     meanIdentity: number;
     genomeCoverage: number;
@@ -132,6 +134,8 @@ export interface PipelineParams {
   alignerOptions?: string;
   spacerSize?: number; // Spacer between sequences in multi-FASTA reference (default: 0)
   blastProgram?: 'blastn' | 'blastx'; // BLAST program (default: blastn)
+  showGCContent?: boolean; // Show GC content ring (default: true)
+  showGCSkew?: boolean; // Show GC skew ring (default: true)
 }
 
 // Graph ring data (for .graph files - coverage, expression, etc.)

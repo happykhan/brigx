@@ -560,7 +560,7 @@ export class CircularPlotRenderer {
         );
         
         // Get color intensity based on percent identity and thresholds
-        const color = this.getColorIntensity(ring.color, hit.percentIdentity);
+        const color = this.getColorIntensity(ring.color, hit.percentIdentity, ring.lowerThreshold, ring.upperThreshold);
         
         const arcElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         arcElement.setAttribute('d', path);
@@ -984,17 +984,15 @@ export class CircularPlotRenderer {
   }
 
   // Color intensity scaling based on identity and thresholds
-  private getColorIntensity(baseColor: string, percentIdentity: number): string {
-    // Parse the base color (assuming hex format like #e74c3c)
+  private getColorIntensity(baseColor: string, percentIdentity: number, lowerThreshold?: number, upperThreshold?: number): string {
     const hex = baseColor.replace('#', '');
     const r = parseInt(hex.substring(0, 2), 16);
     const g = parseInt(hex.substring(2, 4), 16);
     const b = parseInt(hex.substring(4, 6), 16);
-    
-    // Map identity to intensity (minIdentity = white, 100 = full color)
-    // Using config.minIdentity as lower threshold
-    const minIdentity = this.config.minIdentity;
-    const maxIdentity = 100;
+
+    // Use per-ring thresholds if provided, otherwise fall back to global config
+    const minIdentity = lowerThreshold ?? this.config.minIdentity;
+    const maxIdentity = upperThreshold ?? 100;
     
     // Normalize identity to 0-1 range
     const normalized = Math.max(0, Math.min(1, 
@@ -1009,113 +1007,145 @@ export class CircularPlotRenderer {
     return `rgb(${finalR}, ${finalG}, ${finalB})`;
   }
 
-  private renderGCLegend(svg: SVGSVGElement, hasGCSkew: boolean) {
+  private renderGCLegend(svg: SVGSVGElement, hasGCContent: boolean, hasGCSkew: boolean) {
     const legendX = 20;
     const legendY = 20;
+    const fs = this.config.legendFontSize;
+    const barW = 120;
+    const barH = 10;
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('class', 'gc-legend');
-    
-    // Calculate legend height based on content
-    const legendHeight = hasGCSkew ? 115 : 70;
-    
-    // Background
-    const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    bg.setAttribute('x', String(legendX - 5));
-    bg.setAttribute('y', String(legendY - 5));
-    bg.setAttribute('width', '120');
-    bg.setAttribute('height', String(legendHeight));
-    bg.setAttribute('fill', 'white');
-    bg.setAttribute('stroke', '#ccc');
-    bg.setAttribute('stroke-width', '1');
-    bg.setAttribute('rx', '5');
-    bg.setAttribute('opacity', '0.95');
-    group.appendChild(bg);
-    
-    // Title
-    const title = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    title.setAttribute('x', String(legendX));
-    title.setAttribute('y', String(legendY + 10));
-    title.setAttribute('font-size', String(this.config.legendFontSize));
-    title.setAttribute('font-weight', 'bold');
-    title.setAttribute('fill', '#333');
-    title.textContent = 'GC Analysis';
-    group.appendChild(title);
-    
-    // Low GC indicator
-    const lowRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    lowRect.setAttribute('x', String(legendX));
-    lowRect.setAttribute('y', String(legendY + 20));
-    lowRect.setAttribute('width', '15');
-    lowRect.setAttribute('height', '15');
-    lowRect.setAttribute('fill', 'rgb(255, 55, 50)');
-    lowRect.setAttribute('rx', '2');
-    group.appendChild(lowRect);
-    
-    const lowText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    lowText.setAttribute('x', String(legendX + 20));
-    lowText.setAttribute('y', String(legendY + 31));
-    lowText.setAttribute('font-size', String(this.config.legendFontSize - 1));
-    lowText.setAttribute('fill', '#333');
-    lowText.textContent = 'Low GC';
-    group.appendChild(lowText);
-    
-    // High GC indicator
-    const highRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    highRect.setAttribute('x', String(legendX));
-    highRect.setAttribute('y', String(legendY + 40));
-    highRect.setAttribute('width', '15');
-    highRect.setAttribute('height', '15');
-    highRect.setAttribute('fill', 'rgb(55, 255, 50)');
-    highRect.setAttribute('rx', '2');
-    group.appendChild(highRect);
-    
-    const highText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    highText.setAttribute('x', String(legendX + 20));
-    highText.setAttribute('y', String(legendY + 51));
-    highText.setAttribute('font-size', String(this.config.legendFontSize - 1));
-    highText.setAttribute('fill', '#333');
-    highText.textContent = 'High GC';
-    group.appendChild(highText);
-    
-    // GC Skew indicators (if present)
+
+    // Defs for gradients
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    group.appendChild(defs);
+
+    let y = legendY + fs;
+
+    // --- GC Content gradient bar (red → green) ---
+    if (hasGCContent) {
+    const gcTitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    gcTitle.setAttribute('x', String(legendX));
+    gcTitle.setAttribute('y', String(y));
+    gcTitle.setAttribute('font-size', String(fs));
+    gcTitle.setAttribute('font-weight', 'bold');
+    gcTitle.setAttribute('fill', '#333');
+    gcTitle.textContent = 'GC Content';
+    group.appendChild(gcTitle);
+    y += fs + 2;
+
+    const gcGrad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+    gcGrad.setAttribute('id', 'gc-content-grad');
+    const gcStop0 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    gcStop0.setAttribute('offset', '0%');
+    gcStop0.setAttribute('stop-color', 'rgb(255, 55, 50)');
+    gcGrad.appendChild(gcStop0);
+    const gcStop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    gcStop1.setAttribute('offset', '100%');
+    gcStop1.setAttribute('stop-color', 'rgb(55, 255, 50)');
+    gcGrad.appendChild(gcStop1);
+    defs.appendChild(gcGrad);
+
+    const gcBar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    gcBar.setAttribute('x', String(legendX));
+    gcBar.setAttribute('y', String(y));
+    gcBar.setAttribute('width', String(barW));
+    gcBar.setAttribute('height', String(barH));
+    gcBar.setAttribute('fill', 'url(#gc-content-grad)');
+    gcBar.setAttribute('rx', '2');
+    gcBar.setAttribute('stroke', '#ccc');
+    gcBar.setAttribute('stroke-width', '0.5');
+    group.appendChild(gcBar);
+
+    // Ticks: Low / Average / High
+    const gcTicks = [
+      { label: '0%', x: legendX },
+      { label: '50%', x: legendX + barW / 2 },
+      { label: '100%', x: legendX + barW }
+    ];
+    gcTicks.forEach(tick => {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', String(tick.x));
+      line.setAttribute('y1', String(y));
+      line.setAttribute('x2', String(tick.x));
+      line.setAttribute('y2', String(y + barH + 3));
+      line.setAttribute('stroke', '#666');
+      line.setAttribute('stroke-width', '1');
+      group.appendChild(line);
+
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', String(tick.x));
+      label.setAttribute('y', String(y + barH + fs));
+      label.setAttribute('font-size', String(fs - 3));
+      label.setAttribute('fill', '#666');
+      label.setAttribute('text-anchor', 'middle');
+      label.textContent = tick.label;
+      group.appendChild(label);
+    });
+    y += barH + fs * 2 + 6;
+    } // end hasGCContent
+
+    // --- GC Skew gradient bar (purple → green) ---
     if (hasGCSkew) {
-      // Purple for negative (more C)
-      const negSkewRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      negSkewRect.setAttribute('x', String(legendX));
-      negSkewRect.setAttribute('y', String(legendY + 65));
-      negSkewRect.setAttribute('width', '15');
-      negSkewRect.setAttribute('height', '15');
-      negSkewRect.setAttribute('fill', '#a855f7');
-      negSkewRect.setAttribute('rx', '2');
-      group.appendChild(negSkewRect);
-      
-      const negSkewText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      negSkewText.setAttribute('x', String(legendX + 20));
-      negSkewText.setAttribute('y', String(legendY + 76));
-      negSkewText.setAttribute('font-size', String(this.config.legendFontSize - 1));
-      negSkewText.setAttribute('fill', '#333');
-      negSkewText.textContent = 'GC- Skew';
-      group.appendChild(negSkewText);
-      
-      // Green for positive (more G)
-      const posSkewRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      posSkewRect.setAttribute('x', String(legendX));
-      posSkewRect.setAttribute('y', String(legendY + 85));
-      posSkewRect.setAttribute('width', '15');
-      posSkewRect.setAttribute('height', '15');
-      posSkewRect.setAttribute('fill', '#22c55e');
-      posSkewRect.setAttribute('rx', '2');
-      group.appendChild(posSkewRect);
-      
-      const posSkewText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      posSkewText.setAttribute('x', String(legendX + 20));
-      posSkewText.setAttribute('y', String(legendY + 96));
-      posSkewText.setAttribute('font-size', String(this.config.legendFontSize - 1));
-      posSkewText.setAttribute('fill', '#333');
-      posSkewText.textContent = 'GC+ Skew';
-      group.appendChild(posSkewText);
+      const skewTitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      skewTitle.setAttribute('x', String(legendX));
+      skewTitle.setAttribute('y', String(y));
+      skewTitle.setAttribute('font-size', String(fs));
+      skewTitle.setAttribute('font-weight', 'bold');
+      skewTitle.setAttribute('fill', '#333');
+      skewTitle.textContent = 'GC Skew';
+      group.appendChild(skewTitle);
+      y += fs + 2;
+
+      const skewGrad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+      skewGrad.setAttribute('id', 'gc-skew-grad');
+      const skStop0 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+      skStop0.setAttribute('offset', '0%');
+      skStop0.setAttribute('stop-color', '#a855f7');
+      skewGrad.appendChild(skStop0);
+      const skStop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+      skStop1.setAttribute('offset', '100%');
+      skStop1.setAttribute('stop-color', '#22c55e');
+      skewGrad.appendChild(skStop1);
+      defs.appendChild(skewGrad);
+
+      const skewBar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      skewBar.setAttribute('x', String(legendX));
+      skewBar.setAttribute('y', String(y));
+      skewBar.setAttribute('width', String(barW));
+      skewBar.setAttribute('height', String(barH));
+      skewBar.setAttribute('fill', 'url(#gc-skew-grad)');
+      skewBar.setAttribute('rx', '2');
+      skewBar.setAttribute('stroke', '#ccc');
+      skewBar.setAttribute('stroke-width', '0.5');
+      group.appendChild(skewBar);
+
+      const skewTicks = [
+        { label: '-1', x: legendX },
+        { label: '0', x: legendX + barW / 2 },
+        { label: '+1', x: legendX + barW }
+      ];
+      skewTicks.forEach(tick => {
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', String(tick.x));
+        line.setAttribute('y1', String(y));
+        line.setAttribute('x2', String(tick.x));
+        line.setAttribute('y2', String(y + barH + 3));
+        line.setAttribute('stroke', '#666');
+        line.setAttribute('stroke-width', '1');
+        group.appendChild(line);
+
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', String(tick.x));
+        label.setAttribute('y', String(y + barH + fs));
+        label.setAttribute('font-size', String(fs - 3));
+        label.setAttribute('fill', '#666');
+        label.setAttribute('text-anchor', 'middle');
+        label.textContent = tick.label;
+        group.appendChild(label);
+      });
     }
-    
+
     svg.appendChild(group);
   }
 
@@ -1184,73 +1214,110 @@ export class CircularPlotRenderer {
     const fs = this.config.legendFontSize;
     const hasHits = (r: RingData) => (r.hits && r.hits.length > 0) || (r.graphPoints && r.graphPoints.length > 0);
 
-    let y = legendY;
+    let y = legendY + fs;
 
     rings.filter(r => r.visible).forEach((ring) => {
-      // Ring name
-      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      text.setAttribute('x', String(legendX));
-      text.setAttribute('y', String(y));
-      text.setAttribute('font-size', String(fs));
-      text.setAttribute('font-weight', 'bold');
-      text.setAttribute('fill', '#333');
-      text.textContent = ring.queryName;
-      group.appendChild(text);
-      y += fs + 2;
-
       if (hasHits(ring)) {
-        // Colour gradient bar: 3 swatches from upper to lower threshold
-        const swatchW = 12;
-        const swatchH = 10;
-        const labels = [
-          { pct: this.config.maxIdentity, opacity: 1.0 },
-          { pct: Math.round((this.config.maxIdentity + this.config.minIdentity) / 2), opacity: 0.6 },
-          { pct: this.config.minIdentity, opacity: 0.3 }
-        ];
+        // Ring name (bold, own line)
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', String(legendX));
+        text.setAttribute('y', String(y));
+        text.setAttribute('font-size', String(fs));
+        text.setAttribute('font-weight', 'bold');
+        text.setAttribute('fill', '#333');
+        text.textContent = ring.queryName;
+        group.appendChild(text);
+        y += fs + 2;
+        const upper = ring.upperThreshold ?? this.config.maxIdentity;
+        const lower = ring.lowerThreshold ?? this.config.minIdentity;
+        const barW = 120;
+        const barH = 10;
 
-        labels.forEach((item, i) => {
-          const sx = legendX + i * (swatchW + 40 + 4);
-          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-          rect.setAttribute('x', String(sx));
-          rect.setAttribute('y', String(y - swatchH + 2));
-          rect.setAttribute('width', String(swatchW));
-          rect.setAttribute('height', String(swatchH));
-          rect.setAttribute('fill', ring.color);
-          rect.setAttribute('opacity', String(item.opacity));
-          rect.setAttribute('rx', '1');
-          group.appendChild(rect);
+        // Create a unique gradient definition for this ring
+        const gradId = `grad-${ring.queryId}`;
+        let defs = group.querySelector('defs');
+        if (!defs) {
+          defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+          group.insertBefore(defs, group.firstChild);
+        }
+        const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+        grad.setAttribute('id', gradId);
+        // Gradient: left = low identity (faded), right = high identity (full colour)
+        const hex = ring.color.replace('#', '');
+        const cr = parseInt(hex.substring(0, 2), 16);
+        const cg = parseInt(hex.substring(2, 4), 16);
+        const cb = parseInt(hex.substring(4, 6), 16);
+        const stop0 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+        stop0.setAttribute('offset', '0%');
+        stop0.setAttribute('stop-color', `rgb(${Math.round(255 + (cr - 255) * 0.15)}, ${Math.round(255 + (cg - 255) * 0.15)}, ${Math.round(255 + (cb - 255) * 0.15)})`);
+        grad.appendChild(stop0);
+        const stop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+        stop1.setAttribute('offset', '100%');
+        stop1.setAttribute('stop-color', ring.color);
+        grad.appendChild(stop1);
+        defs.appendChild(grad);
+
+        // Draw gradient bar
+        const bar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        bar.setAttribute('x', String(legendX));
+        bar.setAttribute('y', String(y - barH + 2));
+        bar.setAttribute('width', String(barW));
+        bar.setAttribute('height', String(barH));
+        bar.setAttribute('fill', `url(#${gradId})`);
+        bar.setAttribute('rx', '2');
+        bar.setAttribute('stroke', '#ccc');
+        bar.setAttribute('stroke-width', '0.5');
+        group.appendChild(bar);
+
+        // Tick marks and labels at lower, mid, upper
+        const ticks = [
+          { pct: lower, x: legendX },
+          { pct: Math.round((upper + lower) / 2), x: legendX + barW / 2 },
+          { pct: upper, x: legendX + barW }
+        ];
+        ticks.forEach(tick => {
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', String(tick.x));
+          line.setAttribute('y1', String(y - barH + 2));
+          line.setAttribute('x2', String(tick.x));
+          line.setAttribute('y2', String(y + 4));
+          line.setAttribute('stroke', '#666');
+          line.setAttribute('stroke-width', '1');
+          group.appendChild(line);
 
           const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          label.setAttribute('x', String(sx + swatchW + 2));
-          label.setAttribute('y', String(y));
-          label.setAttribute('font-size', String(fs - 2));
+          label.setAttribute('x', String(tick.x));
+          label.setAttribute('y', String(y + fs));
+          label.setAttribute('font-size', String(fs - 3));
           label.setAttribute('fill', '#666');
-          label.textContent = `${item.pct}% identity`;
+          label.setAttribute('text-anchor', 'middle');
+          label.textContent = `${tick.pct}%`;
           group.appendChild(label);
         });
-        y += fs + 4;
+        y += fs + barH + 4;
       } else {
-        // No BLAST hits - just show a colour swatch
+        // No BLAST hits - colour swatch + name on same line
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', String(legendX));
-        rect.setAttribute('y', String(y - 8));
+        rect.setAttribute('y', String(y - fs + 3));
         rect.setAttribute('width', '12');
-        rect.setAttribute('height', '10');
+        rect.setAttribute('height', String(fs));
         rect.setAttribute('fill', ring.color);
-        rect.setAttribute('rx', '1');
+        rect.setAttribute('rx', '2');
         group.appendChild(rect);
 
-        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        label.setAttribute('x', String(legendX + 16));
-        label.setAttribute('y', String(y));
-        label.setAttribute('font-size', String(fs - 2));
-        label.setAttribute('fill', '#666');
-        label.textContent = 'annotation';
-        group.appendChild(label);
-        y += fs + 4;
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', String(legendX + 16));
+        text.setAttribute('y', String(y));
+        text.setAttribute('font-size', String(fs));
+        text.setAttribute('font-weight', 'bold');
+        text.setAttribute('fill', '#333');
+        text.textContent = ring.queryName;
+        group.appendChild(text);
+        y += fs + 2;
       }
 
-      y += 4; // gap between rings
+      y += fs; // gap between rings scales with font size
     });
 
     svg.appendChild(group);
@@ -1341,7 +1408,7 @@ export class CircularPlotRenderer {
     
     // Add GC analysis legend if present
     if (data.reference.gcContent || data.reference.gcSkew) {
-      this.renderGCLegend(mainGroup as any, !!data.reference.gcSkew);
+      this.renderGCLegend(mainGroup as any, !!data.reference.gcContent, !!data.reference.gcSkew);
     }
     
     // Add ring legend

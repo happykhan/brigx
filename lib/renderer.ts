@@ -1,5 +1,5 @@
 // Circular Plot SVG Renderer
-import type { CircularPlotData, RingData, Annotation } from './types';
+import type { CircularPlotData, RingData, Annotation, ContigBoundary } from './types';
 
 export interface RenderConfig {
   width: number;
@@ -329,6 +329,184 @@ export class CircularPlotRenderer {
       group.appendChild(arcElement);
     });
     
+    svg.appendChild(group);
+  }
+
+  private renderGraphRing(
+    svg: SVGSVGElement,
+    cx: number,
+    cy: number,
+    refLength: number,
+    ring: RingData,
+    radius: number,
+    ringWidth?: number
+  ) {
+    const width = ringWidth || this.config.ringWidth;
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('class', `ring ring-graph-${ring.queryId}`);
+    group.setAttribute('data-query-id', ring.queryId);
+
+    const points = ring.graphPoints!;
+    const maxValue = ring.graphMaxValue || 1;
+
+    // Draw ring boundary (outer)
+    const outerCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    outerCircle.setAttribute('cx', String(cx));
+    outerCircle.setAttribute('cy', String(cy));
+    outerCircle.setAttribute('r', String(radius + width));
+    outerCircle.setAttribute('fill', 'none');
+    outerCircle.setAttribute('stroke', '#ccc');
+    outerCircle.setAttribute('stroke-width', '0.5');
+    group.appendChild(outerCircle);
+
+    // Draw ring boundary (inner)
+    const innerCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    innerCircle.setAttribute('cx', String(cx));
+    innerCircle.setAttribute('cy', String(cy));
+    innerCircle.setAttribute('r', String(radius));
+    innerCircle.setAttribute('fill', 'none');
+    innerCircle.setAttribute('stroke', '#ccc');
+    innerCircle.setAttribute('stroke-width', '0.5');
+    group.appendChild(innerCircle);
+
+    // Parse the ring color for opacity-based area chart
+    const hex = ring.color.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+
+    // Render each point as a filled arc proportional to value/maxValue
+    for (const point of points) {
+      if (point.value <= 0) continue;
+
+      const startAngle = (point.start / refLength) * 2 * Math.PI - Math.PI / 2;
+      const endAngle = (point.end / refLength) * 2 * Math.PI - Math.PI / 2;
+
+      // Height proportional to value
+      const fraction = Math.min(1, point.value / maxValue);
+      const barHeight = fraction * width;
+
+      const path = this.createArcPath(
+        cx, cy,
+        radius,
+        radius + barHeight,
+        startAngle,
+        endAngle
+      );
+
+      const arcElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      arcElement.setAttribute('d', path);
+      arcElement.setAttribute('fill', `rgb(${r}, ${g}, ${b})`);
+      arcElement.setAttribute('stroke', 'none');
+      arcElement.setAttribute('opacity', '0.8');
+
+      // Tooltip
+      arcElement.style.cursor = 'pointer';
+      arcElement.addEventListener('mouseenter', () => {
+        arcElement.setAttribute('opacity', '1.0');
+        if (this.tooltipCallback) {
+          this.tooltipCallback({
+            type: 'graph',
+            queryName: ring.queryName,
+            start: point.start,
+            end: point.end,
+            value: point.value.toFixed(2)
+          });
+        }
+      });
+      arcElement.addEventListener('mouseleave', () => {
+        arcElement.setAttribute('opacity', '0.8');
+        if (this.tooltipCallback) {
+          this.tooltipCallback(null);
+        }
+      });
+
+      group.appendChild(arcElement);
+    }
+
+    svg.appendChild(group);
+  }
+
+  private renderContigBoundaries(
+    svg: SVGSVGElement,
+    cx: number,
+    cy: number,
+    refLength: number,
+    contigs: ContigBoundary[],
+    radius: number,
+    ringWidth: number
+  ) {
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('class', 'contig-boundaries');
+
+    const colors = ['#ef4444', '#3b82f6']; // Alternating red/blue
+
+    for (const contig of contigs) {
+      const startAngle = (contig.start / refLength) * 2 * Math.PI - Math.PI / 2;
+      const endAngle = (contig.end / refLength) * 2 * Math.PI - Math.PI / 2;
+      const color = colors[contig.index % 2];
+
+      const path = this.createArcPath(
+        cx, cy,
+        radius,
+        radius + ringWidth,
+        startAngle,
+        endAngle
+      );
+
+      const arcElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      arcElement.setAttribute('d', path);
+      arcElement.setAttribute('fill', color);
+      arcElement.setAttribute('stroke', 'none');
+      arcElement.setAttribute('opacity', '0.6');
+
+      arcElement.style.cursor = 'pointer';
+      arcElement.addEventListener('mouseenter', () => {
+        arcElement.setAttribute('opacity', '0.9');
+        if (this.tooltipCallback) {
+          this.tooltipCallback({
+            type: 'contig',
+            name: contig.name,
+            start: contig.start,
+            end: contig.end,
+            length: contig.end - contig.start
+          });
+        }
+      });
+      arcElement.addEventListener('mouseleave', () => {
+        arcElement.setAttribute('opacity', '0.6');
+        if (this.tooltipCallback) {
+          this.tooltipCallback(null);
+        }
+      });
+
+      group.appendChild(arcElement);
+
+      // Add contig label
+      const midAngle = (startAngle + endAngle) / 2;
+      const labelRadius = radius + ringWidth + 8;
+      const lx = cx + labelRadius * Math.cos(midAngle);
+      const ly = cy + labelRadius * Math.sin(midAngle);
+
+      // Only add label if the arc is large enough
+      const arcSpan = contig.end - contig.start;
+      if (arcSpan / refLength > 0.02) {
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', String(lx));
+        label.setAttribute('y', String(ly));
+        label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('dominant-baseline', 'middle');
+        label.setAttribute('font-size', String(Math.max(7, this.config.scaleFontSize - 2)));
+        label.setAttribute('fill', color);
+        label.setAttribute('font-weight', 'bold');
+
+        // Truncate long names
+        const displayName = contig.name.length > 15 ? contig.name.substring(0, 12) + '...' : contig.name;
+        label.textContent = displayName;
+        group.appendChild(label);
+      }
+    }
+
     svg.appendChild(group);
   }
 
@@ -1004,7 +1182,7 @@ export class CircularPlotRenderer {
     const legendX = this.config.width - 200;
     const legendY = 20;
     const fs = this.config.legendFontSize;
-    const hasHits = (r: RingData) => r.hits && r.hits.length > 0;
+    const hasHits = (r: RingData) => (r.hits && r.hits.length > 0) || (r.graphPoints && r.graphPoints.length > 0);
 
     let y = legendY;
 
@@ -1109,30 +1287,43 @@ export class CircularPlotRenderer {
     
     // Render reference ring first
     this.renderReferenceRing(mainGroup as any, cx, cy, refLength);
-    
-    // Calculate ring positions - GC Content and GC Skew come first as their own rings
+
+    // Calculate ring positions - contig boundaries, GC Content and GC Skew come first
     let currentRadius = this.config.innerRadius;
-    
-    // Render GC Content ring (first ring outside reference, no gap)
+
+    // Render contig boundaries (innermost ring, inside GC rings)
+    if (data.reference.contigs && data.reference.contigs.length > 1) {
+      currentRadius += this.config.ringSpacing;
+      const contigRingWidth = 6; // Thin ring for contig boundaries
+      this.renderContigBoundaries(mainGroup as any, cx, cy, refLength, data.reference.contigs, currentRadius, contigRingWidth);
+      currentRadius += contigRingWidth + this.config.ringSpacing;
+    }
+
+    // Render GC Content ring
     if (data.reference.gcContent) {
       currentRadius += this.config.ringSpacing; // Small spacing from reference
       this.renderGCRing(mainGroup as any, cx, cy, refLength, data.reference.gcContent, currentRadius);
       currentRadius += this.config.gcRingWidth + this.config.ringSpacing;
     }
-    
+
     // Render GC Skew ring (second ring outside reference)
     if (data.reference.gcSkew) {
       this.renderGCSkewRing(mainGroup as any, cx, cy, refLength, data.reference.gcSkew, currentRadius);
       currentRadius += this.config.gcRingWidth + this.config.ringSpacing;
     }
-    
+
     // Render query rings after GC rings
     const visibleRings = data.rings?.filter(r => r.visible) || [];
     visibleRings.forEach((ring) => {
       const ringWidth = ring.customWidth || this.config.ringWidth;
       const radius = currentRadius;
 
-      this.renderQueryRing(mainGroup as any, cx, cy, refLength, ring, radius, ringWidth);
+      // Render as graph ring if it has graph data, otherwise as alignment ring
+      if (ring.graphPoints && ring.graphPoints.length > 0) {
+        this.renderGraphRing(mainGroup as any, cx, cy, refLength, ring, radius, ringWidth);
+      } else {
+        this.renderQueryRing(mainGroup as any, cx, cy, refLength, ring, radius, ringWidth);
+      }
 
       if (ring.annotations && ring.annotations.length > 0) {
         this.renderAnnotations(

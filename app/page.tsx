@@ -616,6 +616,68 @@ export default function Home() {
                   />
                 </div>
 
+                {/* Contig Mapping - Utility Section */}
+                <details className="card">
+                  <summary className="section-title cursor-pointer select-none list-none flex items-center justify-between">
+                    <span>Contig Mapping</span>
+                    <svg className="w-4 h-4 transform transition-transform" style={{ color: 'var(--gx-text-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </summary>
+                  <div className="mt-4 space-y-3">
+                    <p className="text-sm" style={{ color: 'var(--gx-text-muted)' }}>
+                      Order contigs from a draft assembly onto a reference genome using BLAST alignments.
+                    </p>
+                    <div>
+                      <label className="label">Contigs (multi-FASTA)</label>
+                      <input type="file" accept=".fasta,.fa,.fna" className="input-field w-full text-sm" disabled />
+                    </div>
+                    <div>
+                      <label className="label">Reference genome</label>
+                      <input type="file" accept=".fasta,.fa,.fna" className="input-field w-full text-sm" disabled />
+                    </div>
+                    <button className="btn-secondary w-full py-2" disabled>
+                      Map Contigs
+                    </button>
+                    <p className="text-xs text-center" style={{ color: 'var(--gx-text-muted)' }}>
+                      Coming soon -- requires running BLAST between contigs and reference.
+                    </p>
+                  </div>
+                </details>
+
+                {/* Convert Graph - Utility Section */}
+                <details className="card">
+                  <summary className="section-title cursor-pointer select-none list-none flex items-center justify-between">
+                    <span>Convert Graph</span>
+                    <svg className="w-4 h-4 transform transition-transform" style={{ color: 'var(--gx-text-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </summary>
+                  <div className="mt-4 space-y-3">
+                    <p className="text-sm" style={{ color: 'var(--gx-text-muted)' }}>
+                      Convert graph data from one reference coordinate system to another using BLAST alignments between two references.
+                    </p>
+                    <div>
+                      <label className="label">Graph file (.graph)</label>
+                      <input type="file" accept=".graph" className="input-field w-full text-sm" disabled />
+                    </div>
+                    <div>
+                      <label className="label">Source reference</label>
+                      <input type="file" accept=".fasta,.fa,.fna" className="input-field w-full text-sm" disabled />
+                    </div>
+                    <div>
+                      <label className="label">Target reference</label>
+                      <input type="file" accept=".fasta,.fa,.fna" className="input-field w-full text-sm" disabled />
+                    </div>
+                    <button className="btn-secondary w-full py-2" disabled>
+                      Convert Graph
+                    </button>
+                    <p className="text-xs text-center" style={{ color: 'var(--gx-text-muted)' }}>
+                      Coming soon -- requires BLAST alignment between source and target references.
+                    </p>
+                  </div>
+                </details>
+
                 <button
                   onClick={handleRun}
                   disabled={isProcessing || !referenceFile || rings.filter(r => r.files.length > 0).length === 0}

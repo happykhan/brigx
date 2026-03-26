@@ -42,6 +42,8 @@ export interface RingData {
   annotations?: Annotation[]; // Custom annotations for this ring
   customWidth?: number; // Optional custom width override
   alignmentOutput?: string; // Raw alignment output for download
+  graphPoints?: GraphPoint[]; // Graph ring data (from .graph or .sam files)
+  graphMaxValue?: number; // Maximum value for graph ring scaling
   statistics: {
     meanIdentity: number;
     genomeCoverage: number;

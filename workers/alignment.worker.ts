@@ -194,7 +194,8 @@ async function alignGenomes(
   }
   al.FS.writeFile('/query.fna', `>${queryName}\n${queryUpper}\n`);
 
-  const args = ['-p', 'blastn', '-d', '/ref', '-i', '/query.fna', '-m', '8', '-e', '1e-5', '-F', 'F', '-b', '1000000', '-v', '0'];
+  const program = params?.blastProgram || 'blastn';
+  const args = ['-p', program, '-d', '/ref', '-i', '/query.fna', '-m', '8', '-e', '1e-5', '-F', 'F', '-b', '1000000', '-v', '0'];
 
   // Add custom blastall options if provided
   if (params?.alignerOptions?.trim()) {
@@ -228,7 +229,11 @@ async function alignGenomes(
 // Worker message handler
 self.onmessage = async (e: MessageEvent) => {
   console.log('[Alignment Worker] Received message:', e.data.type);
-  const { type, referenceName, referenceSeq, queryName, querySeq, params } = e.data;
+  const { type, referenceName, referenceSeq, queryName, querySeq, params, blastProgram } = e.data;
+  // Merge blastProgram into params for the aligner
+  if (blastProgram && params) {
+    params.blastProgram = blastProgram;
+  }
 
   try {
     if (type === 'init') {

@@ -8,8 +8,11 @@ import type {
   RingConfig,
   PipelineParams,
   ProgressUpdate,
-  ContigBoundary
+  ContigBoundary,
+  GraphPoint
 } from './types';
+import { parseSAMCoverage } from '@/lib/samParser';
+import { parseGraphFile } from '@/lib/graphParser';
 
 
 export class BRIGController {
@@ -261,7 +264,8 @@ export class BRIGController {
         referenceSeq: reference.sequence,
         queryName: query.name,
         querySeq: query.sequence,
-        params
+        params,
+        blastProgram: params.blastProgram
       });
     });
   }
@@ -408,34 +412,66 @@ export class BRIGController {
 
       // Parse and prepare query genomes for each ring
       // Merge all files in each ring into a single query genome
+      // Detect .sam and .graph files and handle them as graph rings
       console.log('[Controller] Step 3: Preparing query genomes for rings');
       this.updateProgress('Preparing query genomes', 15);
-      
+
       const queryGenomes: ParsedGenome[] = [];
-      
+      // Track which rings are graph rings (index in rings array -> graph data)
+      const graphRingData: Map<number, { points: GraphPoint[]; maxValue: number }> = new Map();
+
       for (let i = 0; i < rings.length; i++) {
         const ring = rings[i];
         console.log(`[Controller] Processing ring ${i + 1}/${rings.length}: ${ring.legendText} with ${ring.files.length} files`);
-        
+
+        // Check if any file is a .sam or .graph file
+        const samFile = ring.files.find(f => f.name.toLowerCase().endsWith('.sam'));
+        const graphFile = ring.files.find(f => f.name.toLowerCase().endsWith('.graph'));
+
+        if (samFile) {
+          console.log(`[Controller]   SAM file detected: ${samFile.name}, computing coverage`);
+          const content = await samFile.text();
+          const gcWindowSize = 1000;
+          const result = parseSAMCoverage(content, gcWindowSize);
+          graphRingData.set(i, { points: result.points, maxValue: result.maxValue });
+          console.log(`[Controller]   SAM coverage: ${result.mappedReads}/${result.totalReads} mapped reads, max coverage: ${result.maxValue.toFixed(1)}`);
+          // Push a placeholder genome so array indices stay aligned
+          queryGenomes.push({ id: `sam-${ring.id}`, name: ring.legendText, sequence: '', length: 0, gcContent: 0, isCircular: false });
+          continue;
+        }
+
+        if (graphFile) {
+          console.log(`[Controller]   Graph file detected: ${graphFile.name}`);
+          const content = await graphFile.text();
+          const result = parseGraphFile(content);
+          if (result.errors.length > 0) {
+            console.warn(`[Controller]   Graph parse warnings: ${result.errors.slice(0, 3).join('; ')}`);
+          }
+          graphRingData.set(i, { points: result.points, maxValue: result.maxValue });
+          console.log(`[Controller]   Graph data: ${result.points.length} points, max value: ${result.maxValue.toFixed(1)}`);
+          queryGenomes.push({ id: `graph-${ring.id}`, name: ring.legendText, sequence: '', length: 0, gcContent: 0, isCircular: false });
+          continue;
+        }
+
         // Parse all files and merge sequences
         const allSequences: string[] = [];
         let totalLength = 0;
-        
+
         for (let j = 0; j < ring.files.length; j++) {
           console.log(`[Controller]   Parsing file ${j + 1}/${ring.files.length}: ${ring.files[j].name}`);
           const genomes = await this.parseGenomes(ring.files[j]);
-          
+
           for (const genome of genomes) {
             allSequences.push(genome.sequence);
             totalLength += genome.sequence.length;
           }
         }
-        
+
         if (allSequences.length === 0) {
           console.warn(`[Controller]   Warning: ${ring.legendText} has no sequences, skipping`);
           continue;
         }
-        
+
         // Merge all sequences into a single genome for this ring
         const mergedGenome: ParsedGenome = {
           id: `merged-${ring.id}`,
@@ -445,7 +481,7 @@ export class BRIGController {
           gcContent: 0, // Will be calculated if needed
           isCircular: false
         };
-        
+
         console.log(`[Controller]   Ring merged: ${allSequences.length} sequences -> ${mergedGenome.length} bp total`);
         queryGenomes.push(mergedGenome);
       }
@@ -465,17 +501,34 @@ export class BRIGController {
           const ringIndex = nextRingIndex++;
           const query = queryGenomes[ringIndex];
           const ring = rings[ringIndex];
-          
+
+          // Skip graph rings - they don't need BLAST alignment
+          if (graphRingData.has(ringIndex)) {
+            console.log(`[Controller] Skipping alignment for graph ring: ${ring.legendText}`);
+            alignmentResults.push({
+              result: {
+                queryId: ring.id,
+                queryName: ring.legendText,
+                queryLength: 0,
+                totalHits: 0,
+                hits: [],
+                metadata: { timestamp: Date.now(), alignerVersion: 'graph', parameters: {} }
+              },
+              rawOutput: ''
+            });
+            continue;
+          }
+
           this.updateProgress(
             `Aligning ${ring.legendText}`,
             Math.round(20 + ((ringIndex + 1) / queryGenomes.length) * 50),
             `${ringIndex + 1}/${queryGenomes.length}`
           );
-          
+
           try {
             const cacheKey = `${reference.name}:${query.name}`;
             let result: { result: AlignmentResult; rawOutput: string };
-            
+
             if (!params.forceAlignment && this.alignmentCache.has(cacheKey)) {
               console.log(`[Controller] Using cached alignment for ${query.name}`);
               const cachedResult = this.alignmentCache.get(cacheKey)!;
@@ -490,7 +543,7 @@ export class BRIGController {
               );
               this.alignmentCache.set(cacheKey, result.result);
             }
-            
+
             alignmentResults.push(result);
             console.log(`[Controller] Ring ${ringIndex + 1}/${queryGenomes.length} completed: ${result.result.hits?.length || 0} hits`);
           } catch (error: any) {
@@ -551,6 +604,13 @@ export class BRIGController {
           alignmentOutput: alignResult.rawOutput,
           statistics
         };
+
+        // Add graph data if this is a graph ring
+        const graphData = graphRingData.get(i);
+        if (graphData) {
+          ringData.graphPoints = graphData.points;
+          ringData.graphMaxValue = graphData.maxValue;
+        }
 
         ringDataArray.push(ringData);
         console.log(`[Controller] Ring ${i + 1} processed: ${ringData.hits?.length || 0} hits`);

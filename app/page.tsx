@@ -46,6 +46,9 @@ export default function Home() {
     title: ''
   });
 
+  // Plot expand state
+  const [plotExpanded, setPlotExpanded] = useState(false);
+
   // Annotation editor state
   const [annotationEditorOpen, setAnnotationEditorOpen] = useState(false);
   const [editingRingId, setEditingRingId] = useState<string | null>(null);
@@ -642,10 +645,27 @@ export default function Home() {
                   />
                 </div>
 
-                <div className="card">
+                <div className={`card ${plotExpanded ? 'fixed inset-4 z-50 overflow-auto' : ''}`} style={plotExpanded ? { background: 'var(--gx-bg-alt)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' } : undefined}>
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="section-title mb-0">Circular Plot</h2>
-                    {plotData && <ExportPanel plotData={plotData} imageProperties={imageProperties} />}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setPlotExpanded(!plotExpanded)}
+                        className="btn-secondary text-xs px-2 py-1"
+                        title={plotExpanded ? 'Shrink plot' : 'Expand plot'}
+                      >
+                        {plotExpanded ? (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                          </svg>
+                        )}
+                      </button>
+                      {plotData && <ExportPanel plotData={plotData} imageProperties={imageProperties} />}
+                    </div>
                   </div>
 
                   {plotData ? (

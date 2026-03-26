@@ -78,6 +78,24 @@ export default function ParameterControls({
 
       <div>
         <label className="label">
+          BLAST Program
+        </label>
+        <select
+          value={params.blastProgram || 'blastn'}
+          onChange={(e) => setParams({ ...params, blastProgram: e.target.value as 'blastn' | 'blastx' })}
+          disabled={disabled}
+          className="input-field w-full disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <option value="blastn">blastn (nucleotide vs nucleotide)</option>
+          <option value="blastx">blastx (translated nucleotide vs protein)</option>
+        </select>
+        <p className="mt-1 text-xs" style={{ color: 'var(--gx-text-muted)' }}>
+          Applies to all rings
+        </p>
+      </div>
+
+      <div>
+        <label className="label">
           BLAST Options
         </label>
         <input

@@ -129,6 +129,7 @@ export interface PipelineParams {
   forceAlignment: boolean;
   alignerOptions?: string;
   spacerSize?: number; // Spacer between sequences in multi-FASTA reference (default: 0)
+  blastProgram?: 'blastn' | 'blastx'; // BLAST program (default: blastn)
 }
 
 // Graph ring data (for .graph files - coverage, expression, etc.)

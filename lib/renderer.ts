@@ -1440,14 +1440,14 @@ export class CircularPlotRenderer {
 
     this.renderScaleMarkers(mainGroup as any, cx, cy, refLength);
     
-    // Add GC analysis legend if present
-    if (data.reference.gcContent || data.reference.gcSkew) {
-      this.renderGCLegend(mainGroup as any, !!data.reference.gcContent, !!data.reference.gcSkew);
-    }
-    
-    // Add ring legend
-    if (visibleRings.length > 0) {
-      this.renderRingLegend(mainGroup as any, visibleRings);
+    // Add legends if enabled
+    if (this.config.showLegend !== false) {
+      if (data.reference.gcContent || data.reference.gcSkew) {
+        this.renderGCLegend(mainGroup as any, !!data.reference.gcContent, !!data.reference.gcSkew);
+      }
+      if (visibleRings.length > 0) {
+        this.renderRingLegend(mainGroup as any, visibleRings);
+      }
     }
     
     // Render title and reference size in center

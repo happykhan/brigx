@@ -650,17 +650,35 @@ export default function Home() {
 
               {/* Visualization Panel */}
               <div className="lg:col-span-2 animate-slide-up">
-                <details className="card mb-6">
-                  <summary className="section-title cursor-pointer select-none list-none flex items-center justify-between">
-                    <span>Image Properties</span>
-                    <svg className="w-4 h-4" style={{ color: 'var(--gx-text-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </summary>
-                  <div className="mt-4">
-                    <ImageProperties config={imageProperties} onChange={setImageProperties} />
+                <div className="card mb-6">
+                  <div className="flex items-center gap-4 mb-3">
+                    <input
+                      type="text"
+                      value={imageProperties.title}
+                      onChange={(e) => setImageProperties({ ...imageProperties, title: e.target.value })}
+                      placeholder="Plot title..."
+                      className="input-field flex-1 text-sm"
+                    />
+                    <label className="flex items-center gap-1.5 cursor-pointer text-xs whitespace-nowrap" style={{ color: 'var(--gx-text-muted)' }}>
+                      <input
+                        type="checkbox"
+                        checked={imageProperties.showLegend !== false}
+                        onChange={(e) => setImageProperties({ ...imageProperties, showLegend: e.target.checked })}
+                        className="w-3.5 h-3.5"
+                        style={{ accentColor: 'var(--gx-accent)' }}
+                      />
+                      Legend
+                    </label>
                   </div>
-                </details>
+                  <details>
+                    <summary className="text-xs cursor-pointer select-none list-none" style={{ color: 'var(--gx-text-muted)' }}>
+                      Sizes &amp; fonts...
+                    </summary>
+                    <div className="mt-3">
+                      <ImageProperties config={imageProperties} onChange={setImageProperties} />
+                    </div>
+                  </details>
+                </div>
 
                 <div className={`card ${plotExpanded ? 'fixed inset-0 z-50 flex flex-col' : ''}`} style={plotExpanded ? { background: 'var(--gx-bg-alt)', borderRadius: 0 } : undefined}>
                   <div className="flex justify-between items-center mb-6">

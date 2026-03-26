@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 
 export interface ImagePropertiesConfig {
   innerRadius: number;
@@ -21,8 +20,6 @@ interface ImagePropertiesProps {
 }
 
 export default function ImageProperties({ config, onChange }: ImagePropertiesProps) {
-  const [isOpen, setIsOpen] = useState(false);
-
   const handleChange = (key: keyof ImagePropertiesConfig, value: number | string | boolean) => {
     onChange({
       ...config,
@@ -31,46 +28,7 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
   };
 
   return (
-    <div className="card">
-      {/* Title */}
-      <div className="mb-4">
-        <label className="label">Title</label>
-        <input
-          type="text"
-          value={config.title}
-          onChange={(e) => handleChange('title', e.target.value)}
-          placeholder="Enter plot title..."
-          className="input-field w-full"
-        />
-      </div>
-
-      <div className="mb-4">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={config.showLegend !== false}
-            onChange={(e) => handleChange('showLegend', e.target.checked)}
-            className="w-4 h-4 rounded"
-            style={{ accentColor: 'var(--gx-accent)' }}
-          />
-          <span className="text-sm" style={{ color: 'var(--gx-text)' }}>Show Legend</span>
-        </label>
-      </div>
-
-      <div className="flex items-center justify-between mb-3 pt-4" style={{ borderTop: '1px solid var(--gx-border)' }}>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            style={{ color: 'var(--gx-text-muted)' }}
-          >
-            {isOpen ? '\u25BC' : '\u25B6'}
-          </button>
-          <h3 className="font-semibold" style={{ color: 'var(--gx-text)' }}>Image Properties</h3>
-        </div>
-      </div>
-
-      {isOpen && (
-        <div className="space-y-4">
+    <div className="space-y-4">
           {/* Ring Dimensions */}
           <div className="space-y-3">
             <h4 className="text-sm font-semibold pb-1" style={{ color: 'var(--gx-text)', borderBottom: '1px solid var(--gx-border)' }}>
@@ -213,8 +171,6 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
               />
             </div>
           </div>
-        </div>
-      )}
     </div>
   );
 }

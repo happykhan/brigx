@@ -33,7 +33,8 @@ export default function ExportPanel({ plotData, imageProperties }: ExportPanelPr
       scaleFontSize: imageProperties.scaleFontSize,
       titleFontSize: imageProperties.titleFontSize,
       labelFontSize: imageProperties.labelFontSize,
-      title: imageProperties.title
+      title: imageProperties.title,
+      showLegend: imageProperties.showLegend
     });
 
     renderer.render(container, plotData);
@@ -74,7 +75,8 @@ export default function ExportPanel({ plotData, imageProperties }: ExportPanelPr
         scaleFontSize: imageProperties.scaleFontSize,
         titleFontSize: imageProperties.titleFontSize,
         labelFontSize: imageProperties.labelFontSize,
-        title: imageProperties.title
+        title: imageProperties.title,
+        showLegend: imageProperties.showLegend
       });
 
       renderer.render(container, plotData);

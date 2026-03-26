@@ -58,16 +58,17 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
     const d = dataRef.current;
     if (!canvas || !wrapper || !d) return;
 
-    const rect = wrapper.getBoundingClientRect();
-    const size = Math.max(400, Math.floor(Math.min(rect.width, rect.height)));
     const ip = propsRef.current;
+
+    // Always use fixed 1000x1000 logical space - CSS + DPI handle actual pixel size
+    const logicalSize = 1000;
 
     // Preserve legend positions from previous renderer
     const prevRenderer = rendererRef.current;
 
     const renderer = new CanvasPlotRenderer({
-      width: size,
-      height: size,
+      width: logicalSize,
+      height: logicalSize,
       innerRadius: ip.innerRadius,
       ringWidth: ip.ringWidth,
       gcRingWidth: ip.gcRingWidth,
@@ -88,9 +89,11 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
     }
 
     renderer.render(canvas, d, zoomRef.current, panRef.current.x, panRef.current.y);
-    // Set CSS size to maintain square aspect ratio within container
-    canvas.style.width = size + 'px';
-    canvas.style.height = size + 'px';
+    // CSS size: fill container while staying square
+    const rect = wrapper.getBoundingClientRect();
+    const cssSize = Math.floor(Math.min(rect.width, rect.height));
+    canvas.style.width = cssSize + 'px';
+    canvas.style.height = cssSize + 'px';
     rendererRef.current = renderer;
   }, []);
 

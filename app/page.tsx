@@ -755,6 +755,9 @@ export default function Home() {
                 <a href="https://github.com/happykhan/brigx" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>
                   GitHub
                 </a>
+                <a href="https://genomicx.org" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>
+                  genomicx.org
+                </a>
               </div>
             </div>
           </div>

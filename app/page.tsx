@@ -36,7 +36,7 @@ export default function Home() {
   const [cachedPlotData, setCachedPlotData] = useState<CircularPlotData | null>(null);
   const [imageProperties, setImageProperties] = useState<ImagePropertiesConfig>({
     innerRadius: 200,
-    ringWidth: 24,
+    ringWidth: 20,
     gcRingWidth: 40,
     ringSpacing: 4,
     legendFontSize: 12,

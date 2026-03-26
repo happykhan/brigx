@@ -85,9 +85,9 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
               </label>
               <input
                 type="range"
-                min="20"
+                min="5"
                 max="100"
-                step="5"
+                step="1"
                 value={config.ringWidth}
                 onChange={(e) => handleChange('ringWidth', parseInt(e.target.value))}
                 className="w-full h-2 rounded-lg appearance-none cursor-pointer"

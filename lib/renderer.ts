@@ -1288,16 +1288,8 @@ export class CircularPlotRenderer {
     // Render reference ring first
     this.renderReferenceRing(mainGroup as any, cx, cy, refLength);
 
-    // Calculate ring positions - contig boundaries, GC Content and GC Skew come first
+    // Calculate ring positions - GC Content and GC Skew come first
     let currentRadius = this.config.innerRadius;
-
-    // Render contig boundaries (innermost ring, inside GC rings)
-    if (data.reference.contigs && data.reference.contigs.length > 1) {
-      currentRadius += this.config.ringSpacing;
-      const contigRingWidth = 6; // Thin ring for contig boundaries
-      this.renderContigBoundaries(mainGroup as any, cx, cy, refLength, data.reference.contigs, currentRadius, contigRingWidth);
-      currentRadius += contigRingWidth + this.config.ringSpacing;
-    }
 
     // Render GC Content ring
     if (data.reference.gcContent) {
@@ -1337,7 +1329,14 @@ export class CircularPlotRenderer {
 
       currentRadius += ringWidth + this.config.ringSpacing;
     });
-    
+
+    // Render contig boundaries on the outermost ring (after all query rings)
+    if (data.reference.contigs && data.reference.contigs.length > 1) {
+      const contigRingWidth = 6;
+      this.renderContigBoundaries(mainGroup as any, cx, cy, refLength, data.reference.contigs, currentRadius, contigRingWidth);
+      currentRadius += contigRingWidth + this.config.ringSpacing;
+    }
+
     this.renderScaleMarkers(mainGroup as any, cx, cy, refLength);
     
     // Add GC analysis legend if present

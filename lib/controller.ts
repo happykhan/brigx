@@ -377,7 +377,9 @@ export class BRIGController {
       // Calculate GC content
       console.log('[Controller] Step 2: Calculating GC content');
       this.updateProgress('Calculating GC content', 10);
-      const gcWindowSize = 1000; // Fixed window size for GC resolution
+      // Adapt window size to reference length: aim for ~500-5000 windows
+      // For small genomes (<50kb), use smaller windows to maintain resolution
+      const gcWindowSize = Math.max(10, Math.min(1000, Math.floor(reference.length / 500)));
       const gcContent = await this.calculateGC(reference.sequence, gcWindowSize);
       console.log(`[Controller] GC content calculated: ${gcContent.length} windows`);
 

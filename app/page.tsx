@@ -580,6 +580,14 @@ export default function Home() {
                       onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {
                           setReferenceFile(e.target.files[0]);
+                          // Reset plot when reference changes
+                          setPlotData(null);
+                          setCachedPlotData(null);
+                          setReferenceLength(0);
+                          if (controllerRef.current) {
+                            controllerRef.current.cleanup();
+                            controllerRef.current = null;
+                          }
                         }
                       }}
                       className="input-field w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:cursor-pointer"

@@ -6,6 +6,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import RingConfiguration from '@/components/RingConfiguration';
 import ParameterControls from '@/components/ParameterControls';
 import CircularPlot from '@/components/CircularPlot';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import ExportPanel from '@/components/ExportPanel';
 import ConsoleLog from '@/components/ConsoleLog';
 import ImageProperties, { type ImagePropertiesConfig } from '@/components/ImageProperties';
@@ -699,6 +700,7 @@ export default function Home() {
 
                   {plotData ? (
                     <div className={plotExpanded ? 'flex-1 min-h-0' : ''}>
+                    <ErrorBoundary>
                     <CircularPlot
                       data={{
                         ...plotData,
@@ -710,6 +712,7 @@ export default function Home() {
                       }}
                       imageProperties={imageProperties}
                     />
+                    </ErrorBoundary>
                     </div>
                   ) : (
                     <div className="flex items-center justify-center h-96" style={{ color: 'var(--gx-text-muted)' }}>

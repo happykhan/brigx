@@ -15,7 +15,6 @@
     "deploy": "npm run build:check && git add -A && git commit -m 'Deploy: build verified' && git push"
   },
   "dependencies": {
-    "@biowasm/aioli": "^3.2.1",
     "@handsontable/react": "^16.2.0",
     "comlink": "^4.4.1",
     "handsontable": "^16.2.0",

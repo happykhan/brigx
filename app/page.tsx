@@ -651,6 +651,7 @@ export default function Home() {
               {/* Visualization Panel */}
               <div className="lg:col-span-2 animate-slide-up">
                 <div className="card mb-6">
+                  <h2 className="section-title">Image Properties</h2>
                   <div className="flex items-center gap-4 mb-3">
                     <input
                       type="text"
@@ -670,14 +671,7 @@ export default function Home() {
                       Legend
                     </label>
                   </div>
-                  <details>
-                    <summary className="text-xs cursor-pointer select-none list-none" style={{ color: 'var(--gx-text-muted)' }}>
-                      Sizes &amp; fonts...
-                    </summary>
-                    <div className="mt-3">
-                      <ImageProperties config={imageProperties} onChange={setImageProperties} />
-                    </div>
-                  </details>
+                  <ImageProperties config={imageProperties} onChange={setImageProperties} />
                 </div>
 
                 <div className={`card ${plotExpanded ? 'fixed inset-0 z-50 flex flex-col' : ''}`} style={plotExpanded ? { background: 'var(--gx-bg-alt)', borderRadius: 0 } : undefined}>

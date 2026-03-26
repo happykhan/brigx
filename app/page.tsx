@@ -1,697 +1,58 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
-import toast, { Toaster } from 'react-hot-toast';
-import RingConfiguration from '@/components/RingConfiguration';
-import ParameterControls from '@/components/ParameterControls';
+import { Toaster } from 'react-hot-toast';
 import CircularPlot from '@/components/CircularPlot';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ExportPanel from '@/components/ExportPanel';
 import ConsoleLog from '@/components/ConsoleLog';
-import ImageProperties, { type ImagePropertiesConfig } from '@/components/ImageProperties';
 import AnnotationEditor from '@/components/AnnotationEditor';
-import ThemeToggle from '@/components/ThemeToggle';
-import type { CircularPlotData, PipelineParams, ProgressUpdate, RingConfig, Annotation, RingData } from '@/lib/types';
-import { APP_VERSION } from '@/lib/version';
-import type { BRIGController as BRIGControllerType } from '@/lib/controller';
-import { exportSession, importSession } from '@/lib/session';
+import ReferenceInput from '@/components/ReferenceInput';
+import RingsPanel from '@/components/RingsPanel';
+import ControlPanel from '@/components/ControlPanel';
+import StatisticsPanel from '@/components/StatisticsPanel';
+import BugReportModal from '@/components/BugReportModal';
+import NavBar from '@/components/NavBar';
+import ImagePropertiesPanel from '@/components/ImagePropertiesPanel';
+import { useBRIGController } from '@/hooks/useBRIGController';
 
 export default function Home() {
-  const [referenceFile, setReferenceFile] = useState<File | null>(null);
-  const [rings, setRings] = useState<RingConfig[]>([]);
-
-  // Store controller instance in ref to persist alignment cache across runs
-  const controllerRef = useRef<BRIGControllerType | null>(null);
-  const [params, setParams] = useState<PipelineParams>({
-    minIdentity: 70,
-    minAlignmentLength: 1000,
-    colorScheme: 'blue-red',
-    forceAlignment: false,
-    alignerOptions: ''
-  });
-  const [progress, setProgress] = useState<ProgressUpdate>({ step: 'idle', percent: 0 });
-  const [plotData, setPlotData] = useState<CircularPlotData | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
-  const [cachedPlotData, setCachedPlotData] = useState<CircularPlotData | null>(null);
-  const [imageProperties, setImageProperties] = useState<ImagePropertiesConfig>({
-    innerRadius: 200,
-    ringWidth: 20,
-    gcRingWidth: 40,
-    ringSpacing: 4,
-    legendFontSize: 16,
-    scaleFontSize: 12,
-    titleFontSize: 24,
-    labelFontSize: 14,
-    title: ''
-  });
-
-  // Plot expand state
-  const [plotExpanded, setPlotExpanded] = useState(false);
-  const [showBugReport, setShowBugReport] = useState(false);
-
-  // Annotation editor state
-  const [annotationEditorOpen, setAnnotationEditorOpen] = useState(false);
-  const [editingRingId, setEditingRingId] = useState<string | null>(null);
-  const [ringAnnotations, setRingAnnotations] = useState<Record<string, Annotation[]>>({});
-  const [referenceLength, setReferenceLength] = useState<number>(0);
-
-  // Intercept console.log messages
-  useEffect(() => {
-    const originalLog = console.log;
-    const originalError = console.error;
-    const originalWarn = console.warn;
-
-    // Summarize objects for display - avoid dumping raw arrays
-    const summarizeArg = (arg: any): string => {
-      if (arg == null) return String(arg);
-      if (typeof arg !== 'object') return String(arg);
-      if (Array.isArray(arg)) {
-        if (arg.length > 5) return `[Array(${arg.length})]`;
-        return JSON.stringify(arg);
-      }
-      // Summarize known large fields
-      const clone: any = {};
-      for (const [k, v] of Object.entries(arg)) {
-        if (Array.isArray(v) && (v as any[]).length > 5) {
-          clone[k] = `[${(v as any[]).length} items]`;
-        } else if (k === 'partialData' || k === 'sequence') {
-          clone[k] = '[omitted]';
-        } else if (typeof v === 'object' && v !== null) {
-          clone[k] = summarizeArg(v);
-        } else {
-          clone[k] = v;
-        }
-      }
-      return JSON.stringify(clone);
-    };
-
-    console.log = (...args: any[]) => {
-      const message = args.map(summarizeArg).join(' ');
-      setConsoleLogs(prev => [...prev, `[LOG] ${message}`]);
-      originalLog.apply(console, args);
-    };
-
-    console.error = (...args: any[]) => {
-      const message = args.map(summarizeArg).join(' ');
-      setConsoleLogs(prev => [...prev, `[ERROR] ${message}`]);
-      originalError.apply(console, args);
-    };
-
-    console.warn = (...args: any[]) => {
-      const message = args.map(summarizeArg).join(' ');
-      setConsoleLogs(prev => [...prev, `[WARN] ${message}`]);
-      originalWarn.apply(console, args);
-    };
-
-    return () => {
-      console.log = originalLog;
-      console.error = originalError;
-      console.warn = originalWarn;
-    };
-  }, []);
-
-  // Handle annotation changes
-  const handleAnnotationsChange = (ringId: string, annotations: Annotation[]) => {
-    setRingAnnotations(prev => ({
-      ...prev,
-      [ringId]: annotations
-    }));
-
-    // Update plot data using functional updates to avoid stale closures
-    setCachedPlotData(prev => {
-      if (!prev || !prev.rings) return prev;
-      const updatedRings = prev.rings.map(ringData => {
-        if (ringData.queryId === ringId) {
-          return {
-            ...ringData,
-            annotations,
-            hits: ringData.hits || [],
-            statistics: ringData.statistics || { meanIdentity: 0, genomeCoverage: 0, totalAlignedBases: 0 },
-            alignmentOutput: ringData.alignmentOutput || ''
-          };
-        }
-        return ringData;
-      });
-      const updated = { ...prev, rings: updatedRings };
-      setPlotData(updated);
-      return updated;
-    });
-  };
-
-  const handleOpenAnnotationEditor = (ringId: string) => {
-    setEditingRingId(ringId);
-    setAnnotationEditorOpen(true);
-  };
-
-  // Auto-generate plot skeleton when reference file is loaded
-  useEffect(() => {
-    if (referenceFile && !plotData) {
-      console.log('[Page] Reference file loaded, generating plot skeleton...');
-      generatePlotSkeleton();
-    }
-  }, [referenceFile]);
-
-  // Generate initial plot structure without running alignments
-  const generatePlotSkeleton = async () => {
-    try {
-      const { BRIGController } = await import('@/lib/controller');
-      const controller = new BRIGController();
-      await controller.initialize();
-
-      // Run pipeline without any ring files to just get reference data (GC content/skew)
-      const skeletonResult = await controller.runFullPipeline(
-        referenceFile!,
-        [], // No rings for alignment
-        [],
-        params,
-        (update) => setProgress(update)
-      );
-
-      // Create ring placeholders for configured rings
-      const ringPlaceholders = rings.map((ringConfig) => ({
-        queryId: ringConfig.id,
-        queryName: ringConfig.legendText,
-        color: ringConfig.color,
-        visible: true,
-        customWidth: ringConfig.customWidth,
-        hits: [],
-        annotations: ringAnnotations[ringConfig.id] || [],
-        statistics: {
-          meanIdentity: 0,
-          genomeCoverage: 0,
-          totalAlignedBases: 0
-        }
-      }));
-
-      const plotDataWithRings = {
-        ...skeletonResult,
-        rings: ringPlaceholders
-      };
-
-      setPlotData(plotDataWithRings);
-      setCachedPlotData(plotDataWithRings);
-      setReferenceLength(skeletonResult.reference.length);
-    } catch (error: any) {
-      console.error('[Page] Error generating skeleton:', error);
-      toast.error(`Error: ${error.message}`);
-    }
-  };
-
-  // Auto-update plot when ring settings change (colors, thresholds, visibility, annotations)
-  // NOTE: This should NOT depend on cachedPlotData to avoid overwriting alignment results
-  useEffect(() => {
-    if (!cachedPlotData) return;
-
-    console.log('[Page] Ring settings changed, updating plot');
-
-    // Create a map of existing ring data by queryId
-    const ringDataMap = new Map((cachedPlotData.rings || []).map(r => [r.queryId, r]));
-
-    // Update all configured rings, whether they have alignment data or not
-    const updatedRings = rings.map((ringConfig) => {
-      const existingRingData = ringDataMap.get(ringConfig.id);
-
-      if (existingRingData) {
-        return {
-          ...existingRingData,
-          queryName: ringConfig.legendText,
-          color: ringConfig.color,
-          visible: true,
-          customWidth: ringConfig.customWidth,
-          upperThreshold: ringConfig.upperThreshold,
-          lowerThreshold: ringConfig.lowerThreshold,
-          graphMaxCap: ringConfig.graphMaxCap,
-          showLabels: ringConfig.showLabels,
-          annotations: ringAnnotations[ringConfig.id] || existingRingData.annotations || []
-        };
-      } else {
-        return {
-          queryId: ringConfig.id,
-          queryName: ringConfig.legendText,
-          color: ringConfig.color,
-          visible: true,
-          customWidth: ringConfig.customWidth,
-          upperThreshold: ringConfig.upperThreshold,
-          lowerThreshold: ringConfig.lowerThreshold,
-          graphMaxCap: ringConfig.graphMaxCap,
-          showLabels: ringConfig.showLabels,
-          hits: [],
-          annotations: ringAnnotations[ringConfig.id] || [],
-          statistics: {
-            meanIdentity: 0,
-            genomeCoverage: 0,
-            totalAlignedBases: 0
-          }
-        };
-      }
-    });
-
-    const updated = { ...cachedPlotData, rings: updatedRings };
-    setPlotData(updated);
-    setCachedPlotData(updated);
-  }, [rings, ringAnnotations]); // Removed cachedPlotData from dependencies!
-
-  const handleRun = async () => {
-    console.log(`[BRIGX v${APP_VERSION}] Starting alignment pipeline`);
-
-    // Clear console logs on each run
-    setConsoleLogs([]);
-
-    if (!referenceFile) {
-      toast.error('Please select a reference genome');
-      return;
-    }
-
-    // Check if there are any rings with files to align
-    const ringsWithFiles = rings.filter(r => r.files.length > 0);
-    if (ringsWithFiles.length === 0) {
-      toast('No alignment files to process. Add files to rings or just use annotations.');
-      return;
-    }
-
-    console.log('[Page] Running alignments for:', ringsWithFiles.map(r => r.legendText).join(', '));
-
-    setIsProcessing(true);
-    setProgress({ step: 'Starting alignments...', percent: 0 });
-
-    try {
-      // Reuse existing controller instance to preserve alignment cache
-      if (!controllerRef.current) {
-        const { BRIGController } = await import('@/lib/controller');
-        controllerRef.current = new BRIGController();
-        await controllerRef.current.initialize();
-        console.log('[Page] Created new BRIGController instance');
-      } else {
-        console.log('[Page] Reusing existing BRIGController instance (cache preserved)');
-      }
-
-      const controller = controllerRef.current;
-
-      const result = await controller.runFullPipeline(
-        referenceFile,
-        ringsWithFiles,
-        [],
-        params,
-        (update) => {
-          console.log(`[Page] ${update.step} (${update.percent}%)${update.message ? ' - ' + update.message : ''}`);
-          setProgress(update);
-
-          // Update plot immediately as each ring completes
-          if (update.partialData?.rings && update.partialData.rings.length > 0) {
-            console.log('[Page] Received partial data with', update.partialData.rings.length, 'rings');
-
-            // Merge new ring data with existing cached data (preserve all rings and annotations)
-            const hasExistingRings = cachedPlotData?.rings && cachedPlotData.rings.length > 0;
-
-            let mergedRings;
-            if (hasExistingRings) {
-              // Start with all existing rings
-              mergedRings = cachedPlotData.rings.map(existingRing => {
-                const newRingData = update.partialData!.rings!.find(r => r.queryName === existingRing.queryName);
-                if (newRingData) {
-                  console.log(`[Page] Updating ring: ${existingRing.queryName}, hits: ${newRingData.hits?.length || 0}, preserving annotations: ${existingRing.annotations?.length || 0}`);
-                  return {
-                    ...existingRing,
-                    hits: newRingData.hits,
-                    statistics: newRingData.statistics,
-                    alignmentOutput: newRingData.alignmentOutput,
-                    graphPoints: newRingData.graphPoints || existingRing.graphPoints,
-                    graphMaxValue: newRingData.graphMaxValue || existingRing.graphMaxValue,
-                    graphStats: newRingData.graphStats || existingRing.graphStats,
-                    annotations: existingRing.annotations || []
-                  };
-                }
-                return existingRing;
-              });
-
-              // Add any new rings that weren't in the cache
-              const newRingsToAdd = update.partialData!.rings!.filter(
-                newRing => !cachedPlotData.rings.some(existing => existing.queryName === newRing.queryName)
-              );
-              if (newRingsToAdd.length > 0) {
-                console.log(`[Page] Adding ${newRingsToAdd.length} new rings:`, newRingsToAdd.map(r => r.queryName));
-                // Add annotations from ringAnnotations state if they exist
-                const newRingsWithAnnotations = newRingsToAdd.map(ring => {
-                  const annotations = ringAnnotations[ring.queryId] || ring.annotations || [];
-                  if (annotations.length > 0) {
-                    console.log(`[Page] Adding annotations to new ring ${ring.queryName}:`, annotations.length);
-                  }
-                  return {
-                    ...ring,
-                    annotations
-                  };
-                });
-                mergedRings = [...mergedRings, ...newRingsWithAnnotations];
-              }
-            } else {
-              // No existing rings - add annotations from ringAnnotations state
-              console.log('[Page] No existing rings, adding annotations from state');
-              mergedRings = update.partialData!.rings!.map(ring => {
-                const annotations = ringAnnotations[ring.queryId] || ring.annotations || [];
-                if (annotations.length > 0) {
-                  console.log(`[Page] Adding annotations to ring ${ring.queryName}:`, annotations.length);
-                }
-                return {
-                  ...ring,
-                  annotations
-                };
-              });
-            }
-
-            const updatedPlotData = {
-              reference: update.partialData.reference || cachedPlotData?.reference || { name: '', length: 0 },
-              rings: mergedRings,
-              config: update.partialData.config || cachedPlotData?.config || { minIdentity: 70, minAlignmentLength: 100 }
-            };
-
-            setPlotData(updatedPlotData);
-          }
-        }
-      );
-
-      console.log(`[Page] Alignments complete. ${result.rings?.length || 0} rings: ${result.rings?.map(r => r.queryName).join(', ')}`);
-
-      // Merge final alignment results into existing plot data
-      // CRITICAL: Check if existing rings array has any items, not just if it exists
-      const hasExistingRings = cachedPlotData?.rings && cachedPlotData.rings.length > 0;
-
-      let finalRings: RingData[];
-      if (hasExistingRings) {
-        // Update existing cached rings with new alignment data
-        finalRings = cachedPlotData.rings.map(existingRing => {
-          const newRingData = result.rings?.find(r => r.queryName === existingRing.queryName);
-          if (newRingData) {
-            console.log(`[Page] Final merge - updating ring: ${existingRing.queryName}`);
-            return {
-              ...existingRing,
-              hits: newRingData.hits,
-              statistics: newRingData.statistics,
-              alignmentOutput: newRingData.alignmentOutput,
-              graphPoints: newRingData.graphPoints || existingRing.graphPoints,
-              graphMaxValue: newRingData.graphMaxValue || existingRing.graphMaxValue,
-              annotations: existingRing.annotations || ringAnnotations[existingRing.queryId] || []
-            };
-          }
-          return existingRing;
-        });
-
-        // Append any NEW rings from result that weren't in the cache
-        const newRingsToAdd = (result.rings || []).filter(
-          newRing => !cachedPlotData.rings.some(existing => existing.queryName === newRing.queryName)
-        );
-        if (newRingsToAdd.length > 0) {
-          console.log(`[Page] Final merge - adding ${newRingsToAdd.length} new rings: ${newRingsToAdd.map(r => r.queryName).join(', ')}`);
-          const newRingsWithAnnotations = newRingsToAdd.map(ring => ({
-            ...ring,
-            annotations: ring.annotations || ringAnnotations[ring.queryId] || []
-          }));
-          finalRings = [...finalRings, ...newRingsWithAnnotations];
-        }
-      } else {
-        finalRings = (result.rings || []).map(ring => ({
-          ...ring,
-          annotations: ring.annotations || ringAnnotations[ring.queryId] || []
-        }));
-      }
-
-      console.log(`[Page] Final merge: ${finalRings?.length || 0} rings`);
-
-      // Keep existing skeleton (reference, GC data), only update rings with alignment data
-      if (cachedPlotData) {
-        const finalPlotData = {
-          ...cachedPlotData,
-          rings: finalRings
-        };
-
-        console.log('[Page] Setting final plot data with rings:', finalPlotData.rings?.length);
-        setPlotData(finalPlotData);
-        setCachedPlotData(finalPlotData);
-      } else {
-        // Fallback if no cached data (shouldn't happen)
-        console.warn('[Page] No cached data, using result directly');
-        setPlotData(result);
-        setCachedPlotData(result);
-      }
-      setProgress({ step: 'Complete!', percent: 100 });
-      toast.success('Alignments completed successfully!');
-    } catch (error: any) {
-      console.error('[Page] Alignment error:', error);
-      toast.error(`Error: ${error.message}`, { duration: 6000 });
-      setProgress({ step: 'Error', percent: 0, message: error.message });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleSaveSession = () => {
-    const json = exportSession(
-      APP_VERSION,
-      referenceFile?.name || '',
-      rings,
-      ringAnnotations,
-      params,
-      imageProperties
-    );
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `brigx-session-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Session saved');
-  };
-
-  const handleLoadSession = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const json = await file.text();
-      const session = importSession(json);
-
-      // Restore rings (without files - they can't be serialized)
-      const restoredRings: RingConfig[] = session.rings.map(r => ({
-        id: r.id,
-        legendText: r.legendText,
-        color: r.color,
-        upperThreshold: r.upperThreshold,
-        lowerThreshold: r.lowerThreshold,
-        customWidth: r.customWidth,
-        files: []
-      }));
-      setRings(restoredRings);
-
-      // Restore annotations
-      const restoredAnnotations: Record<string, Annotation[]> = {};
-      session.rings.forEach(r => {
-        if (r.annotations && r.annotations.length > 0) {
-          restoredAnnotations[r.id] = r.annotations;
-        }
-      });
-      setRingAnnotations(restoredAnnotations);
-
-      // Restore params and image config
-      setParams(session.params);
-      setImageProperties(session.imageConfig);
-
-      toast.success('Session loaded. Re-add reference and ring files to run alignments.');
-    } catch (error: any) {
-      toast.error(`Failed to load session: ${error.message}`);
-    }
-
-    e.target.value = '';
-  };
+  const {
+    referenceFile, rings, setRings, params, setParams, progress, plotData,
+    isProcessing, consoleLogs, imageProperties, setImageProperties,
+    plotExpanded, setPlotExpanded, showBugReport, setShowBugReport,
+    annotationEditorOpen, setAnnotationEditorOpen, editingRingId, setEditingRingId,
+    ringAnnotations, referenceLength,
+    handleReferenceFileChange, handleAnnotationsChange, handleOpenAnnotationEditor,
+    handleRun, handleSaveSession, handleLoadSession,
+  } = useBRIGController();
 
   return (
     <>
-      <Toaster
-        position="bottom-right"
-        toastOptions={{
-          style: {
-            background: 'var(--gx-bg-alt)',
-            color: 'var(--gx-text)',
-            border: '1px solid var(--gx-border)',
-          },
-          success: {
-            duration: 3000,
-            iconTheme: {
-              primary: '#14B8A6',
-              secondary: '#fff',
-            },
-          },
-          error: {
-            duration: 6000,
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff',
-            },
-          },
-        }}
-      />
+      <Toaster position="bottom-right" toastOptions={{ style: { background: 'var(--gx-bg-alt)', color: 'var(--gx-text)', border: '1px solid var(--gx-border)' }, success: { duration: 3000, iconTheme: { primary: '#14B8A6', secondary: '#fff' } }, error: { duration: 6000, iconTheme: { primary: '#ef4444', secondary: '#fff' } } }} />
       <div className="min-h-screen flex flex-col" style={{ background: 'var(--gx-bg)' }}>
-        {/* Navigation - Frosted Glass */}
-        <nav className="sticky top-0 z-40" style={{ background: 'var(--gx-nav-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid var(--gx-border)' }}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-[60px]">
-              <div className="flex items-center gap-3">
-                {/* DNA Rings Icon */}
-                <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="var(--gx-accent)" strokeWidth="2">
-                  <circle cx="12" cy="12" r="9" />
-                  <circle cx="12" cy="12" r="5" />
-                  <circle cx="12" cy="12" r="1" fill="var(--gx-accent)" />
-                </svg>
-                <div>
-                  <h1 className="text-lg font-bold" style={{ color: 'var(--gx-text)' }}>BRIGX <span className="text-xs font-normal" style={{ color: 'var(--gx-text-muted)' }}>v{APP_VERSION}</span></h1>
-                  <p className="text-xs" style={{ color: 'var(--gx-text-muted)' }}>Browser-based Ring Image Generator</p>
-                </div>
-              </div>
-              <div className="hidden md:flex items-center gap-6">
-                <button onClick={handleSaveSession} className="btn-secondary text-xs px-3 py-1" title="Save current session (rings, annotations, settings) as JSON">
-                  Save Session
-                </button>
-                <label className="btn-secondary text-xs px-3 py-1 cursor-pointer" title="Load a previously saved session from JSON file">
-                  Load Session
-                  <input type="file" accept=".json" onChange={handleLoadSession} className="hidden" />
-                </label>
-                <Link href="/about" className="text-sm font-medium hover:text-gx-accent transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
-                  About
-                </Link>
-                <a href="https://github.com/happykhan/brigx" target="_blank" rel="noopener" className="text-sm font-medium hover:text-gx-accent transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
-                  GitHub
-                </a>
-                <ThemeToggle />
-              </div>
-            </div>
-          </div>
-        </nav>
+        <NavBar onSaveSession={handleSaveSession} onLoadSession={handleLoadSession} />
 
-        {/* Main Content */}
         <main className="flex-1 py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-              {/* Left Sidebar - Input Panel */}
               <div className="lg:col-span-1 space-y-6 animate-fade-in">
-                <div className="card">
-                  <h2 className="section-title">Reference Genome</h2>
-                  <div>
-                    <label className="label">Reference Genome (FASTA)</label>
-                    <input
-                      type="file"
-                      accept=".fasta,.fa,.fna,.gbk,.gb"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          setReferenceFile(e.target.files[0]);
-                          // Reset plot when reference changes
-                          setPlotData(null);
-                          setCachedPlotData(null);
-                          setReferenceLength(0);
-                          if (controllerRef.current) {
-                            controllerRef.current.cleanup();
-                            controllerRef.current = null;
-                          }
-                        }
-                      }}
-                      className="input-field w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:cursor-pointer"
-                      style={{ fontSize: '0.8rem' }}
-                    />
-                    {referenceFile && (
-                      <div className="mt-2 flex items-center text-sm" style={{ color: 'var(--gx-accent)' }}>
-                        <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        {referenceFile.name}
-                      </div>
-                    )}
-                    <p className="text-xs mt-2" style={{ color: 'var(--gx-text-muted)' }}>
-                      Single sequence or multi-FASTA with spacers
-                    </p>
-                  </div>
-                </div>
-
-                <div className="card">
-                  <RingConfiguration
-                    rings={rings}
-                    setRings={setRings}
-                    onEditAnnotations={handleOpenAnnotationEditor}
-                    ringDataList={plotData?.rings}
-                  />
-                </div>
-
-                <div className="card">
-                  <h2 className="section-title">Parameters</h2>
-                  <ParameterControls
-                    params={params}
-                    setParams={setParams}
-                    disabled={isProcessing}
-                    isMultiFasta={!!(plotData?.reference?.contigs && plotData.reference.contigs.length > 1)}
-                  />
-                </div>
-
-                <button
-                  onClick={handleRun}
-                  disabled={isProcessing || !referenceFile || rings.filter(r => r.files.length > 0).length === 0}
-                  className="w-full btn-primary py-3 px-6 text-lg font-semibold"
-                >
-                  {isProcessing ? (
-                    <span className="flex items-center justify-center">
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Running Alignments...
-                    </span>
-                  ) : (
-                    'Run Alignments'
-                  )}
-                </button>
+                <ReferenceInput referenceFile={referenceFile} onFileChange={handleReferenceFileChange} />
+                <RingsPanel rings={rings} setRings={setRings} onEditAnnotations={handleOpenAnnotationEditor} ringDataList={plotData?.rings} />
+                <ControlPanel params={params} setParams={setParams} isProcessing={isProcessing} referenceFile={referenceFile} rings={rings} plotData={plotData} onRun={handleRun} />
               </div>
 
-              {/* Visualization Panel */}
               <div className="lg:col-span-2 animate-slide-up">
-                <div className="card mb-6">
-                  <h2 className="section-title">Image Properties</h2>
-                  <div className="flex items-center gap-4 mb-3">
-                    <input
-                      type="text"
-                      value={imageProperties.title}
-                      onChange={(e) => setImageProperties({ ...imageProperties, title: e.target.value })}
-                      placeholder="Plot title..."
-                      className="input-field flex-1 text-sm"
-                    />
-                    <label className="flex items-center gap-1.5 cursor-pointer text-xs whitespace-nowrap" style={{ color: 'var(--gx-text-muted)' }}>
-                      <input
-                        type="checkbox"
-                        checked={imageProperties.showLegend !== false}
-                        onChange={(e) => setImageProperties({ ...imageProperties, showLegend: e.target.checked })}
-                        className="w-3.5 h-3.5"
-                        style={{ accentColor: 'var(--gx-accent)' }}
-                      />
-                      Legend
-                    </label>
-                  </div>
-                  <ImageProperties config={imageProperties} onChange={setImageProperties} />
-                </div>
+                <ImagePropertiesPanel imageProperties={imageProperties} onChange={setImageProperties} />
 
                 <div className={`card ${plotExpanded ? 'fixed inset-0 z-50 flex flex-col' : ''}`} style={plotExpanded ? { background: 'var(--gx-bg-alt)', borderRadius: 0 } : undefined}>
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="section-title mb-0">Circular Plot</h2>
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setPlotExpanded(!plotExpanded)}
-                        className="btn-secondary text-xs px-2 py-1"
-                        title={plotExpanded ? 'Shrink plot' : 'Expand plot'}
-                      >
+                      <button onClick={() => setPlotExpanded(!plotExpanded)} className="btn-secondary text-xs px-2 py-1" title={plotExpanded ? 'Shrink plot' : 'Expand plot'}>
                         {plotExpanded ? (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                         ) : (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                          </svg>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
                         )}
                       </button>
                       {plotData && <ExportPanel plotData={plotData} imageProperties={imageProperties} />}
@@ -700,28 +61,14 @@ export default function Home() {
 
                   {plotData ? (
                     <div className={plotExpanded ? 'flex-1 min-h-0' : ''}>
-                    <ErrorBoundary>
-                    <CircularPlot
-                      data={{
-                        ...plotData,
-                        reference: {
-                          ...plotData.reference,
-                          gcContent: params.showGCContent !== false ? plotData.reference.gcContent : undefined,
-                          gcSkew: params.showGCSkew !== false ? plotData.reference.gcSkew : undefined
-                        }
-                      }}
-                      imageProperties={imageProperties}
-                    />
-                    </ErrorBoundary>
+                      <ErrorBoundary>
+                        <CircularPlot data={{ ...plotData, reference: { ...plotData.reference, gcContent: params.showGCContent !== false ? plotData.reference.gcContent : undefined, gcSkew: params.showGCSkew !== false ? plotData.reference.gcSkew : undefined } }} imageProperties={imageProperties} />
+                      </ErrorBoundary>
                     </div>
                   ) : (
                     <div className="flex items-center justify-center h-96" style={{ color: 'var(--gx-text-muted)' }}>
                       <div className="text-center">
-                        <svg className="mx-auto h-24 w-24 mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <circle cx="12" cy="12" r="10" strokeWidth="1.5" />
-                          <circle cx="12" cy="12" r="6" strokeWidth="1.5" />
-                          <circle cx="12" cy="12" r="2" strokeWidth="1.5" />
-                        </svg>
+                        <svg className="mx-auto h-24 w-24 mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth="1.5" /><circle cx="12" cy="12" r="6" strokeWidth="1.5" /><circle cx="12" cy="12" r="2" strokeWidth="1.5" /></svg>
                         <p className="text-lg">Load a reference genome to begin</p>
                         <p className="text-sm mt-2">The plot will generate automatically with GC content/skew rings</p>
                       </div>
@@ -729,83 +76,16 @@ export default function Home() {
                   )}
                 </div>
 
-                {/* Console Log */}
                 <div className="mt-6 animate-fade-in">
                   <ConsoleLog logs={consoleLogs} progress={progress} />
                 </div>
 
-                {plotData && (
-                  <div className="mt-6 card animate-fade-in">
-                    <h2 className="section-title">Statistics</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="p-4 rounded-lg" style={{ background: 'color-mix(in srgb, var(--gx-accent) 10%, transparent)', border: '1px solid var(--gx-border)' }}>
-                        <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--gx-text-muted)' }}>Reference</div>
-                        <div className="text-base font-semibold truncate mt-1" style={{ color: 'var(--gx-text)' }}>{plotData.reference.name}</div>
-                        <div className="text-sm" style={{ color: 'var(--gx-text-muted)' }}>{(plotData.reference.length / 1000).toFixed(1)} kb</div>
-                      </div>
-                      <div className="p-4 rounded-lg" style={{ background: 'color-mix(in srgb, var(--gx-accent) 10%, transparent)', border: '1px solid var(--gx-border)' }}>
-                        <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--gx-text-muted)' }}>Query Genomes</div>
-                        <div className="text-2xl font-bold mt-1" style={{ color: 'var(--gx-text)' }}>{plotData.rings?.length || 0}</div>
-                      </div>
-                      <div className="p-4 rounded-lg" style={{ background: 'color-mix(in srgb, var(--gx-indigo) 10%, transparent)', border: '1px solid var(--gx-border)' }}>
-                        <div className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--gx-text-muted)' }}>Min Identity</div>
-                        <div className="text-2xl font-bold mt-1" style={{ color: 'var(--gx-text)' }}>{plotData.config?.minIdentity || 0}%</div>
-                      </div>
-                    </div>
-
-                    {plotData.rings && plotData.rings.length > 0 && (
-                      <div className="mt-6">
-                        <h3 className="font-semibold mb-3" style={{ color: 'var(--gx-text)' }}>Query Genome Coverage</h3>
-                        <div className="space-y-2">
-                          {plotData.rings.map((ring) => (
-                            <div key={ring.queryId} className="flex items-center justify-between p-3 rounded-lg transition-colors" style={{ background: 'var(--gx-surface)', border: '1px solid var(--gx-border)' }}>
-                              <div className="flex-1">
-                                <div className="font-medium" style={{ color: 'var(--gx-text)' }}>{ring.queryName}</div>
-                                <div className="text-sm" style={{ color: 'var(--gx-text-muted)' }}>
-                                  Coverage: {ring.statistics.genomeCoverage.toFixed(1)}% |
-                                  Avg Identity: {ring.statistics.meanIdentity.toFixed(1)}%
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                {ring.alignmentOutput && (
-                                  <button
-                                    onClick={() => {
-                                      const header = '#query\tsubject\t%identity\talignment_length\tmismatches\tgap_opens\tq.start\tq.end\ts.start\ts.end\tevalue\tbit_score\n';
-                                      const blob = new Blob([header + ring.alignmentOutput!], { type: 'text/plain' });
-                                      const url = URL.createObjectURL(blob);
-                                      const a = document.createElement('a');
-                                      a.href = url;
-                                      a.download = `${ring.queryName}_alignment.txt`;
-                                      a.click();
-                                      URL.revokeObjectURL(url);
-                                      toast.success(`Downloaded alignment results for ${ring.queryName}`);
-                                    }}
-                                    className="btn-secondary text-xs px-2 py-1"
-                                  >
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                    Download
-                                  </button>
-                                )}
-                                <div
-                                  className="w-4 h-4 rounded-full flex-shrink-0"
-                                  style={{ backgroundColor: ring.color, boxShadow: `0 0 0 2px var(--gx-border)` }}
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {plotData && <StatisticsPanel plotData={plotData} />}
               </div>
             </div>
           </div>
         </main>
 
-        {/* Footer */}
         <footer className="mt-auto" style={{ borderTop: '1px solid var(--gx-border)', background: 'var(--gx-bg-alt)' }}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div className="flex flex-col md:flex-row justify-between items-center">
@@ -814,56 +94,18 @@ export default function Home() {
                 <p className="mt-1">All processing runs locally in your browser - no data leaves your computer</p>
               </div>
               <div className="flex gap-6 text-sm">
-                <a href="/about" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>
-                  About
-                </a>
-                <a href="https://github.com/happykhan/brigx" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>
-                  GitHub
-                </a>
-                <a href="https://genomicx.org" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>
-                  genomicx.org
-                </a>
-                <button onClick={() => setShowBugReport(true)} className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>
-                  Report Bug
-                </button>
+                <a href="/about" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>About</a>
+                <a href="https://github.com/happykhan/brigx" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>GitHub</a>
+                <a href="https://genomicx.org" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>genomicx.org</a>
+                <button onClick={() => setShowBugReport(true)} className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>Report Bug</button>
               </div>
             </div>
           </div>
         </footer>
       </div>
 
-      {/* Bug Report Modal */}
-      {showBugReport && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(0, 0, 0, 0.6)' }} onClick={() => setShowBugReport(false)}>
-          <div className="rounded-lg max-w-md w-full p-6" style={{ background: 'var(--gx-bg-alt)' }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold" style={{ color: 'var(--gx-text)' }}>Report a Bug</h3>
-              <button onClick={() => setShowBugReport(false)} style={{ color: 'var(--gx-text-muted)' }}>&times;</button>
-            </div>
-            <div className="space-y-3 text-sm" style={{ color: 'var(--gx-text)' }}>
-              <p>To report a bug, please email the following to:</p>
-              <p className="font-mono font-bold" style={{ color: 'var(--gx-accent)' }}>
-                <a href="mailto:nabil@happykhan.com">nabil@happykhan.com</a>
-              </p>
-              <div className="space-y-2 p-3 rounded" style={{ background: 'var(--gx-surface)' }}>
-                <p className="font-semibold">Please include:</p>
-                <ol className="list-decimal pl-5 space-y-1" style={{ color: 'var(--gx-text-muted)' }}>
-                  <li>A description of what happened and what you expected</li>
-                  <li>Your input files (reference + query genomes)</li>
-                  <li>Saved session file (use &quot;Save Session&quot; button)</li>
-                  <li>Debug console output (copy from the Debug Console panel)</li>
-                  <li>Browser name and version</li>
-                </ol>
-              </div>
-              <p className="text-xs" style={{ color: 'var(--gx-text-muted)' }}>
-                You can also open an issue on <a href="https://github.com/happykhan/brigx/issues" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gx-accent)', textDecoration: 'underline' }}>GitHub</a>.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {showBugReport && <BugReportModal onClose={() => setShowBugReport(false)} />}
 
-      {/* Annotation Editor Modal */}
       {annotationEditorOpen && editingRingId && (
         <AnnotationEditor
           ringId={editingRingId}
@@ -872,10 +114,7 @@ export default function Home() {
           annotations={ringAnnotations[editingRingId] || []}
           referenceLength={referenceLength}
           onAnnotationsChange={handleAnnotationsChange}
-          onClose={() => {
-            setAnnotationEditorOpen(false);
-            setEditingRingId(null);
-          }}
+          onClose={() => { setAnnotationEditorOpen(false); setEditingRingId(null); }}
         />
       )}
     </>

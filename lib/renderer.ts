@@ -1,5 +1,6 @@
 // Circular Plot SVG Renderer
 import type { CircularPlotData, RingData, Annotation, ContigBoundary } from './types';
+import { positionToAngle, createArcPath as geometryCreateArcPath, getColorIntensity as geometryGetColorIntensity } from './geometry';
 
 export interface RenderConfig {
   width: number;
@@ -50,25 +51,7 @@ export class CircularPlotRenderer {
     startAngle: number,
     endAngle: number
   ): string {
-    const x1 = cx + innerR * Math.cos(startAngle);
-    const y1 = cy + innerR * Math.sin(startAngle);
-    const x2 = cx + outerR * Math.cos(startAngle);
-    const y2 = cy + outerR * Math.sin(startAngle);
-    const x3 = cx + outerR * Math.cos(endAngle);
-    const y3 = cy + outerR * Math.sin(endAngle);
-    const x4 = cx + innerR * Math.cos(endAngle);
-    const y4 = cy + innerR * Math.sin(endAngle);
-    
-    const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
-    
-    return `
-      M ${x1} ${y1}
-      L ${x2} ${y2}
-      A ${outerR} ${outerR} 0 ${largeArc} 1 ${x3} ${y3}
-      L ${x4} ${y4}
-      A ${innerR} ${innerR} 0 ${largeArc} 0 ${x1} ${y1}
-      Z
-    `.replace(/\s+/g, ' ').trim();
+    return geometryCreateArcPath(cx, cy, innerR, outerR, startAngle, endAngle);
   }
 
   private renderReferenceRing(
@@ -147,8 +130,8 @@ export class CircularPlotRenderer {
     gcSkew.forEach((skew, i) => {
       const start = i * windowSize;
       const end = (i + 1) * windowSize;
-      const startAngle = (start / refLength) * 2 * Math.PI - Math.PI / 2;
-      const endAngle = (end / refLength) * 2 * Math.PI - Math.PI / 2;
+      const startAngle = positionToAngle(start, refLength);
+      const endAngle = positionToAngle(end, refLength);
       
       // Calculate bar height based on GC skew (ranges from -1 to +1)
       // Scale to use full ring height based on actual data range
@@ -267,8 +250,8 @@ export class CircularPlotRenderer {
     gcContent.forEach((gc, i) => {
       const start = i * windowSize;
       const end = (i + 1) * windowSize;
-      const startAngle = (start / refLength) * 2 * Math.PI - Math.PI / 2;
-      const endAngle = (end / refLength) * 2 * Math.PI - Math.PI / 2;
+      const startAngle = positionToAngle(start, refLength);
+      const endAngle = positionToAngle(end, refLength);
       
       // Calculate bar height based on GC content deviation from 50%
       // Scale to use full ring height based on actual data range
@@ -384,8 +367,8 @@ export class CircularPlotRenderer {
     for (const point of points) {
       if (point.value <= 0) continue;
 
-      const startAngle = (point.start / refLength) * 2 * Math.PI - Math.PI / 2;
-      const endAngle = (point.end / refLength) * 2 * Math.PI - Math.PI / 2;
+      const startAngle = positionToAngle(point.start, refLength);
+      const endAngle = positionToAngle(point.end, refLength);
 
       const isOverCap = ring.graphMaxCap != null && point.value > capValue;
       const fraction = Math.min(1, point.value / capValue);
@@ -448,8 +431,8 @@ export class CircularPlotRenderer {
     const colors = ['#ef4444', '#3b82f6']; // Alternating red/blue
 
     for (const contig of contigs) {
-      const startAngle = (contig.start / refLength) * 2 * Math.PI - Math.PI / 2;
-      const endAngle = (contig.end / refLength) * 2 * Math.PI - Math.PI / 2;
+      const startAngle = positionToAngle(contig.start, refLength);
+      const endAngle = positionToAngle(contig.end, refLength);
       const color = colors[contig.index % 2];
 
       const path = this.createArcPath(
@@ -553,8 +536,8 @@ export class CircularPlotRenderer {
         }
         
         // Calculate angles for this hit
-        const startAngle = (hit.refStart / refLength) * 2 * Math.PI - Math.PI / 2;
-        const endAngle = (hit.refEnd / refLength) * 2 * Math.PI - Math.PI / 2;
+        const startAngle = positionToAngle(hit.refStart, refLength);
+        const endAngle = positionToAngle(hit.refEnd, refLength);
         
         const path = this.createArcPath(
           cx,
@@ -655,8 +638,8 @@ export class CircularPlotRenderer {
       
       const start = Math.max(1, Math.min(ann.start, refLength));
       const end = Math.max(1, Math.min(ann.end, refLength));
-      const startAngle = (start / refLength) * 2 * Math.PI - Math.PI / 2;
-      const endAngle = (end / refLength) * 2 * Math.PI - Math.PI / 2;
+      const startAngle = positionToAngle(start, refLength);
+      const endAngle = positionToAngle(end, refLength);
       const midAngle = (startAngle + endAngle) / 2;
       
       const textWidth = ann.label.length * (this.config.labelFontSize * 0.6);
@@ -745,8 +728,8 @@ export class CircularPlotRenderer {
       const start = Math.max(1, Math.min(ann.start, refLength));
       const end = Math.max(1, Math.min(ann.end, refLength));
       
-      const startAngle = (start / refLength) * 2 * Math.PI - Math.PI / 2;
-      const endAngle = (end / refLength) * 2 * Math.PI - Math.PI / 2;
+      const startAngle = positionToAngle(start, refLength);
+      const endAngle = positionToAngle(end, refLength);
       
       const color = ann.color || '#666666';
       
@@ -990,28 +973,11 @@ export class CircularPlotRenderer {
     svg.appendChild(group);
   }
 
-  // Color intensity scaling based on identity and thresholds
+  // Color intensity scaling based on identity and thresholds (delegates to shared geometry utility)
   private getColorIntensity(baseColor: string, percentIdentity: number, lowerThreshold?: number, upperThreshold?: number): string {
-    const hex = baseColor.replace('#', '');
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-
-    // Use per-ring thresholds if provided, otherwise fall back to global config
-    const minIdentity = lowerThreshold ?? this.config.minIdentity;
-    const maxIdentity = upperThreshold ?? 100;
-    
-    // Normalize identity to 0-1 range
-    const normalized = Math.max(0, Math.min(1, 
-      (percentIdentity - minIdentity) / (maxIdentity - minIdentity)
-    ));
-    
-    // Interpolate between white (255,255,255) and the base color
-    const finalR = Math.round(255 + (r - 255) * normalized);
-    const finalG = Math.round(255 + (g - 255) * normalized);
-    const finalB = Math.round(255 + (b - 255) * normalized);
-    
-    return `rgb(${finalR}, ${finalG}, ${finalB})`;
+    const lower = lowerThreshold ?? this.config.minIdentity;
+    const upper = upperThreshold ?? 100;
+    return geometryGetColorIntensity(baseColor, percentIdentity, lower, upper);
   }
 
   private renderGCLegend(svg: SVGSVGElement, hasGCContent: boolean, hasGCSkew: boolean) {

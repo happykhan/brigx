@@ -500,12 +500,12 @@ export class BRIGController {
       console.log(`[Controller] Step 4: Running alignments for ${queryGenomes.length} rings`);
       this.updateProgress('Running alignments', 20);
       
-      const alignmentResults: Array<{ result: AlignmentResult; rawOutput: string }> = [];
-      
+      const alignmentResults: Array<{ result: AlignmentResult; rawOutput: string } | null> = new Array(queryGenomes.length).fill(null);
+
       // Process rings with worker pool (max 4 concurrent)
       let nextRingIndex = 0;
       const maxConcurrent = Math.min(4, this.alignmentWorkers.length);
-      
+
       const processNextRing = async (workerIndex: number): Promise<void> => {
         while (nextRingIndex < queryGenomes.length) {
           const ringIndex = nextRingIndex++;
@@ -515,7 +515,7 @@ export class BRIGController {
           // Skip graph rings - they don't need BLAST alignment
           if (graphRingData.has(ringIndex)) {
             console.log(`[Controller] Skipping alignment for graph ring: ${ring.legendText}`);
-            alignmentResults.push({
+            alignmentResults[ringIndex] = {
               result: {
                 queryId: ring.id,
                 queryName: ring.legendText,
@@ -525,7 +525,7 @@ export class BRIGController {
                 metadata: { timestamp: Date.now(), alignerVersion: 'graph', parameters: {} }
               },
               rawOutput: ''
-            });
+            };
             continue;
           }
 
@@ -554,12 +554,11 @@ export class BRIGController {
               this.alignmentCache.set(cacheKey, result.result);
             }
 
-            alignmentResults.push(result);
+            alignmentResults[ringIndex] = result;
             console.log(`[Controller] Ring ${ringIndex + 1}/${queryGenomes.length} completed: ${result.result.hits?.length || 0} hits`);
           } catch (error: any) {
             console.error(`[Controller] Alignment error for ${query.name}:`, error);
-            // Push empty result to maintain array alignment
-            alignmentResults.push({
+            alignmentResults[ringIndex] = {
               result: {
                 queryId: ring.id,
                 queryName: ring.legendText,
@@ -569,7 +568,7 @@ export class BRIGController {
                 metadata: { timestamp: Date.now(), alignerVersion: 'BLAST', parameters: params }
               },
               rawOutput: ''
-            });
+            };
           }
         }
       };
@@ -589,6 +588,7 @@ export class BRIGController {
       for (let i = 0; i < alignmentResults.length; i++) {
         const ring = rings[i];
         const alignResult = alignmentResults[i];
+        if (!alignResult) continue; // Should not happen, but guard
 
         console.log(`[Controller] Processing ring ${i + 1}/${alignmentResults.length}: ${ring.legendText}`);
 

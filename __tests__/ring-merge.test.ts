@@ -159,3 +159,59 @@ describe('Ring merge: add ring after initial alignment', () => {
     expect(merged[1].hits).toHaveLength(40);  // Preserved from cache
   });
 });
+
+describe('Ring merge: graph ring data isolation', () => {
+  it('should not leak graphPoints from a graph ring to adjacent alignment rings', () => {
+    // Simulate: Ring 1 = alignment, Ring 2 = graph, Ring 3 = alignment
+    const ring1 = createRing('Ring 1', 100);
+    const ring2: RingData = {
+      ...createRing('Ring 2', 0),
+      graphPoints: [{ start: 0, end: 1000, value: 50 }],
+      graphMaxValue: 50,
+    };
+    const ring3 = createRing('Ring 3', 80);
+
+    const resultRings = [ring1, ring2, ring3];
+    const merged = finalMerge(undefined, resultRings, {});
+
+    expect(merged).toHaveLength(3);
+
+    // Ring 1 should have hits, no graphPoints
+    expect(merged[0].hits).toHaveLength(100);
+    expect(merged[0].graphPoints).toBeUndefined();
+
+    // Ring 2 should have graphPoints, no hits
+    expect(merged[1].graphPoints).toHaveLength(1);
+    expect(merged[1].hits).toHaveLength(0);
+
+    // Ring 3 should have hits, no graphPoints
+    expect(merged[2].hits).toHaveLength(80);
+    expect(merged[2].graphPoints).toBeUndefined();
+  });
+
+  it('should preserve graphPoints during merge with cached rings', () => {
+    const cachedRings = [
+      createRing('Ring 1', 50),
+      {
+        ...createRing('Ring 2', 0),
+        graphPoints: [{ start: 0, end: 1000, value: 50 }],
+        graphMaxValue: 50,
+      },
+    ];
+
+    const resultRings = [
+      createRing('Ring 1', 100),
+      {
+        ...createRing('Ring 2', 0),
+        graphPoints: [{ start: 0, end: 1000, value: 50 }],
+        graphMaxValue: 50,
+      },
+    ];
+
+    const merged = finalMerge(cachedRings, resultRings, {});
+
+    expect(merged).toHaveLength(2);
+    expect(merged[0].graphPoints).toBeUndefined();
+    expect(merged[1].graphPoints).toHaveLength(1);
+  });
+});

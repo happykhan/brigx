@@ -561,7 +561,7 @@ export default function Home() {
                 <a href="https://github.com/happykhan/brigx" target="_blank" rel="noopener" className="text-sm font-medium hover:text-gx-accent transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
                   GitHub
                 </a>
-                <ThemeToggle disabled={!!plotData} />
+                <ThemeToggle />
               </div>
             </div>
           </div>
@@ -629,21 +629,6 @@ export default function Home() {
                   />
                 </div>
 
-                <details className="card">
-                  <summary className="section-title cursor-pointer select-none list-none flex items-center justify-between">
-                    <span>Image Properties</span>
-                    <svg className="w-4 h-4" style={{ color: 'var(--gx-text-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </summary>
-                  <div className="mt-4">
-                    <ImageProperties
-                      config={imageProperties}
-                      onChange={setImageProperties}
-                    />
-                  </div>
-                </details>
-
                 <button
                   onClick={handleRun}
                   disabled={isProcessing || !referenceFile || rings.filter(r => r.files.length > 0).length === 0}
@@ -665,6 +650,17 @@ export default function Home() {
 
               {/* Visualization Panel */}
               <div className="lg:col-span-2 animate-slide-up">
+                <details className="card mb-6">
+                  <summary className="section-title cursor-pointer select-none list-none flex items-center justify-between">
+                    <span>Image Properties</span>
+                    <svg className="w-4 h-4" style={{ color: 'var(--gx-text-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </summary>
+                  <div className="mt-4">
+                    <ImageProperties config={imageProperties} onChange={setImageProperties} />
+                  </div>
+                </details>
 
                 <div className={`card ${plotExpanded ? 'fixed inset-0 z-50 flex flex-col' : ''}`} style={plotExpanded ? { background: 'var(--gx-bg-alt)', borderRadius: 0 } : undefined}>
                   <div className="flex justify-between items-center mb-6">

@@ -15,6 +15,7 @@ export interface RenderConfig {
   titleFontSize: number;
   labelFontSize: number;
   title: string;
+  showLegend?: boolean;
 }
 
 export class CircularPlotRenderer {
@@ -1358,6 +1359,11 @@ export class CircularPlotRenderer {
     this.svg.setAttribute('width', '100%');
     this.svg.setAttribute('height', '100%');
     
+    // Embed font-family style so exports use sans-serif
+    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    style.textContent = 'text { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }';
+    this.svg.appendChild(style);
+
     // Add white background rect so exports also have white background
     const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     bgRect.setAttribute('width', String(this.config.width));

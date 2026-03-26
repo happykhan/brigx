@@ -12,6 +12,7 @@ export interface ImagePropertiesConfig {
   titleFontSize: number;
   labelFontSize: number;
   title: string;
+  showLegend?: boolean;
 }
 
 interface ImagePropertiesProps {
@@ -22,7 +23,7 @@ interface ImagePropertiesProps {
 export default function ImageProperties({ config, onChange }: ImagePropertiesProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleChange = (key: keyof ImagePropertiesConfig, value: number | string) => {
+  const handleChange = (key: keyof ImagePropertiesConfig, value: number | string | boolean) => {
     onChange({
       ...config,
       [key]: value
@@ -41,6 +42,19 @@ export default function ImageProperties({ config, onChange }: ImagePropertiesPro
           placeholder="Enter plot title..."
           className="input-field w-full"
         />
+      </div>
+
+      <div className="mb-4">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={config.showLegend !== false}
+            onChange={(e) => handleChange('showLegend', e.target.checked)}
+            className="w-4 h-4 rounded"
+            style={{ accentColor: 'var(--gx-accent)' }}
+          />
+          <span className="text-sm" style={{ color: 'var(--gx-text)' }}>Show Legend</span>
+        </label>
       </div>
 
       <div className="flex items-center justify-between mb-3 pt-4" style={{ borderTop: '1px solid var(--gx-border)' }}>

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { CircularPlotData } from '@/lib/types';
 import type { ImagePropertiesConfig } from './ImageProperties';
-import { CircularPlotRenderer } from '@/lib/renderer';
+import { CanvasPlotRenderer } from '@/lib/canvas-renderer';
 
 interface CircularPlotProps {
   data: CircularPlotData;
@@ -20,77 +20,179 @@ interface TooltipInfo {
   position?: number;
   windowSize?: number;
   gc?: string;
+  skew?: string;
+  name?: string;
+  length?: number;
+  value?: string;
+  label?: string;
+  strand?: string;
   x: number;
   y: number;
 }
 
 export default function CircularPlot({ data, imageProperties }: CircularPlotProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const svgRef = useRef<SVGSVGElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rendererRef = useRef<CanvasPlotRenderer | null>(null);
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [draggingLegend, setDraggingLegend] = useState<'gc' | 'ring' | null>(null);
+  const [legendDragStart, setLegendDragStart] = useState({ x: 0, y: 0 });
 
-  useEffect(() => {
-    if (!containerRef.current || !data) return;
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const dataRef = useRef(data);
+  const propsRef = useRef(imageProperties);
+  const zoomRef = useRef(zoom);
+  const panRef = useRef(pan);
+  dataRef.current = data;
+  propsRef.current = imageProperties;
+  zoomRef.current = zoom;
+  panRef.current = pan;
 
-    const renderer = new CircularPlotRenderer({
-      width: 1000,
-      height: 1000,
-      innerRadius: imageProperties.innerRadius,
-      ringWidth: imageProperties.ringWidth,
-      gcRingWidth: imageProperties.gcRingWidth,
-      ringSpacing: imageProperties.ringSpacing,
-      minIdentity: data.config.minIdentity,
+  // Render at the container's actual pixel size, preserving zoom/pan
+  const renderAtSize = useCallback(() => {
+    const canvas = canvasRef.current;
+    const wrapper = wrapperRef.current;
+    const d = dataRef.current;
+    if (!canvas || !wrapper || !d) return;
+
+    const rect = wrapper.getBoundingClientRect();
+    const size = Math.max(400, Math.floor(Math.min(rect.width, rect.height)));
+    const ip = propsRef.current;
+
+    // Preserve legend positions from previous renderer
+    const prevRenderer = rendererRef.current;
+
+    const renderer = new CanvasPlotRenderer({
+      width: size,
+      height: size,
+      innerRadius: ip.innerRadius,
+      ringWidth: ip.ringWidth,
+      gcRingWidth: ip.gcRingWidth,
+      ringSpacing: ip.ringSpacing,
+      minIdentity: d.config.minIdentity,
       maxIdentity: 100,
-      legendFontSize: imageProperties.legendFontSize,
-      scaleFontSize: imageProperties.scaleFontSize,
-      titleFontSize: imageProperties.titleFontSize,
-      labelFontSize: imageProperties.labelFontSize,
-      title: imageProperties.title
+      legendFontSize: ip.legendFontSize,
+      scaleFontSize: ip.scaleFontSize,
+      titleFontSize: ip.titleFontSize,
+      labelFontSize: ip.labelFontSize,
+      title: ip.title,
+      showLegend: ip.showLegend
     });
 
-    renderer.setTooltipCallback((info) => setTooltip(info));
-    renderer.render(containerRef.current, data);
-
-    const svg = containerRef.current.querySelector('svg');
-    if (svg) {
-      svgRef.current = svg;
+    // Copy legend positions from old renderer if it exists
+    if (prevRenderer) {
+      renderer.copyLegendPositions(prevRenderer);
     }
-  }, [data, imageProperties]);
 
-  // Apply zoom and pan transform
+    renderer.render(canvas, d, zoomRef.current, panRef.current.x, panRef.current.y);
+    // Set CSS size to maintain square aspect ratio within container
+    canvas.style.width = size + 'px';
+    canvas.style.height = size + 'px';
+    rendererRef.current = renderer;
+  }, []);
+
+  // Re-render on data/config change
   useEffect(() => {
-    if (svgRef.current) {
-      const mainGroup = svgRef.current.querySelector('g.main-content');
-      if (mainGroup) {
-        const viewBox = svgRef.current.viewBox.baseVal;
-        const cx = viewBox.width / 2;
-        const cy = viewBox.height / 2;
-        mainGroup.setAttribute(
-          'transform',
-          `translate(${cx + pan.x}, ${cy + pan.y}) scale(${zoom}) translate(${-cx}, ${-cy})`
-        );
-      }
+    renderAtSize();
+  }, [data, imageProperties, renderAtSize]);
+
+  // Re-render on container resize (e.g. expand/shrink)
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    let resizeTimer: ReturnType<typeof setTimeout>;
+    const observer = new ResizeObserver(() => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(renderAtSize, 100);
+    });
+    observer.observe(wrapper);
+    return () => observer.disconnect();
+  }, [renderAtSize]);
+
+  // Redraw on zoom/pan change
+  useEffect(() => {
+    if (rendererRef.current) {
+      rendererRef.current.redraw(zoom, pan.x, pan.y);
     }
   }, [zoom, pan]);
 
+  const getCanvasCoords = (e: React.MouseEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { canvasX: 0, canvasY: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const logicalW = canvas.width / dpr;
+    const logicalH = canvas.height / dpr;
+    return {
+      canvasX: (e.clientX - rect.left) * (logicalW / rect.width),
+      canvasY: (e.clientY - rect.top) * (logicalH / rect.height),
+    };
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 0) {
-      setIsDragging(true);
-      setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    if (e.button !== 0 || !rendererRef.current) return;
+
+    // Check if clicking on a legend first
+    const { canvasX, canvasY } = getCanvasCoords(e);
+    const legendHit = rendererRef.current.legendHitTest(canvasX, canvasY, zoom, pan.x, pan.y);
+    if (legendHit) {
+      setDraggingLegend(legendHit);
+      setLegendDragStart({ x: e.clientX, y: e.clientY });
+      return;
     }
+
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    // Legend dragging
+    if (draggingLegend && rendererRef.current) {
+      const dx = e.clientX - legendDragStart.x;
+      const dy = e.clientY - legendDragStart.y;
+      rendererRef.current.moveLegend(draggingLegend, dx, dy, zoom);
+      setLegendDragStart({ x: e.clientX, y: e.clientY });
+      rendererRef.current.redraw(zoom, pan.x, pan.y);
+      return;
+    }
+
+    // Pan dragging
     if (isDragging) {
       setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+      return;
+    }
+
+    // Cursor: check if over a legend
+    if (rendererRef.current && canvasRef.current) {
+      const { canvasX, canvasY } = getCanvasCoords(e);
+      const overLegend = rendererRef.current.legendHitTest(canvasX, canvasY, zoom, pan.x, pan.y);
+      const wrapper = wrapperRef.current;
+      if (wrapper) {
+        wrapper.style.cursor = overLegend ? 'move' : (isDragging ? 'grabbing' : 'grab');
+      }
+    }
+
+    // Hit testing for tooltips
+    if (!rendererRef.current || !canvasRef.current) return;
+
+    const { canvasX, canvasY } = getCanvasCoords(e);
+
+    const hit = rendererRef.current.hitTest(canvasX, canvasY, zoom, pan.x, pan.y);
+    if (hit) {
+      setTooltip({
+        ...(hit as unknown as Omit<TooltipInfo, 'x' | 'y'>),
+        x: e.clientX,
+        y: e.clientY,
+      });
+    } else {
+      setTooltip(null);
     }
   };
 
-  const handleMouseUp = () => setIsDragging(false);
+  const handleMouseUp = () => { setIsDragging(false); setDraggingLegend(null); };
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.2, 5));
   const handleZoomOut = () => setZoom(prev => Math.max(prev / 1.2, 0.3));
@@ -129,15 +231,20 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
 
       {/* Plot area */}
       <div
-        ref={containerRef}
-        className="flex-1 min-h-0 overflow-hidden"
+        ref={wrapperRef}
+        className="flex-1 min-h-0 overflow-hidden flex items-center justify-center"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onWheel={handleWheel}
-        style={{ cursor: isDragging ? 'grabbing' : 'grab', background: 'white' }}
-      />
+        style={{ cursor: draggingLegend ? 'move' : isDragging ? 'grabbing' : 'grab', background: 'white' }}
+      >
+        <canvas
+          ref={canvasRef}
+          style={{ maxWidth: '100%', maxHeight: '100%' }}
+        />
+      </div>
 
       {tooltip && tooltip.x != null && tooltip.y != null && (
         <div
@@ -157,6 +264,43 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
               <div>Position: {tooltip.position?.toLocaleString()}</div>
               <div>Window: {tooltip.windowSize?.toLocaleString()} bp</div>
               <div>GC: {tooltip.gc}%</div>
+            </>
+          ) : tooltip.type === 'gc-skew' ? (
+            <>
+              <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>GC Skew</div>
+              <div>Position: {tooltip.position?.toLocaleString()}</div>
+              <div>Window: {tooltip.windowSize?.toLocaleString()} bp</div>
+              <div>Skew: {tooltip.skew}</div>
+            </>
+          ) : tooltip.type === 'contig' ? (
+            <>
+              <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>{tooltip.name}</div>
+              {tooltip.start != null && tooltip.end != null && (
+                <div>Position: {tooltip.start.toLocaleString()} - {tooltip.end.toLocaleString()}</div>
+              )}
+              {tooltip.length != null && (
+                <div>Length: {tooltip.length.toLocaleString()} bp</div>
+              )}
+            </>
+          ) : tooltip.type === 'graph' ? (
+            <>
+              <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>{tooltip.queryName}</div>
+              {tooltip.start != null && tooltip.end != null && (
+                <div>Position: {tooltip.start.toLocaleString()} - {tooltip.end.toLocaleString()}</div>
+              )}
+              {tooltip.value != null && (
+                <div>Value: {tooltip.value}</div>
+              )}
+            </>
+          ) : tooltip.type === 'annotation' ? (
+            <>
+              <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>{tooltip.label}</div>
+              {tooltip.start != null && tooltip.end != null && (
+                <div>Position: {tooltip.start.toLocaleString()} - {tooltip.end.toLocaleString()}</div>
+              )}
+              {tooltip.strand && (
+                <div>Strand: {tooltip.strand}</div>
+              )}
             </>
           ) : (
             <>

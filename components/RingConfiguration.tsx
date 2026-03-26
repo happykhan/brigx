@@ -207,6 +207,18 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
               />
             </div>
 
+            <div className="mb-3">
+              <label className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>BLAST Program</label>
+              <select
+                value={ring.blastType || 'blastn'}
+                onChange={(e) => updateRing(ring.id, { blastType: e.target.value as 'blastn' | 'blastx' })}
+                className="input-field text-sm w-full"
+              >
+                <option value="blastn">blastn (nucleotide)</option>
+                <option value="blastx">blastx (translated)</option>
+              </select>
+            </div>
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-medium" style={{ color: 'var(--gx-text-muted)' }}>
@@ -228,7 +240,7 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
                     <input
                       type="file"
                       multiple
-                      accept=".fasta,.fa,.fna,.gbk,.gb,.genbank,.fasta.gz,.fa.gz,.fna.gz,.gbk.gz,.gb.gz,.genbank.gz,.gz"
+                      accept=".fasta,.fa,.fna,.gbk,.gb,.genbank,.fasta.gz,.fa.gz,.fna.gz,.gbk.gz,.gb.gz,.genbank.gz,.gz,.graph,.sam"
                       onChange={(e) => addFilesToRing(ring.id, e.target.files)}
                       className="hidden"
                     />

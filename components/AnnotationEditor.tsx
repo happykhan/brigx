@@ -31,6 +31,9 @@ export default function AnnotationEditor({
 }: AnnotationEditorProps) {
   const [localAnnotations, setLocalAnnotations] = useState<Annotation[]>([...annotations]);
   const hotRef = useRef<Handsontable | null>(null);
+  const [showGenbankImport, setShowGenbankImport] = useState(false);
+  const [gbFeatureType, setGbFeatureType] = useState('CDS');
+  const [gbTextFilter, setGbTextFilter] = useState('');
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -116,6 +119,30 @@ export default function AnnotationEditor({
     toast.success('Exported annotations');
   };
 
+  const handleGenBankImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const { extractGenBankFeatures } = await import('@/workers/parser.worker');
+      const features = extractGenBankFeatures(text, gbFeatureType, gbTextFilter || undefined);
+
+      if (features.length === 0) {
+        toast.error(`No ${gbFeatureType} features found`);
+        return;
+      }
+
+      setLocalAnnotations([...localAnnotations, ...features]);
+      toast.success(`Imported ${features.length} ${gbFeatureType} feature(s)`);
+      setShowGenbankImport(false);
+    } catch (error: any) {
+      toast.error(`GenBank parse error: ${error.message}`);
+    }
+
+    e.target.value = '';
+  };
+
   // Convert annotations to table data
   const data = localAnnotations.map(ann => ({
     start: ann.start,
@@ -144,7 +171,7 @@ export default function AnnotationEditor({
       } else if (prop === 'label') {
         ann.label = String(newValue);
       } else if (prop === 'shape') {
-        ann.shape = newValue as 'block' | 'arrow-forward' | 'arrow-reverse';
+        ann.shape = newValue as Annotation['shape'];
       } else if (prop === 'color') {
         ann.color = String(newValue);
       }
@@ -202,10 +229,55 @@ export default function AnnotationEditor({
           >
             Export TSV
           </button>
+          <button
+            onClick={() => setShowGenbankImport(!showGenbankImport)}
+            className="btn-secondary text-sm"
+          >
+            Import GenBank Features
+          </button>
           <div className="ml-auto text-sm self-center" style={{ color: 'var(--gx-text-muted)' }}>
             {localAnnotations.length} annotation(s) | Reference: {referenceLength.toLocaleString()} bp
           </div>
         </div>
+
+        {/* GenBank Import Panel */}
+        {showGenbankImport && (
+          <div className="px-4 pb-4 flex gap-2 items-end flex-wrap" style={{ borderBottom: '1px solid var(--gx-border)' }}>
+            <div>
+              <label className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>Feature Type</label>
+              <select
+                value={gbFeatureType}
+                onChange={(e) => setGbFeatureType(e.target.value)}
+                className="input-field text-sm"
+              >
+                <option value="CDS">CDS</option>
+                <option value="gene">gene</option>
+                <option value="rRNA">rRNA</option>
+                <option value="tRNA">tRNA</option>
+                <option value="misc_feature">misc_feature</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>Text Filter (optional)</label>
+              <input
+                type="text"
+                value={gbTextFilter}
+                onChange={(e) => setGbTextFilter(e.target.value)}
+                placeholder="e.g. kinase"
+                className="input-field text-sm"
+              />
+            </div>
+            <label className="btn-primary text-sm cursor-pointer">
+              Choose .gbk File
+              <input
+                type="file"
+                accept=".gbk,.gb,.genbank"
+                onChange={handleGenBankImport}
+                className="hidden"
+              />
+            </label>
+          </div>
+        )}
 
         {/* Spreadsheet */}
         <div className="flex-1 overflow-hidden p-4" style={{ minHeight: '400px' }}>
@@ -220,7 +292,7 @@ export default function AnnotationEditor({
               {
                 data: 'shape',
                 type: 'dropdown',
-                source: ['block', 'arrow-forward', 'arrow-reverse']
+                source: ['block', 'arrow-forward', 'arrow-reverse', 'arc', 'hidden']
               },
               { data: 'color', type: 'text' }
             ]}

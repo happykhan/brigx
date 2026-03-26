@@ -92,6 +92,28 @@ export default function ParameterControls({
           Custom blastall parameters (default: megablast -e 1e-5)
         </p>
       </div>
+
+      <div>
+        <label className="label">
+          Spacer Size (bp)
+        </label>
+        <input
+          type="number"
+          value={params.spacerSize || 0}
+          onChange={(e) => {
+            const val = parseInt(e.target.value);
+            setParams({ ...params, spacerSize: isNaN(val) ? 0 : val });
+          }}
+          disabled={disabled}
+          min="0"
+          max="100000"
+          step="100"
+          className="input-field w-full disabled:opacity-50 disabled:cursor-not-allowed"
+        />
+        <p className="mt-1 text-xs" style={{ color: 'var(--gx-text-muted)' }}>
+          Spacer between contigs in multi-FASTA reference (default: 0)
+        </p>
+      </div>
     </div>
   );
 }

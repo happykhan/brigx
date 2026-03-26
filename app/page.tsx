@@ -14,6 +14,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import type { CircularPlotData, PipelineParams, ProgressUpdate, RingConfig, Annotation, RingData } from '@/lib/types';
 import { APP_VERSION } from '@/lib/version';
 import type { BRIGController as BRIGControllerType } from '@/lib/controller';
+import { exportSession, importSession } from '@/lib/session';
 
 export default function Home() {
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
@@ -437,6 +438,66 @@ export default function Home() {
     }
   };
 
+  const handleSaveSession = () => {
+    const json = exportSession(
+      APP_VERSION,
+      referenceFile?.name || '',
+      rings,
+      ringAnnotations,
+      params,
+      imageProperties
+    );
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `brigx-session-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Session saved');
+  };
+
+  const handleLoadSession = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const json = await file.text();
+      const session = importSession(json);
+
+      // Restore rings (without files - they can't be serialized)
+      const restoredRings: RingConfig[] = session.rings.map(r => ({
+        id: r.id,
+        legendText: r.legendText,
+        color: r.color,
+        upperThreshold: r.upperThreshold,
+        lowerThreshold: r.lowerThreshold,
+        customWidth: r.customWidth,
+        files: []
+      }));
+      setRings(restoredRings);
+
+      // Restore annotations
+      const restoredAnnotations: Record<string, Annotation[]> = {};
+      session.rings.forEach(r => {
+        if (r.annotations && r.annotations.length > 0) {
+          restoredAnnotations[r.id] = r.annotations;
+        }
+      });
+      setRingAnnotations(restoredAnnotations);
+
+      // Restore params and image config
+      setParams(session.params);
+      setImageProperties(session.imageConfig);
+
+      toast.success('Session loaded. Re-add reference and ring files to run alignments.');
+    } catch (error: any) {
+      toast.error(`Failed to load session: ${error.message}`);
+    }
+
+    e.target.value = '';
+  };
+
   return (
     <>
       <Toaster
@@ -481,6 +542,13 @@ export default function Home() {
                 </div>
               </div>
               <div className="hidden md:flex items-center gap-6">
+                <button onClick={handleSaveSession} className="btn-secondary text-xs px-3 py-1">
+                  Save Session
+                </button>
+                <label className="btn-secondary text-xs px-3 py-1 cursor-pointer">
+                  Load Session
+                  <input type="file" accept=".json" onChange={handleLoadSession} className="hidden" />
+                </label>
                 <Link href="/about" className="text-sm font-medium hover:text-gx-accent transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
                   About
                 </Link>
@@ -523,7 +591,7 @@ export default function Home() {
                       </div>
                     )}
                     <p className="text-xs mt-2" style={{ color: 'var(--gx-text-muted)' }}>
-                      Must contain exactly ONE sequence
+                      Single sequence or multi-FASTA with spacers
                     </p>
                   </div>
                 </div>

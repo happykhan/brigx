@@ -302,8 +302,9 @@ export function extractGenBankFeatures(
   return annotations;
 }
 
-// Worker message handler
-self.onmessage = async (e: MessageEvent) => {
+// Worker message handler - only attach when running as a Web Worker
+if (typeof self !== 'undefined' && typeof self.postMessage === 'function') {
+(self as any).onmessage = async (e: MessageEvent) => {
   console.log('[Parser Worker] Received message:', e.data.type);
   const { type, file, sequence, windowSize, genomes } = e.data;
   
@@ -334,3 +335,4 @@ self.onmessage = async (e: MessageEvent) => {
     self.postMessage({ type: 'error', error: error.message });
   }
 };
+}

@@ -44,8 +44,11 @@ export interface RingData {
   alignmentOutput?: string; // Raw alignment output for download
   graphPoints?: GraphPoint[]; // Graph ring data (from .graph or .sam files)
   graphMaxValue?: number; // Maximum value for graph ring scaling
+  graphMaxCap?: number; // User-set cap: values above shown in blue
+  graphStats?: { mean: number; q3: number; max: number }; // Summary stats for graph data
   upperThreshold?: number; // Per-ring upper identity threshold (default: 90)
   lowerThreshold?: number; // Per-ring lower identity threshold (default: 70)
+  showLabels?: boolean; // Show annotation labels on the ring (default: true)
   statistics: {
     meanIdentity: number;
     genomeCoverage: number;
@@ -170,6 +173,8 @@ export interface RingConfig {
   lowerThreshold: number;
   customWidth?: number; // Optional custom width for this ring
   blastType?: 'blastn' | 'blastx'; // Per-ring BLAST program (default: blastn)
+  showLabels?: boolean; // Show annotation labels on ring (default: true)
+  graphMaxCap?: number; // Cap graph values at this maximum (values above shown in blue)
 }
 
 export interface ProgressUpdate {

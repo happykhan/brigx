@@ -15,6 +15,7 @@ registerAllModules();
 interface AnnotationEditorProps {
   ringId: string;
   ringName: string;
+  ringColor?: string;
   annotations: Annotation[];
   referenceLength: number;
   onAnnotationsChange: (ringId: string, annotations: Annotation[]) => void;
@@ -24,6 +25,7 @@ interface AnnotationEditorProps {
 export default function AnnotationEditor({
   ringId,
   ringName,
+  ringColor = '#666666',
   annotations,
   referenceLength,
   onAnnotationsChange,
@@ -53,7 +55,12 @@ export default function AnnotationEditor({
         return;
       }
 
-      setLocalAnnotations([...localAnnotations, ...result.annotations]);
+      // Use ring colour as default for annotations without a specified colour
+      const coloured = result.annotations.map(a => ({
+        ...a,
+        color: a.color === '#666666' ? ringColor : a.color
+      }));
+      setLocalAnnotations([...localAnnotations, ...coloured]);
       toast.success(`Loaded ${result.annotations.length} annotation(s)`);
     } catch (error) {
       toast.error('Failed to parse annotation file');
@@ -71,7 +78,7 @@ export default function AnnotationEditor({
       end: Math.min(1000, referenceLength),
       label: `Annotation ${localAnnotations.length + 1}`,
       shape: 'block',
-      color: '#666666'
+      color: ringColor
     };
     setLocalAnnotations([...localAnnotations, newAnnotation]);
     toast.success('Added new annotation');
@@ -133,8 +140,14 @@ export default function AnnotationEditor({
         return;
       }
 
-      setLocalAnnotations([...localAnnotations, ...features]);
-      toast.success(`Imported ${features.length} ${gbFeatureType} feature(s)`);
+      // Use ring colour for GenBank features (they default to #000000)
+      const coloured = features.map(f => ({ ...f, color: ringColor }));
+      setLocalAnnotations([...localAnnotations, ...coloured]);
+      if (features.length > 200) {
+        toast.success(`Imported ${features.length} features. Labels auto-disabled (too many).`);
+      } else {
+        toast.success(`Imported ${features.length} ${gbFeatureType} feature(s)`);
+      }
       setShowGenbankImport(false);
     } catch (error: any) {
       toast.error(`GenBank parse error: ${error.message}`);

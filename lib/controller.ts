@@ -420,7 +420,7 @@ export class BRIGController {
 
       const queryGenomes: ParsedGenome[] = [];
       // Track which rings are graph rings (index in rings array -> graph data)
-      const graphRingData: Map<number, { points: GraphPoint[]; maxValue: number }> = new Map();
+      const graphRingData: Map<number, { points: GraphPoint[]; maxValue: number; graphStats?: { mean: number; q3: number; max: number } }> = new Map();
 
       for (let i = 0; i < rings.length; i++) {
         const ring = rings[i];
@@ -428,7 +428,10 @@ export class BRIGController {
 
         // Check if any file is a .sam or .graph file
         const samFile = ring.files.find(f => f.name.toLowerCase().endsWith('.sam'));
-        const graphFile = ring.files.find(f => f.name.toLowerCase().endsWith('.graph'));
+        const graphFile = ring.files.find(f => {
+          const name = f.name.toLowerCase();
+          return name.endsWith('.graph') || name.endsWith('.bedgraph') || name.endsWith('.wig');
+        });
 
         if (samFile) {
           console.log(`[Controller]   SAM file detected: ${samFile.name}, computing coverage`);
@@ -449,8 +452,13 @@ export class BRIGController {
           if (result.errors.length > 0) {
             console.warn(`[Controller]   Graph parse warnings: ${result.errors.slice(0, 3).join('; ')}`);
           }
-          graphRingData.set(i, { points: result.points, maxValue: result.maxValue });
-          console.log(`[Controller]   Graph data: ${result.points.length} points, max value: ${result.maxValue.toFixed(1)}`);
+          // Compute summary stats for the graph
+          const values = result.points.map(p => p.value).filter(v => v > 0).sort((a, b) => a - b);
+          const mean = values.length > 0 ? values.reduce((s, v) => s + v, 0) / values.length : 0;
+          const q3 = values.length > 0 ? values[Math.floor(values.length * 0.75)] : 0;
+          const graphStats = { mean: Math.round(mean * 10) / 10, q3: Math.round(q3 * 10) / 10, max: Math.round(result.maxValue * 10) / 10 };
+          graphRingData.set(i, { points: result.points, maxValue: result.maxValue, graphStats });
+          console.log(`[Controller]   Graph data: ${result.points.length} points, mean: ${graphStats.mean}, Q3: ${graphStats.q3}, max: ${graphStats.max}`);
           queryGenomes.push({ id: `graph-${ring.id}`, name: ring.legendText, sequence: '', length: 0, gcContent: 0, isCircular: false });
           continue;
         }
@@ -614,6 +622,7 @@ export class BRIGController {
         if (graphData) {
           ringData.graphPoints = graphData.points;
           ringData.graphMaxValue = graphData.maxValue;
+          ringData.graphStats = graphData.graphStats;
         }
 
         ringDataArray.push(ringData);

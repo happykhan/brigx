@@ -108,9 +108,10 @@ export class CircularPlotRenderer {
     const maxBarHeight = ringWidth / 2; // Maximum height is half the ring width
     const windowSize = refLength / gcSkew.length;
     
-    // Find the maximum absolute skew value for scaling
-    const maxSkew = Math.max(...gcSkew.map(Math.abs));
-    const scaleFactor = maxSkew > 0 ? 1 / maxSkew : 1; // Scale to use full ring height
+    // Use 95th percentile for scaling (avoids outliers)
+    const skewAbs = gcSkew.map(Math.abs).sort((a, b) => a - b);
+    const p95Skew = skewAbs[Math.floor(skewAbs.length * 0.95)] || 0.1;
+    const scaleFactor = p95Skew > 0 ? 1 / p95Skew : 1;
     
     // Draw baseline circle (center of ring)
     const baseline = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -150,7 +151,7 @@ export class CircularPlotRenderer {
       
       // Calculate bar height based on GC skew (ranges from -1 to +1)
       // Scale to use full ring height based on actual data range
-      const barHeight = Math.abs(skew) * scaleFactor * maxBarHeight;
+      const barHeight = Math.min(maxBarHeight, Math.abs(skew) * scaleFactor * maxBarHeight);
       
       let innerRadius: number;
       let outerRadius: number;
@@ -227,9 +228,10 @@ export class CircularPlotRenderer {
     const maxBarHeight = ringWidth / 2; // Maximum height is half the ring width
     const windowSize = refLength / gcContent.length;
     
-    // Find the maximum absolute deviation from 50% for scaling
-    const maxDeviation = Math.max(...gcContent.map(gc => Math.abs(gc - 0.5)));
-    const scaleFactor = maxDeviation > 0 ? 0.5 / maxDeviation : 1; // Scale to use full ring height
+    // Use 95th percentile deviation for scaling (avoids outliers like N-spacer windows)
+    const deviations = gcContent.map(gc => Math.abs(gc - 0.5)).sort((a, b) => a - b);
+    const p95 = deviations[Math.floor(deviations.length * 0.95)] || 0.1;
+    const scaleFactor = p95 > 0 ? 0.5 / p95 : 1;
     
     // Draw baseline circle (center of ring - 50% GC)
     const baseline = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -270,7 +272,7 @@ export class CircularPlotRenderer {
       // Calculate bar height based on GC content deviation from 50%
       // Scale to use full ring height based on actual data range
       const deviation = gc - 0.5; // Range: -0.5 to +0.5
-      const barHeight = Math.abs(deviation) * scaleFactor * maxBarHeight;
+      const barHeight = Math.min(maxBarHeight, Math.abs(deviation) * scaleFactor * maxBarHeight);
       
       let innerRadius: number;
       let outerRadius: number;
@@ -347,7 +349,8 @@ export class CircularPlotRenderer {
     group.setAttribute('data-query-id', ring.queryId);
 
     const points = ring.graphPoints!;
-    const maxValue = ring.graphMaxValue || 1;
+    // Use graphMaxCap if set, otherwise use data max
+    const capValue = ring.graphMaxCap || ring.graphMaxValue || 1;
 
     // Draw ring boundary (outer)
     const outerCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -369,21 +372,22 @@ export class CircularPlotRenderer {
     innerCircle.setAttribute('stroke-width', '0.5');
     group.appendChild(innerCircle);
 
-    // Parse the ring color for opacity-based area chart
+    // Parse the ring color
     const hex = ring.color.replace('#', '');
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
+    const cr = parseInt(hex.substring(0, 2), 16);
+    const cg = parseInt(hex.substring(2, 4), 16);
+    const cb = parseInt(hex.substring(4, 6), 16);
 
-    // Render each point as a filled arc proportional to value/maxValue
+    // Render each point as a filled arc proportional to value/capValue
+    // Values above cap are clamped to full height and shown in blue
     for (const point of points) {
       if (point.value <= 0) continue;
 
       const startAngle = (point.start / refLength) * 2 * Math.PI - Math.PI / 2;
       const endAngle = (point.end / refLength) * 2 * Math.PI - Math.PI / 2;
 
-      // Height proportional to value
-      const fraction = Math.min(1, point.value / maxValue);
+      const isOverCap = ring.graphMaxCap != null && point.value > capValue;
+      const fraction = Math.min(1, point.value / capValue);
       const barHeight = fraction * width;
 
       const path = this.createArcPath(
@@ -396,7 +400,8 @@ export class CircularPlotRenderer {
 
       const arcElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       arcElement.setAttribute('d', path);
-      arcElement.setAttribute('fill', `rgb(${r}, ${g}, ${b})`);
+      // Blue for over-cap, ring colour for normal
+      arcElement.setAttribute('fill', isOverCap ? 'rgb(30, 100, 220)' : `rgb(${cr}, ${cg}, ${cb})`);
       arcElement.setAttribute('stroke', 'none');
       arcElement.setAttribute('opacity', '0.8');
 
@@ -613,13 +618,21 @@ export class CircularPlotRenderer {
     refLength: number,
     annotations: Annotation[],
     innerRadius: number,
-    outerRadius: number
+    outerRadius: number,
+    showLabels: boolean = true
   ) {
     if (!annotations || annotations.length === 0) return;
-    
+
+    // Failsafe: disable labels if too many annotations (prevents browser lockup)
+    const MAX_LABELS = 200;
+    if (showLabels && annotations.length > MAX_LABELS) {
+      console.warn(`[Renderer] ${annotations.length} annotations exceeds label limit (${MAX_LABELS}), disabling labels`);
+      showLabels = false;
+    }
+
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('class', 'annotations');
-    
+
     // Collect label positions for collision detection
     interface LabelPosition {
       annotation: Annotation;
@@ -774,18 +787,15 @@ export class CircularPlotRenderer {
         
         group.appendChild(arcElement);
         
-        // Add text label with leader line only if annotation has a label
-        if (lp) {
+        // Add text label with leader line only if showLabels is true
+        if (showLabels && lp) {
           const midAngle = (startAngle + endAngle) / 2;
           const featureRadius = (innerRadius + outerRadius) / 2;
           const featureX = cx + featureRadius * Math.cos(midAngle);
           const featureY = cy + featureRadius * Math.sin(midAngle);
-          
-          // Use adjusted label position from collision detection
           const labelX = lp.labelX;
           const labelY = lp.labelY;
-          
-          // Draw leader line
+
           const leaderLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
           leaderLine.setAttribute('x1', String(featureX));
           leaderLine.setAttribute('y1', String(featureY));
@@ -795,23 +805,19 @@ export class CircularPlotRenderer {
           leaderLine.setAttribute('stroke-width', '1');
           leaderLine.setAttribute('opacity', '0.6');
           group.appendChild(leaderLine);
-          
-          // Draw label background
+
           const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-          const textWidth = lp.width;
-          const textHeight = lp.height;
-          labelBg.setAttribute('x', String(labelX - textWidth / 2));
-          labelBg.setAttribute('y', String(labelY - textHeight / 2));
-          labelBg.setAttribute('width', String(textWidth));
-          labelBg.setAttribute('height', String(textHeight));
+          labelBg.setAttribute('x', String(labelX - lp.width / 2));
+          labelBg.setAttribute('y', String(labelY - lp.height / 2));
+          labelBg.setAttribute('width', String(lp.width));
+          labelBg.setAttribute('height', String(lp.height));
           labelBg.setAttribute('fill', '#ffffff');
           labelBg.setAttribute('stroke', '#333');
           labelBg.setAttribute('stroke-width', '1');
           labelBg.setAttribute('rx', '3');
           labelBg.setAttribute('opacity', '0.9');
           group.appendChild(labelBg);
-          
-          // Draw label text
+
           const labelText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
           labelText.setAttribute('x', String(labelX));
           labelText.setAttribute('y', String(labelY));
@@ -823,7 +829,7 @@ export class CircularPlotRenderer {
           labelText.textContent = ann.label;
           group.appendChild(labelText);
         }
-        
+
       } else if (ann.shape === 'arrow-forward' || ann.shape === 'arrow-reverse') {
         // Arrow shape (gene-like) - adaptive based on feature length
         const isForward = ann.shape === 'arrow-forward';
@@ -928,8 +934,8 @@ export class CircularPlotRenderer {
           arrowElement.setAttribute('opacity', '0.7');
         });
         
-        // Add text label with leader line for arrow only if annotation has a label
-        if (lp) {
+        // Add text label with leader line for arrow only if showLabels is true
+        if (showLabels && lp) {
           const midAngle = (startAngle + endAngle) / 2;
           const featureRadius = (innerRadius + outerRadius) / 2;
           const featureX = cx + featureRadius * Math.cos(midAngle);
@@ -1212,12 +1218,13 @@ export class CircularPlotRenderer {
     const legendX = this.config.width - 200;
     const legendY = 20;
     const fs = this.config.legendFontSize;
-    const hasHits = (r: RingData) => (r.hits && r.hits.length > 0) || (r.graphPoints && r.graphPoints.length > 0);
+    const hasBlastHits = (r: RingData) => r.hits && r.hits.length > 0;
+    const isGraphRing = (r: RingData) => r.graphPoints && r.graphPoints.length > 0;
 
     let y = legendY + fs;
 
     rings.filter(r => r.visible).forEach((ring) => {
-      if (hasHits(ring)) {
+      if (hasBlastHits(ring)) {
         // Ring name (bold, own line)
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', String(legendX));
@@ -1295,8 +1302,28 @@ export class CircularPlotRenderer {
           group.appendChild(label);
         });
         y += fs + barH + 4;
+      } else if (isGraphRing(ring)) {
+        // Graph ring - colour swatch + name on same line
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', String(legendX));
+        rect.setAttribute('y', String(y - fs + 3));
+        rect.setAttribute('width', '12');
+        rect.setAttribute('height', String(fs));
+        rect.setAttribute('fill', ring.color);
+        rect.setAttribute('rx', '2');
+        group.appendChild(rect);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', String(legendX + 16));
+        text.setAttribute('y', String(y));
+        text.setAttribute('font-size', String(fs));
+        text.setAttribute('font-weight', 'bold');
+        text.setAttribute('fill', '#333');
+        text.textContent = ring.queryName;
+        group.appendChild(text);
+        y += fs + 2;
       } else {
-        // No BLAST hits - colour swatch + name on same line
+        // No data - colour swatch + name on same line
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', String(legendX));
         rect.setAttribute('y', String(y - fs + 3));
@@ -1390,7 +1417,8 @@ export class CircularPlotRenderer {
           cx, cy, refLength,
           ring.annotations,
           radius,
-          radius + ringWidth
+          radius + ringWidth,
+          ring.showLabels !== false
         );
       }
 

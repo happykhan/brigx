@@ -1,11 +1,12 @@
 'use client';
 
-import type { RingConfig } from '@/lib/types';
+import type { RingConfig, RingData } from '@/lib/types';
 
 interface RingConfigurationProps {
   rings: RingConfig[];
   setRings: (rings: RingConfig[]) => void;
   onEditAnnotations?: (ringId: string) => void;
+  ringDataList?: RingData[]; // Computed ring data (for graph stats display)
 }
 
 const PRESET_COLORS = [
@@ -13,7 +14,7 @@ const PRESET_COLORS = [
   '#1abc9c', '#e67e22', '#34495e', '#16a085', '#c0392b'
 ];
 
-export default function RingConfiguration({ rings, setRings, onEditAnnotations }: RingConfigurationProps) {
+export default function RingConfiguration({ rings, setRings, onEditAnnotations, ringDataList }: RingConfigurationProps) {
 
   const addNewRing = () => {
     console.log('[RingConfiguration] Add New Ring clicked, current rings:', rings.length);
@@ -180,12 +181,46 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
               />
             </div>
 
+            {ring.files.some(f => {
+              const n = f.name.toLowerCase();
+              return n.endsWith('.graph') || n.endsWith('.bedgraph') || n.endsWith('.wig') || n.endsWith('.bed') || n.endsWith('.sam');
+            }) && (
+              <div className="mb-3">
+                <label className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>
+                  Graph Max Value
+                  <span className="ml-1" style={{ opacity: 0.7 }}>(values above shown in blue)</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="Auto (use data max)"
+                  value={ring.graphMaxCap || ''}
+                  onChange={(e) => updateRing(ring.id, { graphMaxCap: e.target.value ? Number(e.target.value) : undefined })}
+                  className="input-field text-sm w-full"
+                />
+                {(() => {
+                  const rd = ringDataList?.find(r => r.queryId === ring.id);
+                  if (rd?.graphStats) {
+                    const s = rd.graphStats;
+                    return (
+                      <div className="flex gap-3 mt-1 text-xs" style={{ color: 'var(--gx-text-muted)' }}>
+                        <span>Mean: <strong>{s.mean}</strong></span>
+                        <span>Q3: <strong>{s.q3}</strong></span>
+                        <span>Max: <strong>{s.max}</strong></span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+            )}
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-medium" style={{ color: 'var(--gx-text-muted)' }}>
                   Files ({ring.files.length})
                 </label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   {onEditAnnotations && (
                     <button
                       type="button"
@@ -196,12 +231,22 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
                       Annotations
                     </button>
                   )}
+                  <label className="flex items-center gap-1 text-xs cursor-pointer" style={{ color: 'var(--gx-text-muted)' }} title="Show annotation labels on the ring">
+                    <input
+                      type="checkbox"
+                      checked={ring.showLabels !== false}
+                      onChange={(e) => updateRing(ring.id, { showLabels: e.target.checked })}
+                      className="w-3 h-3"
+                      style={{ accentColor: 'var(--gx-accent)' }}
+                    />
+                    Labels
+                  </label>
                   <label className="text-xs cursor-pointer hover:underline" style={{ color: 'var(--gx-accent)' }}>
                     + Add Files
                     <input
                       type="file"
                       multiple
-                      accept=".fasta,.fa,.fna,.gbk,.gb,.genbank,.fasta.gz,.fa.gz,.fna.gz,.gbk.gz,.gb.gz,.genbank.gz,.gz,.graph,.sam"
+                      accept=".fasta,.fa,.fna,.gbk,.gb,.genbank,.fasta.gz,.fa.gz,.fna.gz,.gbk.gz,.gb.gz,.genbank.gz,.gz,.graph,.bedgraph,.wig,.bed,.sam"
                       onChange={(e) => addFilesToRing(ring.id, e.target.files)}
                       className="hidden"
                     />

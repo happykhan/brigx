@@ -24,7 +24,7 @@ export default function Home() {
   const controllerRef = useRef<BRIGControllerType | null>(null);
   const [params, setParams] = useState<PipelineParams>({
     minIdentity: 70,
-    minAlignmentLength: 100,
+    minAlignmentLength: 1000,
     colorScheme: 'blue-red',
     forceAlignment: false,
     alignerOptions: ''
@@ -48,6 +48,7 @@ export default function Home() {
 
   // Plot expand state
   const [plotExpanded, setPlotExpanded] = useState(false);
+  const [showBugReport, setShowBugReport] = useState(false);
 
   // Annotation editor state
   const [annotationEditorOpen, setAnnotationEditorOpen] = useState(false);
@@ -117,15 +118,14 @@ export default function Home() {
       [ringId]: annotations
     }));
 
-    // Update plot data if it exists
-    if (cachedPlotData && cachedPlotData.rings) {
-      const updatedRings = cachedPlotData.rings.map(ringData => {
+    // Update plot data using functional updates to avoid stale closures
+    setCachedPlotData(prev => {
+      if (!prev || !prev.rings) return prev;
+      const updatedRings = prev.rings.map(ringData => {
         if (ringData.queryId === ringId) {
-          console.log(`[Page] Updating annotations for ring ${ringData.queryName}, preserving hits: ${ringData.hits?.length || 0}`);
           return {
             ...ringData,
             annotations,
-            // CRITICAL: Explicitly preserve alignment data
             hits: ringData.hits || [],
             statistics: ringData.statistics || { meanIdentity: 0, genomeCoverage: 0, totalAlignedBases: 0 },
             alignmentOutput: ringData.alignmentOutput || ''
@@ -133,16 +133,10 @@ export default function Home() {
         }
         return ringData;
       });
-
-      const updatedPlotData = {
-        reference: cachedPlotData.reference,
-        rings: updatedRings,
-        config: cachedPlotData.config
-      };
-
-      setPlotData(updatedPlotData);
-      setCachedPlotData(updatedPlotData);
-    }
+      const updated = { ...prev, rings: updatedRings };
+      setPlotData(updated);
+      return updated;
+    });
   };
 
   const handleOpenAnnotationEditor = (ringId: string) => {
@@ -227,6 +221,8 @@ export default function Home() {
           customWidth: ringConfig.customWidth,
           upperThreshold: ringConfig.upperThreshold,
           lowerThreshold: ringConfig.lowerThreshold,
+          graphMaxCap: ringConfig.graphMaxCap,
+          showLabels: ringConfig.showLabels,
           annotations: ringAnnotations[ringConfig.id] || existingRingData.annotations || []
         };
       } else {
@@ -238,6 +234,8 @@ export default function Home() {
           customWidth: ringConfig.customWidth,
           upperThreshold: ringConfig.upperThreshold,
           lowerThreshold: ringConfig.lowerThreshold,
+          graphMaxCap: ringConfig.graphMaxCap,
+          showLabels: ringConfig.showLabels,
           hits: [],
           annotations: ringAnnotations[ringConfig.id] || [],
           statistics: {
@@ -318,7 +316,9 @@ export default function Home() {
                     hits: newRingData.hits,
                     statistics: newRingData.statistics,
                     alignmentOutput: newRingData.alignmentOutput,
-                    // CRITICAL: Preserve annotations from existing ring
+                    graphPoints: newRingData.graphPoints || existingRing.graphPoints,
+                    graphMaxValue: newRingData.graphMaxValue || existingRing.graphMaxValue,
+                    graphStats: newRingData.graphStats || existingRing.graphStats,
                     annotations: existingRing.annotations || []
                   };
                 }
@@ -388,6 +388,8 @@ export default function Home() {
               hits: newRingData.hits,
               statistics: newRingData.statistics,
               alignmentOutput: newRingData.alignmentOutput,
+              graphPoints: newRingData.graphPoints || existingRing.graphPoints,
+              graphMaxValue: newRingData.graphMaxValue || existingRing.graphMaxValue,
               annotations: existingRing.annotations || ringAnnotations[existingRing.queryId] || []
             };
           }
@@ -559,7 +561,7 @@ export default function Home() {
                 <a href="https://github.com/happykhan/brigx" target="_blank" rel="noopener" className="text-sm font-medium hover:text-gx-accent transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
                   GitHub
                 </a>
-                <ThemeToggle />
+                <ThemeToggle disabled={!!plotData} />
               </div>
             </div>
           </div>
@@ -613,6 +615,7 @@ export default function Home() {
                     rings={rings}
                     setRings={setRings}
                     onEditAnnotations={handleOpenAnnotationEditor}
+                    ringDataList={plotData?.rings}
                   />
                 </div>
 
@@ -625,6 +628,21 @@ export default function Home() {
                     isMultiFasta={!!(plotData?.reference?.contigs && plotData.reference.contigs.length > 1)}
                   />
                 </div>
+
+                <details className="card">
+                  <summary className="section-title cursor-pointer select-none list-none flex items-center justify-between">
+                    <span>Image Properties</span>
+                    <svg className="w-4 h-4" style={{ color: 'var(--gx-text-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </summary>
+                  <div className="mt-4">
+                    <ImageProperties
+                      config={imageProperties}
+                      onChange={setImageProperties}
+                    />
+                  </div>
+                </details>
 
                 <button
                   onClick={handleRun}
@@ -647,13 +665,6 @@ export default function Home() {
 
               {/* Visualization Panel */}
               <div className="lg:col-span-2 animate-slide-up">
-                {/* Image Properties */}
-                <div className="mb-6 animate-fade-in">
-                  <ImageProperties
-                    config={imageProperties}
-                    onChange={setImageProperties}
-                  />
-                </div>
 
                 <div className={`card ${plotExpanded ? 'fixed inset-0 z-50 flex flex-col' : ''}`} style={plotExpanded ? { background: 'var(--gx-bg-alt)', borderRadius: 0 } : undefined}>
                   <div className="flex justify-between items-center mb-6">
@@ -801,17 +812,52 @@ export default function Home() {
                 <a href="https://genomicx.org" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>
                   genomicx.org
                 </a>
+                <button onClick={() => setShowBugReport(true)} className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>
+                  Report Bug
+                </button>
               </div>
             </div>
           </div>
         </footer>
       </div>
 
+      {/* Bug Report Modal */}
+      {showBugReport && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(0, 0, 0, 0.6)' }} onClick={() => setShowBugReport(false)}>
+          <div className="rounded-lg max-w-md w-full p-6" style={{ background: 'var(--gx-bg-alt)' }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold" style={{ color: 'var(--gx-text)' }}>Report a Bug</h3>
+              <button onClick={() => setShowBugReport(false)} style={{ color: 'var(--gx-text-muted)' }}>&times;</button>
+            </div>
+            <div className="space-y-3 text-sm" style={{ color: 'var(--gx-text)' }}>
+              <p>To report a bug, please email the following to:</p>
+              <p className="font-mono font-bold" style={{ color: 'var(--gx-accent)' }}>
+                <a href="mailto:nabil@happykhan.com">nabil@happykhan.com</a>
+              </p>
+              <div className="space-y-2 p-3 rounded" style={{ background: 'var(--gx-surface)' }}>
+                <p className="font-semibold">Please include:</p>
+                <ol className="list-decimal pl-5 space-y-1" style={{ color: 'var(--gx-text-muted)' }}>
+                  <li>A description of what happened and what you expected</li>
+                  <li>Your input files (reference + query genomes)</li>
+                  <li>Saved session file (use &quot;Save Session&quot; button)</li>
+                  <li>Debug console output (copy from the Debug Console panel)</li>
+                  <li>Browser name and version</li>
+                </ol>
+              </div>
+              <p className="text-xs" style={{ color: 'var(--gx-text-muted)' }}>
+                You can also open an issue on <a href="https://github.com/happykhan/brigx/issues" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gx-accent)', textDecoration: 'underline' }}>GitHub</a>.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Annotation Editor Modal */}
       {annotationEditorOpen && editingRingId && (
         <AnnotationEditor
           ringId={editingRingId}
           ringName={rings.find(r => r.id === editingRingId)?.legendText || 'Unknown Ring'}
+          ringColor={rings.find(r => r.id === editingRingId)?.color}
           annotations={ringAnnotations[editingRingId] || []}
           referenceLength={referenceLength}
           onAnnotationsChange={handleAnnotationsChange}

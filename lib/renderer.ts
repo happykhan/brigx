@@ -1000,54 +1000,81 @@ export class CircularPlotRenderer {
   private renderRingLegend(svg: SVGSVGElement, rings: RingData[]) {
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('class', 'ring-legend');
-    
+
     const legendX = this.config.width - 200;
     const legendY = 20;
-    const lineHeight = 25;
-    
-    // Title
-    const title = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    title.setAttribute('x', String(legendX));
-    title.setAttribute('y', String(legendY));
-    title.setAttribute('font-size', String(this.config.legendFontSize + 2));
-    title.setAttribute('font-weight', 'bold');
-    title.setAttribute('fill', '#333');
-    title.textContent = 'Rings';
-    group.appendChild(title);
-    
-    // Legend items
-    rings.filter(r => r.visible).forEach((ring, index) => {
-      const y = legendY + 20 + index * lineHeight;
-      
-      // Color swatch
-      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      rect.setAttribute('x', String(legendX));
-      rect.setAttribute('y', String(y - 10));
-      rect.setAttribute('width', '15');
-      rect.setAttribute('height', '15');
-      rect.setAttribute('fill', ring.color);
-      rect.setAttribute('rx', '2');
-      group.appendChild(rect);
-      
+    const fs = this.config.legendFontSize;
+    const hasHits = (r: RingData) => r.hits && r.hits.length > 0;
+
+    let y = legendY;
+
+    rings.filter(r => r.visible).forEach((ring) => {
       // Ring name
       const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      text.setAttribute('x', String(legendX + 20));
+      text.setAttribute('x', String(legendX));
       text.setAttribute('y', String(y));
-      text.setAttribute('font-size', String(this.config.legendFontSize));
+      text.setAttribute('font-size', String(fs));
+      text.setAttribute('font-weight', 'bold');
       text.setAttribute('fill', '#333');
       text.textContent = ring.queryName;
       group.appendChild(text);
-      
-      // Coverage info
-      const coverage = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      coverage.setAttribute('x', String(legendX + 20));
-      coverage.setAttribute('y', String(y + 12));
-      coverage.setAttribute('font-size', String(this.config.legendFontSize - 2));
-      coverage.setAttribute('fill', '#666');
-      coverage.textContent = `${ring.statistics.genomeCoverage.toFixed(1)}% coverage`;
-      group.appendChild(coverage);
+      y += fs + 2;
+
+      if (hasHits(ring)) {
+        // Colour gradient bar: 3 swatches from upper to lower threshold
+        const swatchW = 12;
+        const swatchH = 10;
+        const labels = [
+          { pct: this.config.maxIdentity, opacity: 1.0 },
+          { pct: Math.round((this.config.maxIdentity + this.config.minIdentity) / 2), opacity: 0.6 },
+          { pct: this.config.minIdentity, opacity: 0.3 }
+        ];
+
+        labels.forEach((item, i) => {
+          const sx = legendX + i * (swatchW + 40 + 4);
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('x', String(sx));
+          rect.setAttribute('y', String(y - swatchH + 2));
+          rect.setAttribute('width', String(swatchW));
+          rect.setAttribute('height', String(swatchH));
+          rect.setAttribute('fill', ring.color);
+          rect.setAttribute('opacity', String(item.opacity));
+          rect.setAttribute('rx', '1');
+          group.appendChild(rect);
+
+          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          label.setAttribute('x', String(sx + swatchW + 2));
+          label.setAttribute('y', String(y));
+          label.setAttribute('font-size', String(fs - 2));
+          label.setAttribute('fill', '#666');
+          label.textContent = `${item.pct}% identity`;
+          group.appendChild(label);
+        });
+        y += fs + 4;
+      } else {
+        // No BLAST hits - just show a colour swatch
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', String(legendX));
+        rect.setAttribute('y', String(y - 8));
+        rect.setAttribute('width', '12');
+        rect.setAttribute('height', '10');
+        rect.setAttribute('fill', ring.color);
+        rect.setAttribute('rx', '1');
+        group.appendChild(rect);
+
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', String(legendX + 16));
+        label.setAttribute('y', String(y));
+        label.setAttribute('font-size', String(fs - 2));
+        label.setAttribute('fill', '#666');
+        label.textContent = 'annotation';
+        group.appendChild(label);
+        y += fs + 4;
+      }
+
+      y += 4; // gap between rings
     });
-    
+
     svg.appendChild(group);
   }
 
@@ -1101,14 +1128,12 @@ export class CircularPlotRenderer {
     
     // Render query rings after GC rings
     const visibleRings = data.rings?.filter(r => r.visible) || [];
-    visibleRings.forEach((ring, index) => {
-      // Use custom width if specified, otherwise use default
+    visibleRings.forEach((ring) => {
       const ringWidth = ring.customWidth || this.config.ringWidth;
-      const radius = currentRadius + (index * (ringWidth + this.config.ringSpacing));
-      
+      const radius = currentRadius;
+
       this.renderQueryRing(mainGroup as any, cx, cy, refLength, ring, radius, ringWidth);
-      
-      // Render annotations for this ring if any
+
       if (ring.annotations && ring.annotations.length > 0) {
         this.renderAnnotations(
           mainGroup as any,
@@ -1118,9 +1143,8 @@ export class CircularPlotRenderer {
           radius + ringWidth
         );
       }
-      
-      // Update currentRadius for next ring
-      currentRadius = radius + ringWidth + this.config.ringSpacing;
+
+      currentRadius += ringWidth + this.config.ringSpacing;
     });
     
     this.renderScaleMarkers(mainGroup as any, cx, cy, refLength);

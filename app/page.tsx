@@ -38,7 +38,7 @@ export default function Home() {
     innerRadius: 200,
     ringWidth: 24,
     gcRingWidth: 30,
-    ringSpacing: 8,
+    ringSpacing: 4,
     legendFontSize: 12,
     scaleFontSize: 12,
     titleFontSize: 24,

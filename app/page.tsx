@@ -37,7 +37,7 @@ export default function Home() {
   const [imageProperties, setImageProperties] = useState<ImagePropertiesConfig>({
     innerRadius: 200,
     ringWidth: 24,
-    gcRingWidth: 30,
+    gcRingWidth: 40,
     ringSpacing: 4,
     legendFontSize: 12,
     scaleFontSize: 12,

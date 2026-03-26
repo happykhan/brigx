@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
 import type { RingConfig } from '@/lib/types';
 
 interface RingConfigurationProps {
@@ -15,21 +14,6 @@ const PRESET_COLORS = [
 ];
 
 export default function RingConfiguration({ rings, setRings, onEditAnnotations }: RingConfigurationProps) {
-  const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null);
-  const colorPickerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (colorPickerRef.current && !colorPickerRef.current.contains(event.target as Node)) {
-        setColorPickerOpen(null);
-      }
-    };
-
-    if (colorPickerOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [colorPickerOpen]);
 
   const addNewRing = () => {
     console.log('[RingConfiguration] Add New Ring clicked, current rings:', rings.length);
@@ -135,25 +119,14 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations }
                   className="input-field text-sm font-medium flex-1"
                   placeholder="Ring name"
                 />
-                <div className="relative" ref={colorPickerOpen === ring.id ? colorPickerRef : null}>
-                  <button
-                    type="button"
-                    onClick={() => setColorPickerOpen(colorPickerOpen === ring.id ? null : ring.id)}
-                    className="w-10 h-8 rounded cursor-pointer"
-                    style={{ backgroundColor: ring.color, border: '2px solid var(--gx-border)' }}
-                    title="Ring color"
-                  />
-                  {colorPickerOpen === ring.id && (
-                    <div className="absolute top-10 right-0 z-10 p-2 rounded-lg" style={{ background: 'var(--gx-bg-alt)', border: '1px solid var(--gx-border)', boxShadow: 'var(--gx-shadow)' }}>
-                      <input
-                        type="color"
-                        value={ring.color}
-                        onChange={(e) => updateRing(ring.id, { color: e.target.value })}
-                        className="w-32 h-32 cursor-pointer"
-                      />
-                    </div>
-                  )}
-                </div>
+                <input
+                  type="color"
+                  value={ring.color}
+                  onChange={(e) => updateRing(ring.id, { color: e.target.value })}
+                  className="w-10 h-8 rounded cursor-pointer border-0 p-0"
+                  style={{ border: '2px solid var(--gx-border)' }}
+                  title="Ring color"
+                />
               </div>
               <button
                 type="button"

@@ -77,6 +77,15 @@ export default function AboutPage() {
                 <li><strong style={{ color: 'var(--gx-text)' }}>Web Workers:</strong> Parallel processing for faster alignments</li>
               </ul>
 
+              <h2 className="text-2xl font-semibold mt-8 mb-4" style={{ color: 'var(--gx-text)' }}>Developer</h2>
+              <p className="mb-4" style={{ color: 'var(--gx-text)' }}>
+                BRIGX is developed by{' '}
+                <a href="https://github.com/happykhan" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gx-accent)', textDecoration: 'underline' }}>Nabil-Fareed Alikhan</a>
+                , Senior Bioinformatician at the{' '}
+                <a href="https://www.pathogensurveillance.net" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gx-accent)', textDecoration: 'underline' }}>Centre for Genomic Pathogen Surveillance</a>
+                , University of Oxford.
+              </p>
+
               <h2 className="text-2xl font-semibold mt-8 mb-4" style={{ color: 'var(--gx-text)' }}>Citation</h2>
               <p className="mb-4" style={{ color: 'var(--gx-text)' }}>
                 If you use BRIGX in your research, please cite the original BRIG paper:

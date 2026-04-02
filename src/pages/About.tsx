@@ -1,6 +1,7 @@
 
 import { Link } from 'react-router-dom';
 import NavBar from '@/components/NavBar';
+import AppFooter from '@/components/AppFooter';
 
 export default function AboutPage() {
   return (
@@ -110,21 +111,7 @@ export default function AboutPage() {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="mt-auto py-8" style={{ background: 'var(--gx-bg-alt)', borderTop: '1px solid var(--gx-border)' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="text-sm mb-4 md:mb-0" style={{ color: 'var(--gx-text-muted)' }}>
-              BRIGX. Built with Vite and WebAssembly.
-            </div>
-            <div className="flex gap-6 text-sm">
-              <a href="https://genomicx.org" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>
-                genomicx.org
-              </a>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <AppFooter />
     </div>
   );
 }

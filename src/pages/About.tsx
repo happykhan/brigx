@@ -1,35 +1,11 @@
 
-
 import { Link } from 'react-router-dom';
-import ThemeToggle from '@/components/ThemeToggle';
+import NavBar from '@/components/NavBar';
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--gx-bg)' }}>
-      {/* Navigation - Frosted Glass */}
-      <nav className="sticky top-0 z-40" style={{ background: 'var(--gx-nav-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid var(--gx-border)' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-[60px]">
-            <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
-              <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="var(--gx-accent)" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <circle cx="12" cy="12" r="6" />
-                <circle cx="12" cy="12" r="2" />
-              </svg>
-              <div>
-                <h1 className="text-lg font-bold" style={{ color: 'var(--gx-text)' }}>BRIGX</h1>
-                <p className="text-xs" style={{ color: 'var(--gx-text-muted)' }}>BLAST Ring Image Generator</p>
-              </div>
-            </Link>
-            <div className="flex items-center gap-4">
-              <Link to="/" className="text-sm font-medium transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>
-                App
-              </Link>
-              <ThemeToggle />
-            </div>
-          </div>
-        </div>
-      </nav>
+      <NavBar />
 
       {/* Main Content */}
       <main className="flex-grow py-12">

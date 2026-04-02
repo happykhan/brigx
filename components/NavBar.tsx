@@ -4,8 +4,8 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { APP_VERSION } from '@/lib/version';
 
 interface NavBarProps {
-  onSaveSession: () => void;
-  onLoadSession: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onSaveSession?: () => void;
+  onLoadSession?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export default function NavBar({ onSaveSession, onLoadSession }: NavBarProps) {
@@ -17,9 +17,9 @@ export default function NavBar({ onSaveSession, onLoadSession }: NavBarProps) {
         <div className="flex items-center justify-between h-[60px]">
           <div className="flex items-center gap-3">
             <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="var(--gx-accent)" strokeWidth="2">
-              <circle cx="12" cy="12" r="9" />
-              <circle cx="12" cy="12" r="5" />
-              <circle cx="12" cy="12" r="1" fill="var(--gx-accent)" />
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="6" />
+              <circle cx="12" cy="12" r="2" />
             </svg>
             <div>
               <h1 className="text-lg font-bold" style={{ color: 'var(--gx-text)' }}>BRIGX <span className="text-xs font-normal" style={{ color: 'var(--gx-text-muted)' }}>v{APP_VERSION}</span></h1>
@@ -29,13 +29,17 @@ export default function NavBar({ onSaveSession, onLoadSession }: NavBarProps) {
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-6">
-            <button onClick={onSaveSession} className="btn-secondary text-xs px-3 py-1" title="Save current session as JSON">
-              Save Session
-            </button>
-            <label className="btn-secondary text-xs px-3 py-1 cursor-pointer" title="Load a previously saved session">
-              Load Session
-              <input type="file" accept=".json" onChange={onLoadSession} className="hidden" />
-            </label>
+            {onSaveSession && (
+              <button onClick={onSaveSession} className="btn-secondary text-xs px-3 py-1" title="Save current session as JSON">
+                Save Session
+              </button>
+            )}
+            {onLoadSession && (
+              <label className="btn-secondary text-xs px-3 py-1 cursor-pointer" title="Load a previously saved session">
+                Load Session
+                <input type="file" accept=".json" onChange={onLoadSession} className="hidden" />
+              </label>
+            )}
             <Link to="/about" className="text-sm font-medium hover:text-gx-accent transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
               About
             </Link>
@@ -72,13 +76,17 @@ export default function NavBar({ onSaveSession, onLoadSession }: NavBarProps) {
       {/* Mobile dropdown */}
       {menuOpen && (
         <div className="md:hidden px-4 pb-4 space-y-2" style={{ borderTop: '1px solid var(--gx-border)', background: 'var(--gx-nav-bg)' }}>
-          <button onClick={() => { onSaveSession(); setMenuOpen(false); }} className="btn-secondary w-full text-sm px-3 py-2 text-left">
-            Save Session
-          </button>
-          <label className="btn-secondary w-full text-sm px-3 py-2 cursor-pointer block">
-            Load Session
-            <input type="file" accept=".json" onChange={(e) => { onLoadSession(e); setMenuOpen(false); }} className="hidden" />
-          </label>
+          {onSaveSession && (
+            <button onClick={() => { onSaveSession(); setMenuOpen(false); }} className="btn-secondary w-full text-sm px-3 py-2 text-left">
+              Save Session
+            </button>
+          )}
+          {onLoadSession && (
+            <label className="btn-secondary w-full text-sm px-3 py-2 cursor-pointer block">
+              Load Session
+              <input type="file" accept=".json" onChange={(e) => { onLoadSession(e); setMenuOpen(false); }} className="hidden" />
+            </label>
+          )}
           <Link to="/about" onClick={() => setMenuOpen(false)} className="block text-sm py-2 transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
             About
           </Link>

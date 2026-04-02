@@ -8,6 +8,30 @@ export function positionToAngle(position: number, refLength: number): number {
 }
 
 /**
+ * Build an SVG path string for a filled annular arc segment.
+ * This is the SVG equivalent of the Canvas drawAnnularArc helper.
+ */
+export function createArcPath(
+  cx: number,
+  cy: number,
+  innerR: number,
+  outerR: number,
+  startAngle: number,
+  endAngle: number
+): string {
+  const x1 = cx + innerR * Math.cos(startAngle);
+  const y1 = cy + innerR * Math.sin(startAngle);
+  const x2 = cx + outerR * Math.cos(startAngle);
+  const y2 = cy + outerR * Math.sin(startAngle);
+  const x3 = cx + outerR * Math.cos(endAngle);
+  const y3 = cy + outerR * Math.sin(endAngle);
+  const x4 = cx + innerR * Math.cos(endAngle);
+  const y4 = cy + innerR * Math.sin(endAngle);
+  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
+  return `M ${x1} ${y1} L ${x2} ${y2} A ${outerR} ${outerR} 0 ${largeArc} 1 ${x3} ${y3} L ${x4} ${y4} A ${innerR} ${innerR} 0 ${largeArc} 0 ${x1} ${y1} Z`;
+}
+
+/**
  * Compute the four corner points of an annular arc segment.
  */
 export interface ArcCoords {

@@ -13,8 +13,8 @@ let cachedDbFiles: Map<string, Uint8Array> | null = null;
 
 async function loadModuleFactory(name: string): Promise<{ factory: any; wasmBinary: ArrayBuffer }> {
   const [jsResponse, wasmResponse] = await Promise.all([
-    fetch(`/wasm/blast/${name}.js`),
-    fetch(`/wasm/blast/${name}.wasm`)
+    fetch(`https://static.genomicx.org/wasm/${name}.js`),
+    fetch(`https://static.genomicx.org/wasm/${name}.wasm`)
   ]);
 
   if (!jsResponse.ok) throw new Error(`Failed to fetch ${name}.js: ${jsResponse.status}`);

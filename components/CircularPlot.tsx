@@ -1,4 +1,4 @@
-'use client';
+
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { CircularPlotData } from '@/lib/types';

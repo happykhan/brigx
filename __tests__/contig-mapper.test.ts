@@ -2,7 +2,7 @@
  * Tests for contig mapping and graph conversion modules.
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { mapContigsToReference, convertGraph } from '@/lib/contigMapper';
 import type { AlignmentHit } from '@/lib/types';
 

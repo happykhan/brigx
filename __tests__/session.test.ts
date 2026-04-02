@@ -2,7 +2,7 @@
  * Tests for session save/load and profile import/export.
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { exportSession, importSession, exportProfile, importProfile } from '@/lib/session';
 import type { PipelineParams, Annotation } from '@/lib/types';
 

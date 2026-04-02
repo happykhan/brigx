@@ -1,4 +1,4 @@
-'use client';
+
 
 import { Toaster } from 'react-hot-toast';
 import CircularPlot from '@/components/CircularPlot';
@@ -13,6 +13,7 @@ import StatisticsPanel from '@/components/StatisticsPanel';
 import BugReportModal from '@/components/BugReportModal';
 import NavBar from '@/components/NavBar';
 import ImagePropertiesPanel from '@/components/ImagePropertiesPanel';
+import { Link } from 'react-router-dom';
 import { useBRIGController } from '@/hooks/useBRIGController';
 
 export default function Home() {
@@ -94,7 +95,7 @@ export default function Home() {
                 <p className="mt-1">All processing runs locally in your browser - no data leaves your computer</p>
               </div>
               <div className="flex gap-6 text-sm">
-                <a href="/about" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>About</a>
+                <Link to="/about" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>About</Link>
                 <a href="https://github.com/happykhan/brigx" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>GitHub</a>
                 <a href="https://genomicx.org" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>genomicx.org</a>
                 <button onClick={() => setShowBugReport(true)} className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>Report Bug</button>

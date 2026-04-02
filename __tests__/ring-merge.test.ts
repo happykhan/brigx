@@ -6,7 +6,7 @@
  * the merge only iterated over cached rings and never appended new ones.
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import type { RingData, CircularPlotData } from '@/lib/types';
 
 function createRing(name: string, hitCount: number): RingData {

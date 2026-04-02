@@ -6,7 +6,7 @@
  * Uses real example files from examples/ where appropriate.
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import {
   parseFasta,
   parseGenBank,

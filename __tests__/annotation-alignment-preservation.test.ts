@@ -7,7 +7,7 @@
  * 3. Multiple operations should not lose data
  */
 
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach } from 'vitest';
 import type { CircularPlotData, RingData, Annotation } from '@/lib/types';
 
 // Mock data helpers
@@ -252,7 +252,7 @@ describe('Annotation and Alignment Preservation', () => {
       // Step 2: Add more annotations (should keep alignments)
       currentRing = {
         ...currentRing,
-        annotations: [...currentRing.annotations, mockAnnotations[1]],
+        annotations: [...(currentRing.annotations ?? []), mockAnnotations[1]],
         hits: currentRing.hits || []
       };
 

@@ -1,18 +1,11 @@
 
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 type Theme = 'dark' | 'light';
 
 export default function ThemeToggle({ disabled = false }: { disabled?: boolean }) {
-  const [theme, setTheme] = useState<Theme>('light');
-
-  useEffect(() => {
-    const saved = localStorage.getItem('gx-theme') as Theme | null;
-    const current = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    setTheme(current);
-    document.documentElement.setAttribute('data-theme', current);
-  }, []);
+  const [theme, setTheme] = useState<Theme>(() => (document.documentElement.getAttribute('data-theme') as Theme) || 'light');
 
   const applyTheme = (t: Theme) => {
     setTheme(t);

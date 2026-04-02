@@ -1,6 +1,6 @@
-'use client';
 
-import Link from 'next/link';
+
+import { Link } from 'react-router-dom';
 import ThemeToggle from '@/components/ThemeToggle';
 import { APP_VERSION } from '@/lib/version';
 
@@ -33,7 +33,7 @@ export default function NavBar({ onSaveSession, onLoadSession }: NavBarProps) {
               Load Session
               <input type="file" accept=".json" onChange={onLoadSession} className="hidden" />
             </label>
-            <Link href="/about" className="text-sm font-medium hover:text-gx-accent transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
+            <Link to="/about" className="text-sm font-medium hover:text-gx-accent transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
               About
             </Link>
             <a href="https://github.com/happykhan/brigx" target="_blank" rel="noopener" className="text-sm font-medium hover:text-gx-accent transition-colors" style={{ color: 'var(--gx-text-muted)' }}>

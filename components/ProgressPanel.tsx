@@ -1,4 +1,4 @@
-'use client';
+
 
 import type { ProgressUpdate } from '@/lib/types';
 

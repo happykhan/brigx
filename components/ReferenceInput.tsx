@@ -1,4 +1,4 @@
-'use client';
+
 
 interface ReferenceInputProps {
   referenceFile: File | null;

@@ -1,4 +1,4 @@
-'use client';
+
 
 import ImageProperties, { type ImagePropertiesConfig } from '@/components/ImageProperties';
 

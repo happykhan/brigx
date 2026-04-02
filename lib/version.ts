@@ -1,2 +1,2 @@
-// Use NEXT_PUBLIC env var or package.json import
-export const APP_VERSION: string = process.env.NEXT_PUBLIC_APP_VERSION ?? 'dev';
+declare const __APP_VERSION__: string;
+export const APP_VERSION: string = __APP_VERSION__;

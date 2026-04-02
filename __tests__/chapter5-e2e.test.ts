@@ -17,7 +17,7 @@
  * - Complete CircularPlotData structure assembly
  */
 
-import { describe, it, expect, beforeAll } from '@jest/globals';
+import { describe, it, expect, beforeAll } from 'vitest';
 import {
   parseFasta,
   parseGenBank,

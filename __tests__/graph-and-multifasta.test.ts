@@ -2,7 +2,7 @@
  * Tests for graph ring parsing and multi-FASTA reference support.
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { parseGraphFile } from '@/lib/graphParser';
 import {
   parseFasta,

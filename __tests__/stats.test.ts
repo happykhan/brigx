@@ -5,7 +5,7 @@
  * without needing Web Workers.
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import type { AlignmentHit } from '@/lib/types';
 
 // Extracted from controller.ts for testability

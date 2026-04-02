@@ -1,4 +1,4 @@
-'use client';
+
 
 import RingConfiguration from '@/components/RingConfiguration';
 import type { RingConfig, RingData } from '@/lib/types';

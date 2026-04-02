@@ -2,7 +2,7 @@
  * Tests for SAM file parsing and coverage computation.
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import { parseSAMCoverage } from '@/lib/samParser';
 import * as fs from 'fs';
 import * as path from 'path';

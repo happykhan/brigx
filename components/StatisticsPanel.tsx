@@ -1,4 +1,4 @@
-'use client';
+
 
 import toast from 'react-hot-toast';
 import type { CircularPlotData } from '@/lib/types';

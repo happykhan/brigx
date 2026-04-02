@@ -1,12 +1,12 @@
 
 import { Link } from 'react-router-dom';
-import NavBar from '@/components/NavBar';
-import AppFooter from '@/components/AppFooter';
+import { NavBar, AppFooter } from '@genomicx/ui';
+import { APP_VERSION } from '@/lib/version';
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--gx-bg)' }}>
-      <NavBar />
+      <NavBar appName="BRIGX" appSubtitle="Browser-based Ring Image Generator" version={APP_VERSION} />
 
       {/* Main Content */}
       <main className="flex-grow py-12">
@@ -50,7 +50,7 @@ export default function AboutPage() {
               <ul className="list-disc pl-6 space-y-2 mb-4" style={{ color: 'var(--gx-text)' }}>
                 <li><strong style={{ color: 'var(--gx-text)' }}>BLAST:</strong> Sequence alignment (formatdb + blastn)</li>
                 <li><strong style={{ color: 'var(--gx-text)' }}>WebAssembly:</strong> High-performance browser execution</li>
-                <li><strong style={{ color: 'var(--gx-text)' }}>Next.js:</strong> React framework for the user interface</li>
+                <li><strong style={{ color: 'var(--gx-text)' }}>Vite + React:</strong> Frontend framework</li>
                 <li><strong style={{ color: 'var(--gx-text)' }}>Web Workers:</strong> Parallel processing for faster alignments</li>
               </ul>
 
@@ -111,7 +111,7 @@ export default function AboutPage() {
         </div>
       </main>
 
-      <AppFooter />
+      <AppFooter appName="BRIGX" />
     </div>
   );
 }

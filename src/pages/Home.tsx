@@ -1,21 +1,18 @@
 
-
 import { Toaster } from 'react-hot-toast';
+import { NavBar, AppFooter, LogConsole } from '@genomicx/ui';
 import CircularPlot from '@/components/CircularPlot';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ExportPanel from '@/components/ExportPanel';
-import ConsoleLog from '@/components/ConsoleLog';
 import AnnotationEditor from '@/components/AnnotationEditor';
 import ReferenceInput from '@/components/ReferenceInput';
 import RingsPanel from '@/components/RingsPanel';
 import ControlPanel from '@/components/ControlPanel';
 import StatisticsPanel from '@/components/StatisticsPanel';
 import BugReportModal from '@/components/BugReportModal';
-import NavBar from '@/components/NavBar';
-import AppFooter from '@/components/AppFooter';
 import ImagePropertiesPanel from '@/components/ImagePropertiesPanel';
-import { Link } from 'react-router-dom';
 import { useBRIGController } from '@/hooks/useBRIGController';
+import { APP_VERSION } from '@/lib/version';
 
 export default function Home() {
   const {
@@ -32,7 +29,33 @@ export default function Home() {
     <>
       <Toaster position="bottom-right" toastOptions={{ style: { background: 'var(--gx-bg-alt)', color: 'var(--gx-text)', border: '1px solid var(--gx-border)' }, success: { duration: 3000, iconTheme: { primary: '#14B8A6', secondary: '#fff' } }, error: { duration: 6000, iconTheme: { primary: '#ef4444', secondary: '#fff' } } }} />
       <div className="min-h-screen flex flex-col" style={{ background: 'var(--gx-bg)' }}>
-        <NavBar onSaveSession={handleSaveSession} onLoadSession={handleLoadSession} />
+        <NavBar
+          appName="BRIGX"
+          appSubtitle="Browser-based Ring Image Generator"
+          version={APP_VERSION}
+          actions={
+            <>
+              <button onClick={handleSaveSession} className="btn-secondary text-xs px-3 py-1" title="Save current session as JSON">
+                Save Session
+              </button>
+              <label className="btn-secondary text-xs px-3 py-1 cursor-pointer" title="Load a previously saved session">
+                Load Session
+                <input type="file" accept=".json" onChange={handleLoadSession} className="hidden" />
+              </label>
+            </>
+          }
+          mobileActions={
+            <>
+              <button onClick={handleSaveSession} className="btn-secondary w-full text-sm px-3 py-2 text-left">
+                Save Session
+              </button>
+              <label className="btn-secondary w-full text-sm px-3 py-2 cursor-pointer block">
+                Load Session
+                <input type="file" accept=".json" onChange={handleLoadSession} className="hidden" />
+              </label>
+            </>
+          }
+        />
 
         <main className="flex-1 py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -79,7 +102,7 @@ export default function Home() {
                 </div>
 
                 <div className="mt-6 animate-fade-in">
-                  <ConsoleLog logs={consoleLogs} progress={progress} />
+                  <LogConsole logs={consoleLogs} progress={progress} title="Debug Console" />
                 </div>
 
                 {plotData && <StatisticsPanel plotData={plotData} />}
@@ -88,7 +111,7 @@ export default function Home() {
           </div>
         </main>
 
-        <AppFooter onReportBug={() => setShowBugReport(true)} />
+        <AppFooter appName="BRIGX" onReportBug={() => setShowBugReport(true)} />
       </div>
 
       {showBugReport && <BugReportModal onClose={() => setShowBugReport(false)} />}

@@ -40,6 +40,9 @@ export default function NavBar({ onSaveSession, onLoadSession }: NavBarProps) {
                 <input type="file" accept=".json" onChange={onLoadSession} className="hidden" />
               </label>
             )}
+            <Link to="/" className="text-sm font-medium hover:text-gx-accent transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
+              App
+            </Link>
             <Link to="/about" className="text-sm font-medium hover:text-gx-accent transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
               About
             </Link>
@@ -87,6 +90,9 @@ export default function NavBar({ onSaveSession, onLoadSession }: NavBarProps) {
               <input type="file" accept=".json" onChange={(e) => { onLoadSession(e); setMenuOpen(false); }} className="hidden" />
             </label>
           )}
+          <Link to="/" onClick={() => setMenuOpen(false)} className="block text-sm py-2 transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
+            App
+          </Link>
           <Link to="/about" onClick={() => setMenuOpen(false)} className="block text-sm py-2 transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
             About
           </Link>

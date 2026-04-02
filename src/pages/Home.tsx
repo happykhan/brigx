@@ -95,8 +95,6 @@ export default function Home() {
                 <p className="mt-1">All processing runs locally in your browser - no data leaves your computer</p>
               </div>
               <div className="flex gap-6 text-sm">
-                <Link to="/about" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>About</Link>
-                <a href="https://github.com/happykhan/brigx" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>GitHub</a>
                 <a href="https://genomicx.org" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>genomicx.org</a>
                 <button onClick={() => setShowBugReport(true)} className="transition-colors hover:text-[var(--gx-accent)]" style={{ color: 'var(--gx-text-muted)' }}>Report Bug</button>
               </div>

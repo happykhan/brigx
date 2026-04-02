@@ -39,8 +39,9 @@ export default function NavBar({ onSaveSession, onLoadSession }: NavBarProps) {
             <Link to="/about" className="text-sm font-medium hover:text-gx-accent transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
               About
             </Link>
-            <a href="https://github.com/happykhan/brigx" target="_blank" rel="noopener" className="text-sm font-medium hover:text-gx-accent transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
+            <a href="https://github.com/happykhan/brigx" target="_blank" rel="noopener noreferrer" className="text-sm font-medium hover:text-gx-accent transition-colors inline-flex items-center gap-1" style={{ color: 'var(--gx-text-muted)' }}>
               GitHub
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
             </a>
             <ThemeToggle />
           </div>
@@ -81,8 +82,9 @@ export default function NavBar({ onSaveSession, onLoadSession }: NavBarProps) {
           <Link to="/about" onClick={() => setMenuOpen(false)} className="block text-sm py-2 transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
             About
           </Link>
-          <a href="https://github.com/happykhan/brigx" target="_blank" rel="noopener" className="block text-sm py-2 transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
+          <a href="https://github.com/happykhan/brigx" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm py-2 transition-colors" style={{ color: 'var(--gx-text-muted)' }}>
             GitHub
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
           </a>
         </div>
       )}

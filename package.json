@@ -15,7 +15,7 @@
         "test:coverage": "vitest run --coverage"
     },
     "dependencies": {
-        "@genomicx/ui": "^0.5.0",
+        "@genomicx/ui": "^0.6.0",
         "@handsontable/react": "^16.2.0",
         "comlink": "^4.4.1",
         "handsontable": "^16.2.0",

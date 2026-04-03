@@ -40,8 +40,6 @@ export function useBRIGController() {
 
   // Plot expand state
   const [plotExpanded, setPlotExpanded] = useState(false);
-  const [showBugReport, setShowBugReport] = useState(false);
-
   // Annotation editor state
   const [annotationEditorOpen, setAnnotationEditorOpen] = useState(false);
   const [editingRingId, setEditingRingId] = useState<string | null>(null);
@@ -523,8 +521,6 @@ export function useBRIGController() {
     setImageProperties,
     plotExpanded,
     setPlotExpanded,
-    showBugReport,
-    setShowBugReport,
     annotationEditorOpen,
     setAnnotationEditorOpen,
     editingRingId,

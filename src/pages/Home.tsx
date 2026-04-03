@@ -9,7 +9,6 @@ import ReferenceInput from '@/components/ReferenceInput';
 import RingsPanel from '@/components/RingsPanel';
 import ControlPanel from '@/components/ControlPanel';
 import StatisticsPanel from '@/components/StatisticsPanel';
-import BugReportModal from '@/components/BugReportModal';
 import ImagePropertiesPanel from '@/components/ImagePropertiesPanel';
 import { useBRIGController } from '@/hooks/useBRIGController';
 import { APP_VERSION } from '@/lib/version';
@@ -18,7 +17,7 @@ export default function Home() {
   const {
     referenceFile, rings, setRings, params, setParams, progress, plotData,
     isProcessing, consoleLogs, imageProperties, setImageProperties,
-    plotExpanded, setPlotExpanded, showBugReport, setShowBugReport,
+    plotExpanded, setPlotExpanded,
     annotationEditorOpen, setAnnotationEditorOpen, editingRingId, setEditingRingId,
     ringAnnotations, referenceLength,
     handleReferenceFileChange, handleAnnotationsChange, handleOpenAnnotationEditor,
@@ -111,10 +110,8 @@ export default function Home() {
           </div>
         </main>
 
-        <AppFooter appName="BRIGX" onReportBug={() => setShowBugReport(true)} />
+        <AppFooter appName="BRIGX" bugReportEmail="nabil@happykhan.com" bugReportUrl="https://github.com/happykhan/brigx/issues" bugReportItems={['A description of what happened and what you expected', 'Your input files (reference + query genomes)', 'Saved session file (use "Save Session" button)', 'Debug console output (copy from the Debug Console panel)', 'Browser name and version']} />
       </div>
-
-      {showBugReport && <BugReportModal onClose={() => setShowBugReport(false)} />}
 
       {annotationEditorOpen && editingRingId && (
         <AnnotationEditor

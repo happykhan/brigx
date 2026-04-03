@@ -111,7 +111,7 @@ export default function AboutPage() {
         </div>
       </main>
 
-      <AppFooter appName="BRIGX" />
+      <AppFooter appName="BRIGX" bugReportEmail="nabil@happykhan.com" bugReportUrl="https://github.com/happykhan/brigx/issues" />
     </div>
   );
 }

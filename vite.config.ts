@@ -24,6 +24,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     include: ['**/__tests__/**/*.{ts,tsx}', '**/*.{spec,test}.{ts,tsx}'],
+    exclude: ['**/node_modules/**', '**/tests/e2e/**'],
     alias: {
       '@': resolve(__dirname, '.'),
     },

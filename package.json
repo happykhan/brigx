@@ -1,7 +1,15 @@
 {
     "name": "brig-web",
     "version": "0.6.21",
+    "description": "Browser-based circular genome comparison tool — BLAST Ring Image Generator in the browser",
     "private": true,
+    "license": "GPL-3.0",
+    "author": "Nabil-Fareed Alikhan",
+    "homepage": "https://brigx.genomicx.org",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/happykhan/BRIGx.git"
+    },
     "scripts": {
         "dev": "vite",
         "build": "tsc -b && vite build",

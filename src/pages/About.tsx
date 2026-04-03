@@ -12,18 +12,18 @@ export default function AboutPage() {
       <main className="flex-grow py-12">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="card">
-            <h1 className="text-4xl font-bold mb-8" style={{ color: 'var(--gx-text)', letterSpacing: '-0.025em' }}>About BRIGX</h1>
+            <h1 className="text-4xl font-bold mb-8" style={{ letterSpacing: '-0.025em' }}>About BRIGX</h1>
 
             <div className="max-w-none">
-              <h2 className="text-2xl font-semibold mt-6 mb-4" style={{ color: 'var(--gx-text)' }}>Overview</h2>
-              <p className="mb-4" style={{ color: 'var(--gx-text)' }}>
+              <h2 className="text-2xl font-semibold mt-6 mb-4">Overview</h2>
+              <p className="mb-4">
                 BRIGX (BLAST Ring Image Generator eXtended) is a web-based tool for comparative genomics visualization.
                 It creates circular genome comparison plots similar to the original BRIG tool, but runs entirely in your browser
                 using WebAssembly technology.
               </p>
 
-              <h2 className="text-2xl font-semibold mt-8 mb-4" style={{ color: 'var(--gx-text)' }}>Features</h2>
-              <ul className="list-disc pl-6 space-y-2 mb-4" style={{ color: 'var(--gx-text)' }}>
+              <h2 className="text-2xl font-semibold mt-8 mb-4">Features</h2>
+              <ul className="list-disc pl-6 space-y-2 mb-4">
                 <li>Compare multiple genome sequences against a reference genome</li>
                 <li>Interactive circular visualization with multiple rings</li>
                 <li>GC content and GC skew analysis</li>
@@ -33,29 +33,29 @@ export default function AboutPage() {
                 <li>All processing happens locally in your browser</li>
               </ul>
 
-              <h2 className="text-2xl font-semibold mt-8 mb-4" style={{ color: 'var(--gx-text)' }}>How It Works</h2>
-              <p className="mb-4" style={{ color: 'var(--gx-text)' }}>
+              <h2 className="text-2xl font-semibold mt-8 mb-4">How It Works</h2>
+              <p className="mb-4">
                 BRIGX uses BLAST (Basic Local Alignment Search Tool), compiled to WebAssembly. This allows
                 sophisticated bioinformatics analysis to run directly in your web browser without requiring any
                 server-side processing or data upload.
               </p>
 
-              <h2 className="text-2xl font-semibold mt-8 mb-4" style={{ color: 'var(--gx-text)' }}>Privacy</h2>
-              <p className="mb-4" style={{ color: 'var(--gx-text)' }}>
+              <h2 className="text-2xl font-semibold mt-8 mb-4">Privacy</h2>
+              <p className="mb-4">
                 All processing happens locally in your browser using WebAssembly. Your genome data never leaves
                 your computer, ensuring complete privacy and security of your research data.
               </p>
 
-              <h2 className="text-2xl font-semibold mt-8 mb-4" style={{ color: 'var(--gx-text)' }}>Technology Stack</h2>
-              <ul className="list-disc pl-6 space-y-2 mb-4" style={{ color: 'var(--gx-text)' }}>
-                <li><strong style={{ color: 'var(--gx-text)' }}>BLAST:</strong> Sequence alignment (formatdb + blastn)</li>
-                <li><strong style={{ color: 'var(--gx-text)' }}>WebAssembly:</strong> High-performance browser execution</li>
-                <li><strong style={{ color: 'var(--gx-text)' }}>Vite + React:</strong> Frontend framework</li>
-                <li><strong style={{ color: 'var(--gx-text)' }}>Web Workers:</strong> Parallel processing for faster alignments</li>
+              <h2 className="text-2xl font-semibold mt-8 mb-4">Technology Stack</h2>
+              <ul className="list-disc pl-6 space-y-2 mb-4">
+                <li><strong>BLAST:</strong> Sequence alignment (formatdb + blastn)</li>
+                <li><strong>WebAssembly:</strong> High-performance browser execution</li>
+                <li><strong>Vite + React:</strong> Frontend framework</li>
+                <li><strong>Web Workers:</strong> Parallel processing for faster alignments</li>
               </ul>
 
-              <h2 className="text-2xl font-semibold mt-8 mb-4" style={{ color: 'var(--gx-text)' }}>Developer</h2>
-              <p className="mb-4" style={{ color: 'var(--gx-text)' }}>
+              <h2 className="text-2xl font-semibold mt-8 mb-4">Developer</h2>
+              <p className="mb-4">
                 BRIGX is developed by{' '}
                 <a href="https://github.com/happykhan" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gx-accent)', textDecoration: 'underline' }}>Nabil-Fareed Alikhan</a>
                 , Senior Bioinformatician at the{' '}
@@ -63,8 +63,8 @@ export default function AboutPage() {
                 , University of Oxford.
               </p>
 
-              <h2 className="text-2xl font-semibold mt-8 mb-4" style={{ color: 'var(--gx-text)' }}>Citation</h2>
-              <p className="mb-4" style={{ color: 'var(--gx-text)' }}>
+              <h2 className="text-2xl font-semibold mt-8 mb-4">Citation</h2>
+              <p className="mb-4">
                 If you use BRIGX in your research, please cite the original BRIG paper:
               </p>
               <blockquote className="pl-4 italic mb-4" style={{ borderLeft: '4px solid var(--gx-accent)', color: 'var(--gx-text-muted)' }}>
@@ -81,8 +81,8 @@ export default function AboutPage() {
                 </a>
               </blockquote>
 
-              <h2 className="text-2xl font-semibold mt-8 mb-4" style={{ color: 'var(--gx-text)' }}>Contributing</h2>
-              <p className="mb-4" style={{ color: 'var(--gx-text)' }}>
+              <h2 className="text-2xl font-semibold mt-8 mb-4">Contributing</h2>
+              <p className="mb-4">
                 BRIGX is an open-source project. You can contribute to the project on{' '}
                 <a
                   href="https://github.com/happykhan/brigx"

@@ -13,7 +13,7 @@ export default function ReferenceInput({ referenceFile, onFileChange }: Referenc
         <label className="label">Reference Genome (FASTA)</label>
         <input
           type="file"
-          accept=".fasta,.fa,.fna,.gbk,.gb"
+          accept=".fasta,.fa,.fna,.gbk,.gb,.gbff"
           onChange={(e) => {
             if (e.target.files && e.target.files[0]) {
               onFileChange(e.target.files[0]);

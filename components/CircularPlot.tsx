@@ -153,10 +153,12 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
 
   const handleMouseMove = (e: React.MouseEvent) => {
     // Legend dragging
-    if (draggingLegend && rendererRef.current) {
+    if (draggingLegend && rendererRef.current && canvasRef.current) {
       const dx = e.clientX - legendDragStart.x;
       const dy = e.clientY - legendDragStart.y;
-      rendererRef.current.moveLegend(draggingLegend, dx, dy, zoom);
+      // Scale CSS px delta to logical space (canvas is 1000×1000 logical but rendered at CSS size)
+      const scale = 1000 / (canvasRef.current.offsetWidth || 1000);
+      rendererRef.current.moveLegend(draggingLegend, dx * scale, dy * scale, zoom);
       setLegendDragStart({ x: e.clientX, y: e.clientY });
       rendererRef.current.redraw(zoom, pan.x, pan.y);
       return;
@@ -200,6 +202,7 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
   const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.2, 5));
   const handleZoomOut = () => setZoom(prev => Math.max(prev / 1.2, 0.3));
   const handleResetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+  const handleCenterView = () => setPan({ x: 0, y: 0 });
 
   // Scroll to zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -224,6 +227,12 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
           <button type="button" onClick={handleZoomIn} className="p-1.5 rounded hover:opacity-80" style={{ color: 'var(--gx-text)' }} title="Zoom in (or scroll up)">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+          <button type="button" onClick={handleCenterView} className="p-1.5 rounded hover:opacity-80" style={{ color: 'var(--gx-text)' }} title="Centre the plot (keep current zoom)">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="3" strokeWidth={2} />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v4m0 12v4M2 12h4m12 0h4" />
             </svg>
           </button>
         </div>

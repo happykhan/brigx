@@ -36,6 +36,9 @@ export default function AnnotationEditor({
   const [showGenbankImport, setShowGenbankImport] = useState(false);
   const [gbFeatureType, setGbFeatureType] = useState('CDS');
   const [gbTextFilter, setGbTextFilter] = useState('');
+  const [showGFF3Import, setShowGFF3Import] = useState(false);
+  const [gff3FeatureType, setGff3FeatureType] = useState('CDS');
+  const [gff3TextFilter, setGff3TextFilter] = useState('');
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -156,6 +159,35 @@ export default function AnnotationEditor({
     e.target.value = '';
   };
 
+  const handleGFF3Import = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const { extractGFF3Features } = await import('@/workers/parser.worker');
+      const features = extractGFF3Features(text, gff3FeatureType, gff3TextFilter || undefined);
+
+      if (features.length === 0) {
+        toast.error(`No ${gff3FeatureType} features found`);
+        return;
+      }
+
+      const coloured = features.map(f => ({ ...f, color: ringColor }));
+      setLocalAnnotations([...localAnnotations, ...coloured]);
+      if (features.length > 200) {
+        toast.success(`Imported ${features.length} features. Labels auto-disabled (too many).`);
+      } else {
+        toast.success(`Imported ${features.length} ${gff3FeatureType} feature(s) from GFF3`);
+      }
+      setShowGFF3Import(false);
+    } catch (error: any) {
+      toast.error(`GFF3 parse error: ${error.message}`);
+    }
+
+    e.target.value = '';
+  };
+
   // Convert annotations to table data
   const data = localAnnotations.map(ann => ({
     start: ann.start,
@@ -248,6 +280,12 @@ export default function AnnotationEditor({
           >
             Import GenBank Features
           </button>
+          <button
+            onClick={() => setShowGFF3Import(!showGFF3Import)}
+            className="btn-secondary text-sm"
+          >
+            Import GFF3 Features
+          </button>
           <div className="ml-auto text-sm self-center" style={{ color: 'var(--gx-text-muted)' }}>
             {localAnnotations.length} annotation(s) | Reference: {referenceLength.toLocaleString()} bp
           </div>
@@ -284,8 +322,47 @@ export default function AnnotationEditor({
               Choose .gbk File
               <input
                 type="file"
-                accept=".gbk,.gb,.genbank"
+                accept=".gbk,.gb,.genbank,.gbff"
                 onChange={handleGenBankImport}
+                className="hidden"
+              />
+            </label>
+          </div>
+        )}
+
+        {/* GFF3 Import Panel */}
+        {showGFF3Import && (
+          <div className="px-4 pb-4 flex gap-2 items-end flex-wrap" style={{ borderBottom: '1px solid var(--gx-border)' }}>
+            <div>
+              <label className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>Feature Type</label>
+              <select
+                value={gff3FeatureType}
+                onChange={(e) => setGff3FeatureType(e.target.value)}
+                className="input-field text-sm"
+              >
+                <option value="CDS">CDS</option>
+                <option value="gene">gene</option>
+                <option value="rRNA">rRNA</option>
+                <option value="tRNA">tRNA</option>
+                <option value="misc_feature">misc_feature</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>Text Filter (optional)</label>
+              <input
+                type="text"
+                value={gff3TextFilter}
+                onChange={(e) => setGff3TextFilter(e.target.value)}
+                placeholder="e.g. kinase"
+                className="input-field text-sm"
+              />
+            </div>
+            <label className="btn-primary text-sm cursor-pointer">
+              Choose .gff3 File
+              <input
+                type="file"
+                accept=".gff3,.gff"
+                onChange={handleGFF3Import}
                 className="hidden"
               />
             </label>

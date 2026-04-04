@@ -302,6 +302,60 @@ export function extractGenBankFeatures(
   return annotations;
 }
 
+export function extractGFF3Features(
+  text: string,
+  featureType: string,
+  textContains?: string
+): Annotation[] {
+  const annotations: Annotation[] = [];
+  const lines = text.split('\n');
+
+  for (const line of lines) {
+    if (line.startsWith('#') || !line.trim()) continue;
+    const parts = line.split('\t');
+    if (parts.length < 9) continue;
+
+    const type = parts[2];
+    if (type !== featureType) continue;
+
+    const start = parseInt(parts[3], 10);
+    const end = parseInt(parts[4], 10);
+    const strand = parts[6];
+    const attributeStr = parts[8];
+
+    if (isNaN(start) || isNaN(end)) continue;
+
+    const attrs: Record<string, string> = {};
+    for (const attr of attributeStr.split(';')) {
+      const eqIdx = attr.indexOf('=');
+      if (eqIdx === -1) continue;
+      const key = attr.slice(0, eqIdx).trim();
+      const val = attr.slice(eqIdx + 1).trim();
+      try { attrs[key] = decodeURIComponent(val); } catch { attrs[key] = val; }
+    }
+
+    const label = attrs['gene'] || attrs['locus_tag'] || attrs['Name'] || attrs['ID'] || type;
+
+    if (textContains) {
+      const fullText = Object.values(attrs).join(' ').toLowerCase();
+      if (!fullText.includes(textContains.toLowerCase())) continue;
+    }
+
+    const shape: AnnotationShape = strand === '-' ? 'arrow-reverse' : 'arrow-forward';
+
+    annotations.push({
+      id: `gff-${annotations.length}-${start}`,
+      start,
+      end,
+      label,
+      shape,
+      color: '#000000',
+    });
+  }
+
+  return annotations;
+}
+
 // Worker message handler - only attach when running as a Web Worker
 if (typeof self !== 'undefined' && typeof self.postMessage === 'function') {
 (self as any).onmessage = async (e: MessageEvent) => {

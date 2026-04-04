@@ -32,29 +32,34 @@ export default function Home() {
           appName="BRIGX"
           appSubtitle="Browser-based Ring Image Generator"
           version={APP_VERSION}
-          actions={
-            <>
-              <button onClick={handleSaveSession} className="btn-secondary text-xs px-3 py-1" title="Save current session as JSON">
-                Save Session
-              </button>
-              <label className="btn-secondary text-xs px-3 py-1 cursor-pointer" title="Load a previously saved session">
-                Load Session
-                <input type="file" accept=".json" onChange={handleLoadSession} className="hidden" />
-              </label>
-            </>
-          }
-          mobileActions={
-            <>
-              <button onClick={handleSaveSession} className="btn-secondary w-full text-sm px-3 py-2 text-left">
-                Save Session
-              </button>
-              <label className="btn-secondary w-full text-sm px-3 py-2 cursor-pointer block">
-                Load Session
-                <input type="file" accept=".json" onChange={handleLoadSession} className="hidden" />
-              </label>
-            </>
-          }
         />
+
+        {/* Session sub-nav — styled like RonaQC's secondary tab strip */}
+        <nav style={{ background: 'var(--gx-bg-alt)', borderBottom: '1px solid var(--gx-border)' }}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex overflow-x-auto">
+            <button
+              type="button"
+              onClick={handleSaveSession}
+              className="text-sm px-4 py-2.5 shrink-0"
+              style={{ color: 'var(--gx-text-muted)', borderBottom: '2px solid transparent' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--gx-text)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--gx-text-muted)')}
+              title="Download the current configuration and results as a JSON file"
+            >
+              Save Session
+            </button>
+            <label
+              className="text-sm px-4 py-2.5 shrink-0 cursor-pointer"
+              style={{ color: 'var(--gx-text-muted)', borderBottom: '2px solid transparent' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--gx-text)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--gx-text-muted)')}
+              title="Restore a previously saved session from a JSON file"
+            >
+              Load Session
+              <input type="file" accept=".json" onChange={handleLoadSession} className="hidden" />
+            </label>
+          </div>
+        </nav>
 
         <main className="flex-1 py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

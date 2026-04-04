@@ -182,9 +182,10 @@ export function useBRIGController() {
       setPlotData(plotDataWithRings);
       setCachedPlotData(plotDataWithRings);
       setReferenceLength(skeletonResult.reference.length);
-    } catch (error: any) {
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       console.error('[Page] Error generating skeleton:', error);
-      toast.error(`Error: ${error.message}`);
+      toast.error(`Error: ${msg}`);
     }
   };
 
@@ -425,10 +426,11 @@ export function useBRIGController() {
       }
       setProgress({ step: 'Complete!', percent: 100 });
       toast.success('Alignments completed successfully!');
-    } catch (error: any) {
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       console.error('[Page] Alignment error:', error);
-      toast.error(`Error: ${error.message}`, { duration: 6000 });
-      setProgress({ step: 'Error', percent: 0, message: error.message });
+      toast.error(`Error: ${msg}`, { duration: 6000 });
+      setProgress({ step: 'Error', percent: 0, message: msg });
     } finally {
       setIsProcessing(false);
     }
@@ -499,8 +501,8 @@ export function useBRIGController() {
       setImageProperties(session.imageConfig);
 
       toast.success('Session loaded. Re-add reference and ring files to run alignments.');
-    } catch (error: any) {
-      toast.error(`Failed to load session: ${error.message}`);
+    } catch (error) {
+      toast.error(`Failed to load session: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     e.target.value = '';

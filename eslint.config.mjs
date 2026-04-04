@@ -16,6 +16,7 @@ export default tseslint.config(
     ignores: [
       "__tests__/**",
       "node_modules/**",
+      "dist/**",
       ".next/**",
       "out/**",
       "jest.config.js",

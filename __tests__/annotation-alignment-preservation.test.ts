@@ -128,11 +128,6 @@ describe('Annotation and Alignment Preservation', () => {
         ...mockRing,
         annotations: mockAnnotations
       };
-      const cachedPlotData: CircularPlotData = {
-        ...mockPlotData,
-        rings: [cachedRing]
-      };
-
       // Final alignment result (no annotations from worker)
       const finalAlignmentResult: RingData = {
         ...mockRing,

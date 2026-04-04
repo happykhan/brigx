@@ -28,20 +28,6 @@ export class CircularPlotRenderer {
     this.config = config;
   }
 
-  private getColorForIdentity(identity: number): string {
-    const normalizedIdentity = 
-      (identity - this.config.minIdentity) / 
-      (this.config.maxIdentity - this.config.minIdentity);
-    
-    const clamped = Math.max(0, Math.min(1, normalizedIdentity));
-    
-    // Blue to Red gradient
-    const r = Math.floor(clamped * 220 + 35);
-    const g = Math.floor(100 * (1 - Math.abs(clamped - 0.5) * 2));
-    const b = Math.floor((1 - clamped) * 220 + 35);
-    
-    return `rgb(${r}, ${g}, ${b})`;
-  }
 
   private createArcPath(
     cx: number,

@@ -1,6 +1,6 @@
 // Canvas 2D renderer for circular genome plot (display only; SVG renderer kept for export)
 
-import type { CircularPlotData, RingData, Annotation, ContigBoundary } from './types';
+import type { CircularPlotData, RingData, Annotation, AnnotationShape, ContigBoundary } from './types';
 import type { RenderConfig } from './renderer';
 import { positionToAngle, hexToRGB, getColorIntensity, calculateRingLayout } from './geometry';
 
@@ -195,6 +195,21 @@ export class CanvasPlotRenderer {
 
     // --- Reference ring ---
     this.drawCircle(ctx, cx, cy, this.config.innerRadius, '#333', 2);
+
+    // Reference features (from GenBank reference file)
+    if (data.reference.features && data.reference.features.length > 0) {
+      const featureInner = Math.max(10, this.config.innerRadius - 30);
+      const featureOuter = this.config.innerRadius;
+      const featureAnnotations: Annotation[] = data.reference.features.map((f, i) => ({
+        id: `ref-feat-${i}`,
+        start: f.start,
+        end: f.end,
+        label: f.name || f.product || f.type,
+        shape: (f.strand === '+' ? 'arrow-forward' : 'arrow-reverse') as AnnotationShape,
+        color: f.color || '#4a90e2',
+      }));
+      this.drawAnnotations(ctx, cx, cy, refLength, featureAnnotations, featureInner, featureOuter, true, true);
+    }
 
     // --- Ring layout ---
     const layouts = calculateRingLayout(
@@ -564,7 +579,8 @@ export class CanvasPlotRenderer {
     annotations: Annotation[],
     innerRadius: number,
     outerRadius: number,
-    showLabels: boolean
+    showLabels: boolean,
+    labelInward: boolean = false
   ): void {
     if (!annotations || annotations.length === 0) return;
 
@@ -585,7 +601,7 @@ export class CanvasPlotRenderer {
     }
 
     const labelPositions: LabelPosition[] = [];
-    const labelDistance = outerRadius + 30;
+    const labelDistance = labelInward ? Math.max(20, innerRadius - 30) : outerRadius + 30;
 
     if (showLabels) {
       for (const ann of annotations) {

@@ -9,8 +9,10 @@ import type {
   PipelineParams,
   ProgressUpdate,
   ContigBoundary,
-  GraphPoint
+  GraphPoint,
+  Feature
 } from './types';
+import { extractGenBankFeatures } from '../workers/parser.worker';
 import { parseSAMCoverage } from '@/lib/samParser';
 import { parseGraphFile } from '@/lib/graphParser';
 
@@ -373,7 +375,27 @@ export class BRIGController {
         reference = referenceGenomes[0];
       }
       console.log(`[Controller] Reference: ${reference.name}, ${(reference.length / 1_000_000).toFixed(2)} Mbp`);
-      
+
+      // Extract features from GenBank reference if applicable
+      let referenceFeatures: Feature[] = [];
+      const refExt = referenceFile.name.toLowerCase();
+      if (refExt.match(/\.(gbk|gb|genbank|gbff)(\.gz)?$/)) {
+        try {
+          const refText = await referenceFile.text();
+          const annots = extractGenBankFeatures(refText, 'CDS');
+          referenceFeatures = annots.map(a => ({
+            type: 'CDS',
+            start: a.start,
+            end: a.end,
+            strand: (a.shape === 'arrow-forward' ? '+' : '-') as '+' | '-',
+            name: a.label,
+          }));
+          console.log(`[Controller] Extracted ${referenceFeatures.length} CDS features from reference`);
+        } catch (e) {
+          console.warn('[Controller] Failed to extract reference features:', e);
+        }
+      }
+
       // Calculate GC content
       console.log('[Controller] Step 2: Calculating GC content');
       this.updateProgress('Calculating GC content', 10);
@@ -400,7 +422,7 @@ export class BRIGController {
               length: reference.length,
               gcContent,
               gcSkew,
-              features: [],
+              features: referenceFeatures,
               contigs: contigBoundaries
             },
             rings: [], // Empty rings array initially
@@ -639,7 +661,7 @@ export class BRIGController {
                 length: reference.length,
                 gcContent,
                 gcSkew,
-                features: [],
+                features: referenceFeatures,
                 contigs: contigBoundaries
               },
               rings: [...ringDataArray], // Send all rings processed so far

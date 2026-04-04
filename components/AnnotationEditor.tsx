@@ -152,8 +152,8 @@ export default function AnnotationEditor({
         toast.success(`Imported ${features.length} ${gbFeatureType} feature(s)`);
       }
       setShowGenbankImport(false);
-    } catch (error: any) {
-      toast.error(`GenBank parse error: ${error.message}`);
+    } catch (error) {
+      toast.error(`GenBank parse error: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     e.target.value = '';
@@ -181,8 +181,8 @@ export default function AnnotationEditor({
         toast.success(`Imported ${features.length} ${gff3FeatureType} feature(s) from GFF3`);
       }
       setShowGFF3Import(false);
-    } catch (error: any) {
-      toast.error(`GFF3 parse error: ${error.message}`);
+    } catch (error) {
+      toast.error(`GFF3 parse error: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     e.target.value = '';

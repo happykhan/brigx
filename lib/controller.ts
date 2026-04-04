@@ -81,64 +81,6 @@ export class BRIGController {
     }
   }
 
-  private async parseGenome(file: File): Promise<ParsedGenome> {
-    console.log(`[Controller] Parsing genome: ${file.name}`);
-    return new Promise((resolve, reject) => {
-      if (!this.parserWorker) {
-        console.error('[Controller] Parser worker not initialized');
-        reject(new Error('Parser worker not initialized'));
-        return;
-      }
-
-      const timeout = setTimeout(() => {
-        console.error('[Controller] Genome parsing timeout');
-        reject(new Error('Genome parsing timeout'));
-      }, 60000); // 60 second timeout
-
-      this.parserWorker.onmessage = (e) => {
-        if (e.data.type === 'parsed') {
-          clearTimeout(timeout);
-          console.log(`[Controller] Parsed ${e.data.genomes.length} sequences from ${file.name}`);
-          resolve(e.data.genomes);
-        } else if (e.data.type === 'error') {
-          clearTimeout(timeout);
-          reject(new Error(e.data.error));
-        }
-      };
-
-      console.log('[Controller] Sending parse request');
-      this.parserWorker.postMessage({ type: 'parse', file });
-    });
-  }
-
-  private async mergeGenomes(genomes: ParsedGenome[]): Promise<ParsedGenome> {
-    console.log(`[Controller] Merging ${genomes.length} genomes`);
-    return new Promise((resolve, reject) => {
-      if (!this.parserWorker) {
-        reject(new Error('Parser worker not initialized'));
-        return;
-      }
-
-      const timeout = setTimeout(() => {
-        reject(new Error('Genome merge timeout'));
-      }, 30000); // 30 second timeout
-
-      this.parserWorker.onmessage = (e) => {
-        if (e.data.type === 'merged') {
-          clearTimeout(timeout);
-          console.log(`[Controller] Merged genome: ${e.data.genome.name}`);
-          resolve(e.data.genome);
-        } else if (e.data.type === 'error') {
-          clearTimeout(timeout);
-          reject(new Error(e.data.error));
-        }
-      };
-
-      console.log('[Controller] Sending merge request');
-      this.parserWorker.postMessage({ type: 'merge', genomes });
-    });
-  }
-
   private async parseGenomes(file: File): Promise<ParsedGenome[]> {
     console.log(`[Controller] Parsing genomes: ${file.name}`);
     return new Promise((resolve, reject) => {
@@ -317,7 +259,7 @@ export class BRIGController {
   async runFullPipeline(
     referenceFile: File,
     rings: RingConfig[],
-    annotationFiles: File[],
+    _annotationFiles: File[],
     params: PipelineParams,
     progressCallback?: (update: ProgressUpdate) => void
   ): Promise<CircularPlotData> {
@@ -578,7 +520,7 @@ export class BRIGController {
 
             alignmentResults[ringIndex] = result;
             console.log(`[Controller] Ring ${ringIndex + 1}/${queryGenomes.length} completed: ${result.result.hits?.length || 0} hits`);
-          } catch (error: any) {
+          } catch (error) {
             console.error(`[Controller] Alignment error for ${query.name}:`, error);
             alignmentResults[ringIndex] = {
               result: {

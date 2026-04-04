@@ -384,9 +384,9 @@ if (typeof self !== 'undefined' && typeof self.postMessage === 'function') {
       console.log(`[Parser Worker] Merge complete: ${merged.name}`);
       self.postMessage({ type: 'merged', genome: merged });
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Parser Worker] Error:', error);
-    self.postMessage({ type: 'error', error: error.message });
+    self.postMessage({ type: 'error', error: error instanceof Error ? error.message : String(error) });
   }
 };
 }

@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { RingData, CircularPlotData } from '@/lib/types';
+import type { RingData } from '@/lib/types';
 
 function createRing(name: string, hitCount: number): RingData {
   return {

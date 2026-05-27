@@ -1,6 +1,45 @@
 
 
+import { useState } from 'react';
 import type { RingConfig, RingData } from '@/lib/types';
+
+/** Small controlled hex input that syncs with external colour state on blur / valid input. */
+function HexInput({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
+  const [local, setLocal] = useState(value);
+  const [focused, setFocused] = useState(false);
+
+  // Sync from parent when not focused (e.g. colour picker changes)
+  const displayed = focused ? local : value;
+
+  return (
+    <input
+      type="text"
+      value={displayed}
+      onChange={(e) => {
+        const v = e.target.value;
+        setLocal(v);
+        if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+          onChange(v.toLowerCase());
+        }
+      }}
+      onFocus={() => { setLocal(value); setFocused(true); }}
+      onBlur={(e) => {
+        setFocused(false);
+        let v = e.target.value.trim();
+        if (!v.startsWith('#')) v = '#' + v;
+        if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+          onChange(v.toLowerCase());
+        }
+        // Reset local to current canonical value
+        setLocal(value);
+      }}
+      className="input-field text-xs font-mono w-20 flex-shrink-0"
+      placeholder="#000000"
+      maxLength={7}
+      title="Hex colour code"
+    />
+  );
+}
 
 interface RingConfigurationProps {
   rings: RingConfig[];
@@ -124,9 +163,13 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations, 
                   type="color"
                   value={ring.color}
                   onChange={(e) => updateRing(ring.id, { color: e.target.value })}
-                  className="w-10 h-8 rounded cursor-pointer border-0 p-0"
+                  className="w-8 h-8 rounded cursor-pointer border-0 p-0 flex-shrink-0"
                   style={{ border: '2px solid var(--gx-border)' }}
-                  title="Ring color"
+                  title="Ring colour"
+                />
+                <HexInput
+                  value={ring.color}
+                  onChange={(hex) => updateRing(ring.id, { color: hex })}
                 />
               </div>
               <button

@@ -19,10 +19,21 @@ export interface RenderConfig {
   showLegend?: boolean;
 }
 
+/** View state to apply to the exported SVG so it matches the canvas preview. */
+export interface SVGViewState {
+  zoom: number;
+  panX: number;
+  panY: number;
+  gcLegendPos: { x: number; y: number } | null;
+  ringLegendPos: { x: number; y: number } | null;
+}
+
 export class CircularPlotRenderer {
   private svg: SVGSVGElement | null = null;
   private config: RenderConfig;
   private tooltipCallback?: (info: any) => void;
+  private gcLegendPos: { x: number; y: number } | null = null;
+  private ringLegendPos: { x: number; y: number } | null = null;
 
   constructor(config: RenderConfig) {
     this.config = config;
@@ -61,8 +72,10 @@ export class CircularPlotRenderer {
     _refLength: number
   ) {
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('id', 'reference-ring');
+    group.setAttribute('inkscape:label', 'Reference Ring');
     group.setAttribute('class', 'reference-ring');
-    
+
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     circle.setAttribute('cx', String(cx));
     circle.setAttribute('cy', String(cy));
@@ -84,6 +97,8 @@ export class CircularPlotRenderer {
     ringRadius: number
   ) {
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('id', 'gc-skew-ring');
+    group.setAttribute('inkscape:label', 'GC Skew');
     group.setAttribute('class', 'gc-skew-ring');
     
     // Position GC skew as its own ring
@@ -204,6 +219,8 @@ export class CircularPlotRenderer {
     ringRadius: number
   ) {
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('id', 'gc-content-ring');
+    group.setAttribute('inkscape:label', 'GC Content');
     group.setAttribute('class', 'gc-ring');
     
     // Position GC ring as its own ring outside reference
@@ -329,6 +346,8 @@ export class CircularPlotRenderer {
   ) {
     const width = ringWidth || this.config.ringWidth;
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('id', `ring-graph-${ring.queryId}`);
+    group.setAttribute('inkscape:label', `Graph: ${ring.queryName}`);
     group.setAttribute('class', `ring ring-graph-${ring.queryId}`);
     group.setAttribute('data-query-id', ring.queryId);
 
@@ -426,6 +445,8 @@ export class CircularPlotRenderer {
     ringWidth: number
   ) {
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('id', 'contig-boundaries');
+    group.setAttribute('inkscape:label', 'Contig Boundaries');
     group.setAttribute('class', 'contig-boundaries');
 
     const colors = ['#ef4444', '#3b82f6']; // Alternating red/blue
@@ -510,6 +531,8 @@ export class CircularPlotRenderer {
   ) {
     const width = ringWidth || this.config.ringWidth;
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('id', `ring-${ring.queryId}`);
+    group.setAttribute('inkscape:label', `Ring: ${ring.queryName}`);
     group.setAttribute('class', `ring ring-${ring.queryId}`);
     group.setAttribute('data-query-id', ring.queryId);
     
@@ -615,6 +638,8 @@ export class CircularPlotRenderer {
     }
 
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('id', `annotations-${innerRadius.toFixed(0)}`);
+    group.setAttribute('inkscape:label', 'Annotations');
     group.setAttribute('class', 'annotations');
 
     // Collect label positions for collision detection
@@ -981,21 +1006,22 @@ export class CircularPlotRenderer {
   }
 
   private renderGCLegend(svg: SVGSVGElement, hasGCContent: boolean, hasGCSkew: boolean) {
-    const legendX = 20;
-    const legendY = 20;
+    const legendX = this.gcLegendPos?.x ?? 20;
+    const legendY = this.gcLegendPos?.y ?? 20;
     const fs = this.config.legendFontSize;
     const barW = 120;
     const barH = 10;
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('id', 'gc-legend');
+    group.setAttribute('inkscape:label', 'GC Legend');
     group.setAttribute('class', 'gc-legend');
 
-    // Defs for gradients
-    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-    group.appendChild(defs);
+    // Hoist gradients to the top-level <defs> (for Inkscape compatibility)
+    const topDefs = this.svg?.querySelector('#defs') || null;
 
     let y = legendY + fs;
 
-    // --- GC Content gradient bar (red → green) ---
+    // --- GC Content gradient bar (red -> green) ---
     if (hasGCContent) {
     const gcTitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     gcTitle.setAttribute('x', String(legendX));
@@ -1017,7 +1043,7 @@ export class CircularPlotRenderer {
     gcStop1.setAttribute('offset', '100%');
     gcStop1.setAttribute('stop-color', 'rgb(55, 255, 50)');
     gcGrad.appendChild(gcStop1);
-    defs.appendChild(gcGrad);
+    if (topDefs) { topDefs.appendChild(gcGrad); } // Hoist to top-level defs
 
     const gcBar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     gcBar.setAttribute('x', String(legendX));
@@ -1058,7 +1084,7 @@ export class CircularPlotRenderer {
     y += barH + fs * 2 + 6;
     } // end hasGCContent
 
-    // --- GC Skew gradient bar (purple → green) ---
+    // --- GC Skew gradient bar (purple -> green) ---
     if (hasGCSkew) {
       const skewTitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       skewTitle.setAttribute('x', String(legendX));
@@ -1080,7 +1106,7 @@ export class CircularPlotRenderer {
       skStop1.setAttribute('offset', '100%');
       skStop1.setAttribute('stop-color', '#22c55e');
       skewGrad.appendChild(skStop1);
-      defs.appendChild(skewGrad);
+      if (topDefs) { topDefs.appendChild(skewGrad); } // Hoist to top-level defs
 
       const skewBar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       skewBar.setAttribute('x', String(legendX));
@@ -1119,6 +1145,17 @@ export class CircularPlotRenderer {
       });
     }
 
+    // Transparent background rect so the legend is selectable as a unit in Inkscape
+    const totalHeight = y + barH + fs + 5 - legendY;
+    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bgRect.setAttribute('x', String(legendX - 5));
+    bgRect.setAttribute('y', String(legendY));
+    bgRect.setAttribute('width', String(barW + 10));
+    bgRect.setAttribute('height', String(totalHeight));
+    bgRect.setAttribute('fill', 'white');
+    bgRect.setAttribute('fill-opacity', '0');
+    group.insertBefore(bgRect, group.firstChild);
+
     svg.appendChild(group);
   }
 
@@ -1129,6 +1166,8 @@ export class CircularPlotRenderer {
     refLength: number
   ) {
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('id', 'scale-markers');
+    group.setAttribute('inkscape:label', 'Scale Markers');
     group.setAttribute('class', 'scale-markers');
     
     const numMarkers = 12;
@@ -1180,13 +1219,18 @@ export class CircularPlotRenderer {
 
   private renderRingLegend(svg: SVGSVGElement, rings: RingData[]) {
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('id', 'ring-legend');
+    group.setAttribute('inkscape:label', 'Ring Legend');
     group.setAttribute('class', 'ring-legend');
 
-    const legendX = this.config.width - 200;
-    const legendY = 20;
+    const legendX = this.ringLegendPos?.x ?? (this.config.width - 200);
+    const legendY = this.ringLegendPos?.y ?? 20;
     const fs = this.config.legendFontSize;
     const hasBlastHits = (r: RingData) => r.hits && r.hits.length > 0;
     const isGraphRing = (r: RingData) => r.graphPoints && r.graphPoints.length > 0;
+
+    // Hoist gradients to the top-level <defs> (for Inkscape compatibility)
+    const topDefs = this.svg?.querySelector('#defs') || null;
 
     let y = legendY + fs;
 
@@ -1207,13 +1251,8 @@ export class CircularPlotRenderer {
         const barW = 120;
         const barH = 10;
 
-        // Create a unique gradient definition for this ring
+        // Create a unique gradient definition and hoist to top-level defs
         const gradId = `grad-${ring.queryId}`;
-        let defs = group.querySelector('defs');
-        if (!defs) {
-          defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-          group.insertBefore(defs, group.firstChild);
-        }
         const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
         grad.setAttribute('id', gradId);
         // Gradient: left = low identity (faded), right = high identity (full colour)
@@ -1229,7 +1268,7 @@ export class CircularPlotRenderer {
         stop1.setAttribute('offset', '100%');
         stop1.setAttribute('stop-color', ring.color);
         grad.appendChild(stop1);
-        defs.appendChild(grad);
+        if (topDefs) { topDefs.appendChild(grad); } // Hoist to top-level defs
 
         // Draw gradient bar
         const bar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -1314,17 +1353,40 @@ export class CircularPlotRenderer {
       y += fs; // gap between rings scales with font size
     });
 
+    // Transparent background rect so the legend is selectable as a unit in Inkscape
+    const totalHeight = y - legendY + 5;
+    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bgRect.setAttribute('x', String(legendX - 5));
+    bgRect.setAttribute('y', String(legendY));
+    bgRect.setAttribute('width', '200');
+    bgRect.setAttribute('height', String(totalHeight));
+    bgRect.setAttribute('fill', 'white');
+    bgRect.setAttribute('fill-opacity', '0');
+    group.insertBefore(bgRect, group.firstChild);
+
     svg.appendChild(group);
   }
 
-  render(container: HTMLElement, data: CircularPlotData): SVGSVGElement {
-    // Create SVG
+  render(container: HTMLElement, data: CircularPlotData, viewState?: SVGViewState): SVGSVGElement {
+    // Apply legend positions from view state if provided
+    if (viewState) {
+      this.gcLegendPos = viewState.gcLegendPos;
+      this.ringLegendPos = viewState.ringLegendPos;
+    }
+
+    // Create SVG with Inkscape namespace for layer/group compatibility
     this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    this.svg.setAttribute('xmlns:inkscape', 'http://www.inkscape.org/namespaces/inkscape');
     this.svg.setAttribute('viewBox', `0 0 ${this.config.width} ${this.config.height}`);
     this.svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     this.svg.setAttribute('width', '100%');
     this.svg.setAttribute('height', '100%');
-    
+
+    // Top-level defs for gradients (hoisted from legend groups for Inkscape compatibility)
+    const topDefs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    topDefs.setAttribute('id', 'defs');
+    this.svg.appendChild(topDefs);
+
     // Embed font-family style so exports use sans-serif
     const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
     style.textContent = 'text { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }';
@@ -1332,6 +1394,7 @@ export class CircularPlotRenderer {
 
     // Add white background rect so exports also have white background
     const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bgRect.setAttribute('id', 'background');
     bgRect.setAttribute('width', String(this.config.width));
     bgRect.setAttribute('height', String(this.config.height));
     bgRect.setAttribute('fill', 'white');
@@ -1339,8 +1402,20 @@ export class CircularPlotRenderer {
 
     // Create main content group for zoom/pan transforms
     const mainGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    mainGroup.setAttribute('class', 'main-content');
+    mainGroup.setAttribute('id', 'main-content');
+    mainGroup.setAttribute('inkscape:label', 'Plot Content');
     mainGroup.setAttribute('transform-origin', 'center');
+
+    // Apply zoom/pan transform if view state is provided (matches canvas renderer's transform)
+    if (viewState && (viewState.zoom !== 1 || viewState.panX !== 0 || viewState.panY !== 0)) {
+      const cx = this.config.width / 2;
+      const cy = this.config.height / 2;
+      // Replicate the canvas transform: translate(cx + panX, cy + panY) scale(zoom) translate(-cx, -cy)
+      mainGroup.setAttribute('transform',
+        `translate(${cx + viewState.panX}, ${cy + viewState.panY}) scale(${viewState.zoom}) translate(${-cx}, ${-cy})`
+      );
+    }
+
     this.svg.appendChild(mainGroup);
     
     // Now render everything into mainGroup instead of svg

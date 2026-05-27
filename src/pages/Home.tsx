@@ -58,14 +58,14 @@ export default function Home() {
 
         <main className="flex-1 py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-              <div className="lg:col-span-1 space-y-6 animate-fade-in">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 lg:items-start">
+              <div className="lg:col-span-1 space-y-6 animate-fade-in lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-2">
                 <ReferenceInput referenceFile={referenceFile} onFileChange={handleReferenceFileChange} />
                 <RingsPanel rings={rings} setRings={setRings} onEditAnnotations={handleOpenAnnotationEditor} ringDataList={plotData?.rings} />
                 <ControlPanel params={params} setParams={setParams} isProcessing={isProcessing} referenceFile={referenceFile} rings={rings} plotData={plotData} onRun={handleRun} />
               </div>
 
-              <div className="lg:col-span-2 animate-slide-up">
+              <div className="lg:col-span-2 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto animate-slide-up">
                 <ImagePropertiesPanel imageProperties={imageProperties} onChange={setImageProperties} />
 
                 <div className={`card ${plotExpanded ? 'fixed inset-0 z-50 flex flex-col' : ''}`} style={plotExpanded ? { background: 'var(--gx-bg-alt)', borderRadius: 0 } : undefined}>

@@ -19,6 +19,8 @@ export default tseslint.config(
       "dist/**",
       ".next/**",
       "out/**",
+      ".pixi/**",
+      "public/wasm/**",
       "jest.config.js",
       "jest.setup.js",
       "tailwind.config.ts",
@@ -26,3 +28,4 @@ export default tseslint.config(
     ],
   }
 );
+

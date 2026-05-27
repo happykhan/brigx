@@ -55,6 +55,11 @@ export class CanvasPlotRenderer {
     this.ringLegendPos = other.ringLegendPos;
   }
 
+  /** Return the current legend positions (for threading to the SVG export renderer). */
+  getLegendPositions(): { gcLegendPos: { x: number; y: number } | null; ringLegendPos: { x: number; y: number } | null } {
+    return { gcLegendPos: this.gcLegendPos, ringLegendPos: this.ringLegendPos };
+  }
+
   render(canvas: HTMLCanvasElement, data: CircularPlotData, zoom: number = 1, panX: number = 0, panY: number = 0): void {
     this.canvas = canvas;
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;

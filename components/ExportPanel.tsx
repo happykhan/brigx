@@ -5,13 +5,15 @@ import toast from 'react-hot-toast';
 import type { CircularPlotData } from '@/lib/types';
 import { CircularPlotRenderer } from '@/lib/renderer';
 import type { ImagePropertiesConfig } from './ImageProperties';
+import type { PlotViewState } from './CircularPlot';
 
 interface ExportPanelProps {
   plotData: CircularPlotData;
   imageProperties: ImagePropertiesConfig;
+  viewState?: PlotViewState | null;
 }
 
-export default function ExportPanel({ plotData, imageProperties }: ExportPanelProps) {
+export default function ExportPanel({ plotData, imageProperties, viewState }: ExportPanelProps) {
   const [isExporting, setIsExporting] = useState(false);
   const exportSVG = () => {
     // Create temporary container
@@ -37,7 +39,17 @@ export default function ExportPanel({ plotData, imageProperties }: ExportPanelPr
       showLegend: imageProperties.showLegend
     });
 
-    renderer.render(container, plotData);
+    // Thread the current view state (zoom, pan, legend positions) so the SVG
+    // matches what the user sees in the canvas preview.
+    const exportViewState = viewState ? {
+      zoom: viewState.zoom,
+      panX: viewState.panX,
+      panY: viewState.panY,
+      gcLegendPos: viewState.gcLegendPos,
+      ringLegendPos: viewState.ringLegendPos,
+    } : undefined;
+
+    renderer.render(container, plotData, exportViewState);
     const svgString = renderer.exportSVG();
 
     // Download
@@ -79,7 +91,15 @@ export default function ExportPanel({ plotData, imageProperties }: ExportPanelPr
         showLegend: imageProperties.showLegend
       });
 
-      renderer.render(container, plotData);
+      const pngViewState = viewState ? {
+        zoom: viewState.zoom,
+        panX: viewState.panX,
+        panY: viewState.panY,
+        gcLegendPos: viewState.gcLegendPos,
+        ringLegendPos: viewState.ringLegendPos,
+      } : undefined;
+
+      renderer.render(container, plotData, pngViewState);
       const svgString = renderer.exportSVG();
 
       // Convert SVG to PNG

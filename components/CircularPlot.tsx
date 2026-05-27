@@ -5,9 +5,19 @@ import type { CircularPlotData } from '@/lib/types';
 import type { ImagePropertiesConfig } from './ImageProperties';
 import { CanvasPlotRenderer } from '@/lib/canvas-renderer';
 
+/** View state exposed by CircularPlot so the export panel can reproduce the same view. */
+export interface PlotViewState {
+  zoom: number;
+  panX: number;
+  panY: number;
+  gcLegendPos: { x: number; y: number } | null;
+  ringLegendPos: { x: number; y: number } | null;
+}
+
 interface CircularPlotProps {
   data: CircularPlotData;
   imageProperties: ImagePropertiesConfig;
+  onViewStateChange?: (state: PlotViewState) => void;
 }
 
 interface TooltipInfo {
@@ -30,7 +40,7 @@ interface TooltipInfo {
   y: number;
 }
 
-export default function CircularPlot({ data, imageProperties }: CircularPlotProps) {
+export default function CircularPlot({ data, imageProperties, onViewStateChange }: CircularPlotProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<CanvasPlotRenderer | null>(null);
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
@@ -50,6 +60,24 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
   propsRef.current = imageProperties;
   zoomRef.current = zoom;
   panRef.current = pan;
+
+  const onViewStateChangeRef = useRef(onViewStateChange);
+  onViewStateChangeRef.current = onViewStateChange;
+
+  /** Emit current view state to parent (for SVG export). */
+  const emitViewState = useCallback(() => {
+    const cb = onViewStateChangeRef.current;
+    if (!cb) return;
+    const renderer = rendererRef.current;
+    const legendPos = renderer ? renderer.getLegendPositions() : { gcLegendPos: null, ringLegendPos: null };
+    cb({
+      zoom: zoomRef.current,
+      panX: panRef.current.x,
+      panY: panRef.current.y,
+      gcLegendPos: legendPos.gcLegendPos,
+      ringLegendPos: legendPos.ringLegendPos,
+    });
+  }, []);
 
   // Render at the container's actual pixel size, preserving zoom/pan
   const renderAtSize = useCallback(() => {
@@ -95,7 +123,8 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
     canvas.style.width = cssSize + 'px';
     canvas.style.height = cssSize + 'px';
     rendererRef.current = renderer;
-  }, []);
+    emitViewState();
+  }, [emitViewState]);
 
   // Re-render on data/config change
   useEffect(() => {
@@ -120,7 +149,8 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
     if (rendererRef.current) {
       rendererRef.current.redraw(zoom, pan.x, pan.y);
     }
-  }, [zoom, pan]);
+    emitViewState();
+  }, [zoom, pan, emitViewState]);
 
   const getCanvasCoords = (e: React.MouseEvent) => {
     const canvas = canvasRef.current;
@@ -161,6 +191,7 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
       rendererRef.current.moveLegend(draggingLegend, dx * scale, dy * scale, zoom);
       setLegendDragStart({ x: e.clientX, y: e.clientY });
       rendererRef.current.redraw(zoom, pan.x, pan.y);
+      emitViewState();
       return;
     }
 

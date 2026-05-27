@@ -1,7 +1,9 @@
 
+import { useState as useReactState, useCallback } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { NavBar, AppFooter, LogConsole } from '@genomicx/ui';
 import CircularPlot from '@/components/CircularPlot';
+import type { PlotViewState } from '@/components/CircularPlot';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ExportPanel from '@/components/ExportPanel';
 import AnnotationEditor from '@/components/AnnotationEditor';
@@ -23,6 +25,11 @@ export default function Home() {
     handleReferenceFileChange, handleAnnotationsChange, handleOpenAnnotationEditor,
     handleRun, handleSaveSession, handleLoadSession,
   } = useBRIGController();
+
+  const [plotViewState, setPlotViewState] = useReactState<PlotViewState | null>(null);
+  const handleViewStateChange = useCallback((state: PlotViewState) => {
+    setPlotViewState(state);
+  }, []);
 
   return (
     <>
@@ -84,14 +91,14 @@ export default function Home() {
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
                         )}
                       </button>
-                      {plotData && <ExportPanel plotData={plotData} imageProperties={imageProperties} />}
+                      {plotData && <ExportPanel plotData={plotData} imageProperties={imageProperties} viewState={plotViewState} />}
                     </div>
                   </div>
 
                   {plotData ? (
                     <div className={plotExpanded ? 'flex-1 min-h-0' : ''}>
                       <ErrorBoundary>
-                        <CircularPlot data={{ ...plotData, reference: { ...plotData.reference, gcContent: params.showGCContent !== false ? plotData.reference.gcContent : undefined, gcSkew: params.showGCSkew !== false ? plotData.reference.gcSkew : undefined } }} imageProperties={imageProperties} />
+                        <CircularPlot data={{ ...plotData, reference: { ...plotData.reference, gcContent: params.showGCContent !== false ? plotData.reference.gcContent : undefined, gcSkew: params.showGCSkew !== false ? plotData.reference.gcSkew : undefined } }} imageProperties={imageProperties} onViewStateChange={handleViewStateChange} />
                       </ErrorBoundary>
                     </div>
                   ) : (

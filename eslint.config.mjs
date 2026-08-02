@@ -17,6 +17,7 @@ export default tseslint.config(
       "__tests__/**",
       "node_modules/**",
       "dist/**",
+      "desktop-dist/**",
       ".next/**",
       "out/**",
       ".pixi/**",
@@ -28,4 +29,3 @@ export default tseslint.config(
     ],
   }
 );
-

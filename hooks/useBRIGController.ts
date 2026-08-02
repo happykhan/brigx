@@ -1,16 +1,47 @@
 
 
-import { useState, useEffect, useRef, useReducer } from 'react';
+import { useState, useEffect, useRef, useReducer, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import type { PipelineParams, ProgressUpdate, RingConfig, Annotation } from '@/lib/types';
+import type {
+  DesktopOpenProjectResult,
+  DesktopRecentProject,
+} from '@/desktop/contracts';
 import { APP_VERSION } from '@/lib/version';
 import type { BRIGController as BRIGControllerType } from '@/lib/controller';
 import { exportSession, importSession } from '@/lib/session';
+import {
+  buildDesktopProjectRequest,
+  desktopProjectFingerprint,
+  restoreDesktopFiles,
+} from '@/lib/desktopBridge';
+import { saveBlob } from '@/lib/download';
+import { importPlotData } from '@/lib/plotValidation';
 import { readFileText } from '@/lib/fileAccess';
 import { extractReferenceAnnotationFile } from '@/lib/featureParser';
 import { INITIAL_PLOT_STATE, plotStateReducer } from '@/lib/plotState';
 import type { ImagePropertiesConfig } from '@/components/ImageProperties';
 import { useConsoleCapture } from './useConsoleCapture';
+
+const DEFAULT_PARAMS: PipelineParams = {
+  minIdentity: 70,
+  minAlignmentLength: 1000,
+  colorScheme: 'blue-red',
+  forceAlignment: false,
+  alignerOptions: '',
+};
+
+const DEFAULT_IMAGE_PROPERTIES: ImagePropertiesConfig = {
+  innerRadius: 200,
+  ringWidth: 20,
+  gcRingWidth: 40,
+  ringSpacing: 4,
+  legendFontSize: 16,
+  scaleFontSize: 12,
+  titleFontSize: 24,
+  labelFontSize: 14,
+  title: '',
+};
 
 export function useBRIGController() {
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
@@ -21,28 +52,14 @@ export function useBRIGController() {
   // Store controller instance in ref to persist alignment cache across runs
   const controllerRef = useRef<BRIGControllerType | null>(null);
   const referenceGenerationRef = useRef(0);
-  const [params, setParams] = useState<PipelineParams>({
-    minIdentity: 70,
-    minAlignmentLength: 1000,
-    colorScheme: 'blue-red',
-    forceAlignment: false,
-    alignerOptions: ''
-  });
+  const [params, setParams] = useState<PipelineParams>({ ...DEFAULT_PARAMS });
   const [progress, setProgress] = useState<ProgressUpdate>({ step: 'idle', percent: 0 });
   const [plotState, dispatchPlot] = useReducer(plotStateReducer, INITIAL_PLOT_STATE);
   const plotData = plotState.displayed;
   const [isProcessing, setIsProcessing] = useState(false);
   const { logs: consoleLogs, clearLogs: clearConsoleLogs } = useConsoleCapture();
   const [imageProperties, setImageProperties] = useState<ImagePropertiesConfig>({
-    innerRadius: 200,
-    ringWidth: 20,
-    gcRingWidth: 40,
-    ringSpacing: 4,
-    legendFontSize: 16,
-    scaleFontSize: 12,
-    titleFontSize: 24,
-    labelFontSize: 14,
-    title: ''
+    ...DEFAULT_IMAGE_PROPERTIES,
   });
 
   // Plot expand state
@@ -58,12 +75,66 @@ export function useBRIGController() {
   referenceAnnotationsRef.current = referenceAnnotations;
   const [referenceAnnotationFileName, setReferenceAnnotationFileName] = useState<string | null>(null);
   const referenceLength = plotData?.reference.length ?? 0;
+  const desktop = typeof window === 'undefined' ? undefined : window.brigxDesktop;
+  const [desktopProjectName, setDesktopProjectName] = useState<string | null>(null);
+  const [desktopRecentProjects, setDesktopRecentProjects] = useState<DesktopRecentProject[]>([]);
+  const [desktopHasRecovery, setDesktopHasRecovery] = useState(false);
+  const [desktopSaving, setDesktopSaving] = useState(false);
+  const [desktopProjectDirty, setDesktopProjectDirty] = useState(false);
+  const [desktopProjectRevision, setDesktopProjectRevision] = useState(0);
+  const savedDesktopFingerprintRef = useRef<string | null>(null);
+  const lastRecoveryFingerprintRef = useRef<string | null>(null);
+  const recoveryTimerRef = useRef<number | null>(null);
+
+  const desktopProjectRequest = useMemo(() => (
+    desktop
+      ? buildDesktopProjectRequest({
+          appVersion: APP_VERSION,
+          referenceFile,
+          rings,
+          ringAnnotations,
+          params,
+          imageProperties,
+          referenceAnnotations,
+          plotData,
+        }, false, 0)
+      : null
+  ), [
+    desktop,
+    referenceFile,
+    rings,
+    ringAnnotations,
+    params,
+    imageProperties,
+    referenceAnnotations,
+    plotData,
+  ]);
+  const desktopFingerprint = useMemo(() => (
+    desktopProjectRequest ? desktopProjectFingerprint(desktopProjectRequest) : null
+  ), [desktopProjectRequest]);
 
   useEffect(() => () => {
     referenceGenerationRef.current += 1;
     controllerRef.current?.cleanup();
     controllerRef.current = null;
   }, []);
+
+  useEffect(() => {
+    if (!desktop || desktopFingerprint === null) return;
+    if (savedDesktopFingerprintRef.current === null) {
+      savedDesktopFingerprintRef.current = desktopFingerprint;
+      setDesktopProjectDirty(false);
+      return;
+    }
+    setDesktopProjectDirty(savedDesktopFingerprintRef.current !== desktopFingerprint);
+  }, [desktop, desktopFingerprint]);
+
+  useEffect(() => {
+    if (!desktop) return;
+    void desktop.setDirtyState(desktopProjectDirty).catch(error => {
+      console.error('[Desktop] Could not update window dirty state:', error);
+    });
+  }, [desktop, desktopProjectDirty]);
 
   // Handle annotation changes
   const handleAnnotationsChange = (ringId: string, annotations: Annotation[]) => {
@@ -300,24 +371,25 @@ export function useBRIGController() {
     }
   };
 
-  const handleSaveSession = () => {
-    const json = exportSession(
-      APP_VERSION,
-      referenceFile?.name || '',
-      rings,
-      ringAnnotations,
-      params,
-      imageProperties,
-      referenceAnnotations,
-    );
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `brigx-session-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Session saved');
+  const handleSaveSession = async () => {
+    try {
+      const json = exportSession(
+        APP_VERSION,
+        referenceFile?.name || '',
+        rings,
+        ringAnnotations,
+        params,
+        imageProperties,
+        referenceAnnotations,
+      );
+      const saved = await saveBlob(
+        new Blob([json], { type: 'application/json' }),
+        `brigx-session-${new Date().toISOString().slice(0, 10)}.json`,
+      );
+      if (saved) toast.success('Session saved');
+    } catch (error) {
+      toast.error(`Failed to save session: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
 
   const handleLoadSession = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -369,6 +441,281 @@ export function useBRIGController() {
     e.target.value = '';
   };
 
+  const applyDesktopProject = useCallback((result: DesktopOpenProjectResult, recovered = false) => {
+    if (result.cancelled) return;
+    if (!result.sessionJson) throw new Error('Project session is missing');
+
+    const session = importSession(result.sessionJson);
+    const restored = restoreDesktopFiles(session, result.files);
+    const restoredAnnotations: Record<string, Annotation[]> = {};
+    for (const ring of session.rings) {
+      if (ring.annotations.length > 0) restoredAnnotations[ring.id] = ring.annotations;
+    }
+    const restoredReferenceAnnotations = session.referenceAnnotations ?? [];
+    const restoredPlot = result.plotJson ? importPlotData(result.plotJson) : null;
+
+    referenceGenerationRef.current += 1;
+    controllerRef.current?.cleanup();
+    controllerRef.current = null;
+    const restoredFingerprint = desktopProjectFingerprint(buildDesktopProjectRequest({
+      appVersion: APP_VERSION,
+      referenceFile: restored.referenceFile,
+      rings: restored.rings,
+      ringAnnotations: restoredAnnotations,
+      params: session.params,
+      imageProperties: session.imageConfig,
+      referenceAnnotations: restoredReferenceAnnotations,
+      plotData: restoredPlot,
+    }, false, 0));
+    const requiresSave = recovered || result.issues.length > 0;
+    savedDesktopFingerprintRef.current = requiresSave
+      ? `unpersisted:${restoredFingerprint}`
+      : restoredFingerprint;
+    lastRecoveryFingerprintRef.current = recovered ? restoredFingerprint : null;
+    setDesktopProjectDirty(requiresSave);
+    setReferenceFile(restored.referenceFile);
+    setRings(restored.rings);
+    setRingAnnotations(restoredAnnotations);
+    setReferenceAnnotations(restoredReferenceAnnotations);
+    setReferenceAnnotationFileName(
+      restoredReferenceAnnotations.length > 0 ? 'Loaded from project' : null,
+    );
+    setParams(session.params);
+    setImageProperties(session.imageConfig);
+    dispatchPlot(restoredPlot ? { type: 'replace', data: restoredPlot } : { type: 'clear' });
+    setProgress(restoredPlot
+      ? { step: 'Project restored', percent: 100 }
+      : { step: 'Project files restored', percent: 0 });
+    setDesktopProjectName(recovered ? 'Recovered session' : (result.displayName ?? null));
+    setDesktopProjectRevision(value => value + 1);
+
+    if (result.issues.length > 0) {
+      toast.error(
+        `Project opened, but ${result.issues.length} input file(s) could not be restored. ${result.issues.join('; ')}`,
+        { duration: 10_000 },
+      );
+    } else {
+      toast.success(recovered ? 'Recovered the last autosaved session' : 'Project opened');
+    }
+  }, []);
+
+  const refreshDesktopProjectState = useCallback(async () => {
+    if (!desktop) return;
+    const [recent, hasRecovery] = await Promise.all([
+      desktop.listRecentProjects(),
+      desktop.hasRecoverySnapshot(),
+    ]);
+    setDesktopRecentProjects(recent);
+    setDesktopHasRecovery(hasRecovery);
+  }, [desktop]);
+
+  const confirmReplaceDesktopProject = useCallback(() => (
+    !desktopProjectDirty
+    || window.confirm('Discard unsaved changes and open another BRIGX project?')
+  ), [desktopProjectDirty]);
+
+  const handleDesktopNew = useCallback(async () => {
+    if (!desktop || !confirmReplaceDesktopProject()) return;
+    try {
+      await desktop.startNewProject();
+    } catch (error) {
+      toast.error(`Failed to start a new project: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+    referenceGenerationRef.current += 1;
+    controllerRef.current?.cleanup();
+    controllerRef.current = null;
+    const emptyRequest = buildDesktopProjectRequest({
+      appVersion: APP_VERSION,
+      referenceFile: null,
+      rings: [],
+      ringAnnotations: {},
+      params: DEFAULT_PARAMS,
+      imageProperties: DEFAULT_IMAGE_PROPERTIES,
+      referenceAnnotations: [],
+      plotData: null,
+    }, false, 0);
+    savedDesktopFingerprintRef.current = desktopProjectFingerprint(emptyRequest);
+    lastRecoveryFingerprintRef.current = null;
+    setReferenceFile(null);
+    setRings([]);
+    setRingAnnotations({});
+    setReferenceAnnotations([]);
+    setReferenceAnnotationFileName(null);
+    setParams({ ...DEFAULT_PARAMS });
+    setImageProperties({ ...DEFAULT_IMAGE_PROPERTIES });
+    dispatchPlot({ type: 'clear' });
+    setProgress({ step: 'idle', percent: 0 });
+    setDesktopProjectName(null);
+    setDesktopProjectDirty(false);
+    setDesktopProjectRevision(value => value + 1);
+    try {
+      await desktop.clearRecoverySnapshot();
+      setDesktopHasRecovery(false);
+    } catch (error) {
+      console.warn('[Desktop] New project created, but recovery data could not be cleared:', error);
+    }
+    toast.success('New project created');
+  }, [confirmReplaceDesktopProject, desktop]);
+
+  const handleDesktopOpen = useCallback(async () => {
+    if (!desktop || !confirmReplaceDesktopProject()) return;
+    try {
+      applyDesktopProject(await desktop.openProject());
+      await refreshDesktopProjectState();
+    } catch (error) {
+      toast.error(`Failed to open project: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [applyDesktopProject, confirmReplaceDesktopProject, desktop, refreshDesktopProjectState]);
+
+  const handleDesktopOpenRecent = useCallback(async (id: string) => {
+    if (!desktop || !confirmReplaceDesktopProject()) return;
+    try {
+      applyDesktopProject(await desktop.openRecentProject(id));
+      await refreshDesktopProjectState();
+    } catch (error) {
+      toast.error(`Failed to open recent project: ${error instanceof Error ? error.message : String(error)}`);
+      await refreshDesktopProjectState().catch(() => undefined);
+    }
+  }, [applyDesktopProject, confirmReplaceDesktopProject, desktop, refreshDesktopProjectState]);
+
+  const handleDesktopRecover = useCallback(async () => {
+    if (!desktop || !confirmReplaceDesktopProject()) return;
+    try {
+      applyDesktopProject(await desktop.openRecoverySnapshot(), true);
+    } catch (error) {
+      toast.error(`Failed to recover session: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [applyDesktopProject, confirmReplaceDesktopProject, desktop]);
+
+  const saveDesktopProject = useCallback(async (saveAs = false, closeAfterSave = false) => {
+    if (!desktop || !desktopProjectRequest || desktopFingerprint === null) return false;
+    setDesktopSaving(true);
+    try {
+      const session = JSON.parse(desktopProjectRequest.sessionJson) as Record<string, unknown>;
+      session.timestamp = Date.now();
+      const result = await desktop.saveProject({
+        ...desktopProjectRequest,
+        sessionJson: JSON.stringify(session),
+        saveAs,
+      });
+      if (result.cancelled) return false;
+
+      savedDesktopFingerprintRef.current = desktopFingerprint;
+      lastRecoveryFingerprintRef.current = desktopFingerprint;
+      setDesktopProjectDirty(false);
+      setDesktopProjectName(result.displayName ?? desktopProjectName);
+      if (recoveryTimerRef.current !== null) {
+        window.clearTimeout(recoveryTimerRef.current);
+        recoveryTimerRef.current = null;
+      }
+      try {
+        await desktop.clearRecoverySnapshot();
+        setDesktopHasRecovery(false);
+      } catch (error) {
+        console.warn('[Desktop] Project saved, but the recovery snapshot could not be cleared:', error);
+      }
+      try {
+        setDesktopRecentProjects(await desktop.listRecentProjects());
+      } catch (error) {
+        console.warn('[Desktop] Project saved, but recent projects could not be refreshed:', error);
+      }
+      toast.success(`Project saved${result.displayName ? ` as ${result.displayName}` : ''}`);
+      if (closeAfterSave) await desktop.closeAfterSave();
+      return true;
+    } catch (error) {
+      toast.error(`Failed to save project: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    } finally {
+      setDesktopSaving(false);
+    }
+  }, [desktop, desktopFingerprint, desktopProjectName, desktopProjectRequest]);
+
+  useEffect(() => {
+    if (!desktop) return;
+    void refreshDesktopProjectState().catch(error => {
+      console.error('[Desktop] Could not read project recovery state:', error);
+    });
+  }, [desktop, refreshDesktopProjectState]);
+
+  useEffect(() => {
+    if (!desktop) return;
+    return desktop.onMenuAction(action => {
+      switch (action.type) {
+        case 'new-project':
+          void handleDesktopNew();
+          break;
+        case 'open-project':
+          void handleDesktopOpen();
+          break;
+        case 'open-recent':
+          void handleDesktopOpenRecent(action.id);
+          break;
+        case 'save-project':
+          void saveDesktopProject(false);
+          break;
+        case 'save-project-as':
+          void saveDesktopProject(true);
+          break;
+        case 'save-and-close':
+          void saveDesktopProject(false, true);
+          break;
+        case 'recover-project':
+          void handleDesktopRecover();
+          break;
+      }
+    });
+  }, [
+    desktop,
+    handleDesktopNew,
+    handleDesktopOpen,
+    handleDesktopOpenRecent,
+    handleDesktopRecover,
+    saveDesktopProject,
+  ]);
+
+  useEffect(() => {
+    if (
+      !desktop
+      || !desktopProjectRequest
+      || desktopFingerprint === null
+      || !desktopProjectDirty
+      || isProcessing
+      || (!referenceFile && rings.length === 0 && !plotData)
+      || lastRecoveryFingerprintRef.current === desktopFingerprint
+    ) return;
+
+    recoveryTimerRef.current = window.setTimeout(() => {
+      recoveryTimerRef.current = null;
+      void desktop.saveRecoverySnapshot(desktopProjectRequest).then(() => {
+        lastRecoveryFingerprintRef.current = desktopFingerprint;
+        setDesktopHasRecovery(true);
+      }).catch(error => {
+        console.error('[Desktop] Recovery snapshot failed:', error);
+      });
+    }, 1_500);
+    return () => {
+      if (recoveryTimerRef.current !== null) {
+        window.clearTimeout(recoveryTimerRef.current);
+        recoveryTimerRef.current = null;
+      }
+    };
+  }, [
+    desktop,
+    desktopFingerprint,
+    desktopProjectDirty,
+    desktopProjectRequest,
+    isProcessing,
+    plotData,
+    referenceFile,
+    rings.length,
+  ]);
+
+  useEffect(() => {
+    if (!desktop) return;
+    document.title = `${desktopProjectDirty ? '• ' : ''}${desktopProjectName ? `${desktopProjectName} — ` : ''}BRIGX`;
+  }, [desktop, desktopProjectDirty, desktopProjectName]);
+
   return {
     // State
     referenceFile,
@@ -392,6 +739,13 @@ export function useBRIGController() {
     referenceAnnotations,
     referenceAnnotationFileName,
     referenceLength,
+    isDesktop: Boolean(desktop),
+    desktopProjectName,
+    desktopRecentProjects,
+    desktopHasRecovery,
+    desktopSaving,
+    desktopProjectDirty,
+    desktopProjectRevision,
     // Handlers
     handleReferenceFileChange,
     handleAnnotationsChange,
@@ -401,5 +755,11 @@ export function useBRIGController() {
     handleRun,
     handleSaveSession,
     handleLoadSession,
+    handleDesktopOpen,
+    handleDesktopNew,
+    handleDesktopOpenRecent,
+    handleDesktopRecover,
+    handleDesktopSave: () => saveDesktopProject(false),
+    handleDesktopSaveAs: () => saveDesktopProject(true),
   };
 }

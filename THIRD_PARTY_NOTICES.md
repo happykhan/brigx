@@ -38,9 +38,21 @@ The BLAST JavaScript/WebAssembly output includes Emscripten runtime code. Emscri
 
 The production application does not include Handsontable or LAST. BRIGX's annotation editor and circular renderer are first-party code.
 
+## Desktop runtime
+
+The optional desktop edition is packaged with Electron 43.2.0. That distribution includes Chromium 150 and Node.js 24.18.0, plus their transitive libraries. Electron is MIT-licensed; Chromium, Node.js, and their dependencies use several permissive open-source licences. Each packaged Electron distribution includes its complete `LICENSE` and `LICENSES.chromium.html` files.
+
+| Component | Purpose | Licence and notices | Source |
+|---|---|---|---|
+| `electron` | Sandboxed desktop application runtime | MIT; bundled Chromium notices | https://github.com/electron/electron |
+| Chromium | Rendering and Web Platform runtime | BSD-style and component-specific licences | https://www.chromium.org/Home/ |
+| Node.js | Main-process runtime; not exposed to BRIGX web content | MIT and bundled third-party licences | https://github.com/nodejs/node |
+
+Electron Forge, Electron Packager, Electron Fuses, esbuild, and the platform-specific makers are build-time tools. They are installed from the exact versions in `package-lock.json` and are not shipped as executable JavaScript inside the application archive. The fuses are applied to the packaged Electron executable during release builds.
+
 ## Build and test tooling
 
-BRIGX is built and tested with open-source tools including TypeScript, Vite, Tailwind CSS, ESLint, Vitest, Testing Library, jsdom, and Playwright. Their package manifests and licence files are installed by npm for development and CI; they are not production runtime dependencies.
+BRIGX is built and tested with open-source tools including TypeScript, Vite, Tailwind CSS, ESLint, Vitest, Testing Library, jsdom, Playwright, Electron Forge, Electron Fuses, and esbuild. Their package manifests and licence files are installed by npm for development and CI; except for the fuses applied to Electron, they are not production runtime dependencies.
 
 ## Example and test data
 

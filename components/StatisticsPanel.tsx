@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import type { CircularPlotData } from '@/lib/types';
+import { saveBlob } from '@/lib/download';
 
 /** Inline info icon that shows a tooltip on hover/click. */
 function InfoTip({ text }: { text: string }) {
@@ -74,15 +75,17 @@ export default function StatisticsPanel({ plotData }: StatisticsPanelProps) {
                   {ring.alignmentOutput && (
                     <button
                       onClick={() => {
-                        const header = '#query\tsubject\t%identity\talignment_length\tmismatches\tgap_opens\tq.start\tq.end\ts.start\ts.end\tevalue\tbit_score\n';
-                        const blob = new Blob([header + ring.alignmentOutput!], { type: 'text/plain' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `${ring.queryName}_alignment.txt`;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                        toast.success(`Downloaded alignment results for ${ring.queryName}`);
+                        void (async () => {
+                          try {
+                            const header = '#query\tsubject\t%identity\talignment_length\tmismatches\tgap_opens\tq.start\tq.end\ts.start\ts.end\tevalue\tbit_score\n';
+                            const blob = new Blob([header + ring.alignmentOutput!], { type: 'text/plain' });
+                            if (await saveBlob(blob, `${ring.queryName}_alignment.txt`)) {
+                              toast.success(`Saved alignment results for ${ring.queryName}`);
+                            }
+                          } catch (error) {
+                            toast.error(`Could not save alignment results: ${error instanceof Error ? error.message : String(error)}`);
+                          }
+                        })();
                       }}
                       className="btn-secondary text-xs px-2 py-1"
                     >

@@ -21,13 +21,14 @@ export default function BugReportModal({ onClose }: BugReportModalProps) {
             <p className="font-semibold">Please include:</p>
             <ol className="list-decimal pl-5 space-y-1" style={{ color: 'var(--gx-text-muted)' }}>
               <li>A description of what happened and what you expected</li>
-              <li>Your input files (reference + query genomes)</li>
-              <li>Saved session file (use &quot;Save Session&quot; button)</li>
+              <li>A minimised or synthetic reproducer, if the problem depends on input data</li>
+              <li>A saved session or project containing only safe test data, if relevant</li>
               <li>Debug console output (copy from the Debug Console panel)</li>
               <li>Browser name and version</li>
             </ol>
           </div>
           <p className="text-xs" style={{ color: 'var(--gx-text-muted)' }}>
+            Never email confidential, embargoed, patient-identifiable, or otherwise sensitive genome data.{' '}
             You can also open an issue on <a href="https://github.com/happykhan/brigx/issues" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gx-accent)', textDecoration: 'underline' }}>GitHub</a>.
           </p>
         </div>

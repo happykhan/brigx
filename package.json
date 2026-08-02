@@ -1,9 +1,11 @@
 {
     "name": "brig-web",
+    "productName": "BRIGX",
     "version": "0.6.30",
     "description": "Browser-based circular genome comparison tool — BLAST Ring Image Generator in the browser",
     "private": true,
     "type": "module",
+    "main": "desktop-dist/main.cjs",
     "engines": {
         "node": ">=24 <25"
     },
@@ -28,7 +30,16 @@
         "version:minor": "npm version minor --no-git-tag-version",
         "test:coverage": "vitest run --coverage",
         "test:e2e": "playwright test",
-        "verify": "npm run lint && npm run quality:architecture && npm run quality:licenses && npm run quality:security && npm test && npm run build && npm run test:e2e"
+        "desktop:build:main": "esbuild desktop/main.ts desktop/preload.ts --bundle --platform=node --format=cjs --external:electron --outdir=desktop-dist --out-extension:.js=.cjs --sourcemap --target=node24",
+        "desktop:build": "npm run build && npm run desktop:build:main",
+        "desktop:dev": "node scripts/desktop-dev.mjs",
+        "desktop:start": "npm run desktop:build && electron .",
+        "desktop:test": "npm run desktop:build && playwright test --config=playwright.electron.config.ts",
+        "desktop:package": "npm run desktop:build && electron-forge package",
+        "desktop:make": "npm run desktop:build && electron-forge make",
+        "verify": "npm run lint && npm run quality:architecture && npm run quality:licenses && npm run quality:security && npm test && npm run build && npm run test:e2e",
+        "verify:desktop": "npm run desktop:test && npm run desktop:package",
+        "verify:all": "npm run verify && npm run verify:desktop"
     },
     "dependencies": {
         "@genomicx/ui": "0.9.1",
@@ -39,16 +50,26 @@
         "react-router-dom": "7.18.2"
     },
     "devDependencies": {
+        "@electron-forge/cli": "7.11.2",
+        "@electron-forge/maker-deb": "7.11.2",
+        "@electron-forge/maker-dmg": "7.11.2",
+        "@electron-forge/maker-rpm": "7.11.2",
+        "@electron-forge/maker-squirrel": "7.11.2",
+        "@electron-forge/maker-zip": "7.11.2",
+        "@electron-forge/plugin-fuses": "7.11.2",
+        "@electron/fuses": "2.1.3",
         "@eslint/js": "9.39.5",
         "@playwright/test": "1.62.1",
         "@tailwindcss/vite": "4.3.3",
         "@testing-library/jest-dom": "6.9.1",
-        "@types/node": "22.20.1",
+        "@types/node": "24.13.3",
         "@types/pako": "2.0.4",
         "@types/react": "19.2.18",
         "@types/react-dom": "19.2.4",
         "@vitejs/plugin-react": "4.7.0",
         "@vitest/coverage-v8": "3.2.7",
+        "electron": "43.2.0",
+        "esbuild": "0.28.1",
         "eslint": "9.39.5",
         "jsdom": "26.1.0",
         "tailwindcss": "4.3.3",
@@ -58,6 +79,8 @@
         "vitest": "3.2.7"
     },
     "overrides": {
-        "dompurify": "3.4.12"
+        "dompurify": "3.4.12",
+        "tar": "7.5.22",
+        "tmp": "0.2.7"
     }
 }

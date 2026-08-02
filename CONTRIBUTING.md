@@ -1,103 +1,63 @@
-# Contributing to BRIGx
+# Contributing to BRIGX
 
-Thank you for your interest in contributing to BRIGx — a browser-based tool for generating BRIG-style circular genome comparison plots entirely in the browser using WebAssembly.
+BRIGX is a local-first React, TypeScript, WebAssembly, and Electron application. Contributions are welcome through GitHub issues and pull requests.
 
 ## Prerequisites
 
-- **Node.js 24 LTS** (see `.nvmrc` and `.node-version`)
-- **npm** (use the version bundled with Node.js 24)
-- A modern browser for manual testing (Chrome or Firefox recommended)
+- Node.js 24 LTS, matching `.nvmrc` and `.node-version`
+- npm bundled with Node.js 24
+- Chromium for browser end-to-end tests
+- The platform packaging tools listed in `DESKTOP.md` when building installers
 
-## Getting Started
-
-1. **Fork and clone the repository**
-
-   ```bash
-   git clone https://github.com/happykhan/BRIGx.git
-   cd BRIGx
-   ```
-
-2. **Install dependencies**
-
-   ```bash
-   npm install
-   ```
-
-3. **Start the development server**
-
-   ```bash
-   npm run dev
-   ```
-
-   The app will be available at [http://localhost:3000](http://localhost:3000). Changes to source files are reflected immediately via hot reload.
-
-## Running Tests
+Install the committed dependency graph with:
 
 ```bash
-npm test
+npm ci
 ```
 
-To run tests in watch mode (re-runs on file changes):
+Do not replace `package-lock.json` with an unreviewed dependency resolution.
+
+## Development
 
 ```bash
-npm run test:watch
+npm run dev             # Web app at http://localhost:5173
+npm run desktop:dev     # Electron shell with hot reload
 ```
 
-Tests live in `__tests__/` and use Jest with `jest-environment-jsdom`.
+The web and desktop editions share the renderer and the BLAST WebAssembly engine. Keep browser-only and Electron-only behaviour behind the narrow `window.brigxDesktop` bridge; renderer code must never import Electron or Node.js runtime modules.
 
-## Linting
+## Verification
 
 ```bash
 npm run lint
-```
-
-Please ensure there are no new lint errors before opening a PR. Lint warnings for `@typescript-eslint/no-explicit-any` are acceptable in the short term but should be addressed progressively.
-
-## Building
-
-```bash
+npm run quality:architecture
+npm run quality:licenses
+npm run quality:security
+npm test
 npm run build
+npm run test:e2e
+npm run desktop:test
+npm run desktop:package
 ```
 
-BRIGx uses `next build` with static export (`output: 'export'`). The built output is placed in `out/`. Always verify the build succeeds before submitting a PR.
+`npm run verify` covers the web release gates. `npm run verify:desktop` covers the Electron workflow and current-platform package. `npm run verify:all` runs both.
 
-## Pull Request Process
+Tests live in `__tests__/`, `tests/e2e/`, and `tests/electron/`. Changes to file parsing, rendering, workers, project persistence, preload IPC, CSP, or packaging require regression coverage at the appropriate layer.
 
-1. Create a feature branch from `main`:
+## Pull requests
 
-   ```bash
-   git checkout -b feat/my-feature
-   ```
+1. Branch from `master`.
+2. Keep commits focused and explain the user-visible or scientific effect.
+3. Run the relevant verification commands above.
+4. Open a pull request against `master` and include testing evidence.
+5. Do not commit secrets, signing credentials, private genome data, generated packages, or test reports.
 
-2. Make your changes with focused, well-described commits.
+Use functional React components and strict TypeScript types. Preserve the Electron defaults of sandboxing, context isolation, no renderer Node integration, denied permissions, and allowlisted IPC. Do not weaken CSP or expose filesystem paths to the renderer without a documented security review.
 
-3. Ensure tests pass (`npm test`) and lint is clean (`npm run lint`).
+## Data and bug reports
 
-4. Verify the production build succeeds (`npm run build`).
+Never attach confidential, embargoed, patient-identifiable, or otherwise sensitive genome data. Use a minimised, synthetic, or public reproducer and remove sensitive local paths from `.brigx` files before sharing them.
 
-5. Open a pull request against `main` on GitHub. Fill in the PR template with:
-   - A clear description of what changed and why
-   - Any relevant issue numbers (e.g. `Closes #42`)
-   - Notes on manual testing performed
+## Licence and notices
 
-6. A maintainer will review your PR. Please respond to review comments promptly.
-
-## Code Style
-
-- **TypeScript** is used throughout. Avoid `any` types where possible — use proper interfaces or generics instead.
-- **React** components live in `components/`. Use functional components with hooks; avoid class components unless implementing an error boundary.
-- **Formatting**: The project does not currently enforce Prettier — aim for consistency with the surrounding code (2-space indentation, single quotes in TS/TSX).
-- **Comments**: Comment non-obvious logic, especially in `lib/` where geometry and rendering code can be complex.
-- **WASM/Workers**: WebAssembly binaries and web workers live in `public/` and `workers/` respectively. Changes here require extra care as they interact with browser APIs.
-
-## Benchmarks
-
-Development benchmark scripts (Python) live in `benchmarks/`. These are not part of the application and are not required for normal development.
-
-## Reporting Bugs
-
-Please use the GitHub issue tracker and fill in the bug report template. Include steps to reproduce, expected behaviour, and actual behaviour. Attaching sample FASTA/genome files (or a minimal reproducer) is very helpful.
-
-## Feature Requests
-
-Open a GitHub issue using the feature request template. Describe the use case, not just the implementation — this helps maintainers understand the need.
+BRIGX is GPL-3.0. New runtime dependencies need an approved entry in `scripts/check-licenses.mjs`, a notice in `THIRD_PARTY_NOTICES.md`, and an About-page disclosure when applicable. Release packages must retain the BRIGX licence, third-party notices, Electron licence files, and a link to the exact corresponding source tag.

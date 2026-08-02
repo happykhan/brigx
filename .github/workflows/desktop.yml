@@ -1,0 +1,137 @@
+name: Desktop
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+    tags: ['v*']
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  electron-test:
+    name: Electron integration tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install Electron runtime libraries
+        run: npx playwright install --with-deps chromium
+
+      - name: Test the desktop shell and scientific workflow
+        run: xvfb-run --auto-servernum npm run desktop:test
+
+  package:
+    name: Package ${{ matrix.label }}
+    needs: electron-test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            label: macOS
+            artifact: macos
+          - os: windows-latest
+            label: Windows
+            artifact: windows
+          - os: ubuntu-latest
+            label: Linux
+            artifact: linux
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes fakeroot rpm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Prepare Windows signing certificate
+        if: runner.os == 'Windows' && env.WINDOWS_CERTIFICATE_BASE64 != ''
+        shell: pwsh
+        run: |
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'brigx-signing.pfx'
+          [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
+          "WINDOWS_CERTIFICATE_FILE=$certificatePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build installers
+        run: npm run desktop:make
+
+      - name: Remove temporary Windows signing certificate
+        if: always() && runner.os == 'Windows' && env.WINDOWS_CERTIFICATE_FILE != ''
+        shell: pwsh
+        run: Remove-Item -LiteralPath $env:WINDOWS_CERTIFICATE_FILE -Force
+
+      - name: Attest tagged build provenance
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: '.desktop-artifacts/make/**/*'
+
+      - name: Upload installers
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: BRIGX-${{ matrix.artifact }}-${{ runner.arch }}
+          path: .desktop-artifacts/make/**/*
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+
+  draft-release:
+    name: Create draft release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download packaged installers
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: release-assets
+
+      - name: Create checksums
+        working-directory: release-assets
+        run: find . -type f -print0 | sort -z | xargs -0 shasum -a 256 > SHA256SUMS.txt
+
+      - name: Create a draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mapfile -d '' files < <(find release-assets -type f -print0)
+          gh release create "$RELEASE_TAG" "${files[@]}" \
+            --draft \
+            --verify-tag \
+            --generate-notes \
+            --title "BRIGX $RELEASE_TAG"

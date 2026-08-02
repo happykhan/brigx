@@ -9,9 +9,10 @@ function ExternalLink({ href, children }: { href: string; children: React.ReactN
 }
 
 export default function AboutPage() {
+  const desktop = typeof window === 'undefined' ? undefined : window.brigxDesktop;
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--gx-bg)' }}>
-      <NavBar appName="BRIGX" appSubtitle="Browser-based Ring Image Generator" version={APP_VERSION} />
+      <NavBar appName="BRIGX" appSubtitle={desktop ? 'Offline Desktop Ring Image Generator' : 'Browser-based Ring Image Generator'} version={APP_VERSION} />
 
       <main className="flex-grow py-12">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -21,22 +22,31 @@ export default function AboutPage() {
             <div className="max-w-none">
               <h2 className="text-2xl font-semibold mt-6 mb-4">Overview</h2>
               <p className="mb-4">
-                BRIGX (BLAST Ring Image Generator eXtended) is a browser-based comparative genomics tool.
+                BRIGX (BLAST Ring Image Generator eXtended) is a free, open-source comparative genomics tool
+                available for the web and as an offline desktop application.
                 It creates interactive circular genome comparison plots inspired by the original BRIG application,
                 with publication-ready SVG and PNG export.
               </p>
 
               <h2 className="text-2xl font-semibold mt-8 mb-4">Data handling and privacy</h2>
               <p className="mb-4">
-                Genome and annotation files are processed locally in your browser. BRIGX does not upload file
-                contents to an analysis server, and the BLAST WebAssembly modules are served as versioned assets
-                from the same site. This release contains no accounts, cloud storage, advertising, or analytics.
+                Genome and annotation files are processed locally {desktop ? 'on this computer' : 'in your browser'}.
+                BRIGX does not upload file contents to an analysis server. This release contains no accounts,
+                cloud storage, advertising, telemetry, or analytics.
               </p>
-              <p className="mb-4">
-                As with any website, the hosting provider may receive ordinary request metadata such as IP address,
-                browser information, requested asset, and time of access. If a future edition adds cloud storage or
-                accounts, its privacy notice and retention controls must be updated before that feature is enabled.
-              </p>
+              {desktop ? (
+                <p className="mb-4">
+                  Desktop project files store settings, completed plot data, SHA-256 checksums, and local paths to
+                  source files; they do not copy genome contents into the project. Treat a <code>.brigx</code> file as
+                  potentially sensitive because its paths and filenames may reveal information about your computer
+                  or work. Recovery snapshots stay in BRIGX&apos;s local application-data directory.
+                </p>
+              ) : (
+                <p className="mb-4">
+                  As with any website, the hosting provider may receive ordinary request metadata such as IP address,
+                  browser information, requested asset, and time of access.
+                </p>
+              )}
 
               <h2 className="text-2xl font-semibold mt-8 mb-4">Open-source licence and commercial use</h2>
               <p className="mb-4">
@@ -75,6 +85,18 @@ export default function AboutPage() {
                       <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>BLAST WebAssembly runtime</td>
                       <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}><ExternalLink href="https://emscripten.org/docs/introducing_emscripten/emscripten_license.html">MIT/NCSA</ExternalLink></td>
                     </tr>
+                    {desktop && (
+                      <tr>
+                        <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>
+                          <ExternalLink href="https://www.electronjs.org/">Electron {desktop.versions.electron}</ExternalLink>
+                          {' '}(Chromium {desktop.versions.chrome}, Node.js {desktop.versions.node})
+                        </td>
+                        <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>Desktop application runtime</td>
+                        <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>
+                          <ExternalLink href="https://github.com/electron/electron/blob/main/LICENSE">MIT and bundled third-party notices</ExternalLink>
+                        </td>
+                      </tr>
+                    )}
                     <tr>
                       <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}><ExternalLink href="https://react.dev/">React and React DOM</ExternalLink></td>
                       <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>User interface</td>

@@ -498,6 +498,7 @@ export class BRIGController {
       if (needsAlignment) await this.ensureAlignmentWorkers();
       
       const alignmentResults: Array<{ result: AlignmentResult; rawOutput: string } | null> = new Array(queryGenomes.length).fill(null);
+      const alignmentErrors: Array<{ ringName: string; message: string }> = [];
 
       // Process rings with worker pool (max 4 concurrent)
       let nextRingIndex = 0;
@@ -555,6 +556,10 @@ export class BRIGController {
             console.log(`[Controller] Ring ${ringIndex + 1}/${queryGenomes.length} completed: ${result.result.hits?.length || 0} hits`);
           } catch (error) {
             console.error(`[Controller] Alignment error for ${query.name}:`, error);
+            alignmentErrors.push({
+              ringName: ring.legendText,
+              message: error instanceof Error ? error.message : String(error),
+            });
             alignmentResults[ringIndex] = emptyAlignment(ring, query.length, 'BLAST', params);
           }
         }
@@ -564,6 +569,12 @@ export class BRIGController {
       await Promise.all(
         Array.from({ length: maxConcurrent }, (_, i) => processNextRing(i))
       );
+
+      if (alignmentErrors.length > 0) {
+        throw new Error(alignmentErrors
+          .map(error => `${error.ringName}: ${error.message}`)
+          .join('; '));
+      }
       
       console.log(`[Controller] All ${alignmentResults.length} alignments completed`);
 

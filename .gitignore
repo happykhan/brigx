@@ -27,7 +27,6 @@ npm-debug.log*
 *.nsq
 # OS / editor
 out/
-package-lock.json
 .pixi/*
 !.pixi/config.toml
 # pixi environments
@@ -36,6 +35,8 @@ pnpm-debug.log*
 # testing
 test-results/
 playwright-report/
+desktop-dist/
+.desktop-artifacts/
 *.tgz
 *.pyc
 __pycache__/

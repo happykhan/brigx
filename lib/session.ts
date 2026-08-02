@@ -30,9 +30,10 @@ export interface BRIGXSession {
 }
 
 /**
- * Export current session state as JSON string.
+ * Build a serialisable session object. Desktop projects use this directly so
+ * the browser session export and desktop project format cannot drift apart.
  */
-export function exportSession(
+export function createSession(
   version: string,
   referenceFileName: string,
   rings: readonly RingConfig[],
@@ -40,10 +41,11 @@ export function exportSession(
   params: PipelineParams,
   imageConfig: ImagePropertiesConfig,
   referenceAnnotations: readonly Annotation[] = [],
-): string {
-  const session: BRIGXSession = {
+  timestamp = Date.now(),
+): BRIGXSession {
+  return {
     version,
-    timestamp: Date.now(),
+    timestamp,
     referenceFileName,
     referenceAnnotations: [...referenceAnnotations],
     rings: rings.map(r => ({
@@ -57,13 +59,34 @@ export function exportSession(
       showLabels: r.showLabels,
       graphMaxCap: r.graphMaxCap,
       fileNames: r.files.map(f => f.name),
-      annotations: ringAnnotations[r.id] || []
+      annotations: ringAnnotations[r.id] || [],
     })),
     params,
-    imageConfig
+    imageConfig,
   };
+}
 
-  return JSON.stringify(session, null, 2);
+/**
+ * Export current session state as JSON string.
+ */
+export function exportSession(
+  version: string,
+  referenceFileName: string,
+  rings: readonly RingConfig[],
+  ringAnnotations: Record<string, Annotation[]>,
+  params: PipelineParams,
+  imageConfig: ImagePropertiesConfig,
+  referenceAnnotations: readonly Annotation[] = [],
+): string {
+  return JSON.stringify(createSession(
+    version,
+    referenceFileName,
+    rings,
+    ringAnnotations,
+    params,
+    imageConfig,
+    referenceAnnotations,
+  ), null, 2);
 }
 
 /**
@@ -72,7 +95,7 @@ export function exportSession(
  */
 export function importSession(json: string): BRIGXSession {
   const session: unknown = JSON.parse(json);
-  if (!isSession(session)) {
+  if (!isBRIGXSession(session)) {
     throw new Error('Invalid BRIGX session file');
   }
 
@@ -179,7 +202,7 @@ function isImageConfig(value: unknown): value is ImagePropertiesConfig {
     && (value.showLegend === undefined || typeof value.showLegend === 'boolean');
 }
 
-function isSession(value: unknown): value is BRIGXSession {
+export function isBRIGXSession(value: unknown): value is BRIGXSession {
   if (!isRecord(value)) return false;
   return typeof value.version === 'string'
     && value.version.length > 0

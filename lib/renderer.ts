@@ -1,5 +1,6 @@
 // Circular Plot SVG Renderer
-import type { CircularPlotData, RingData, Annotation, AnnotationShape, ContigBoundary } from './types';
+import type { CircularPlotData, RingData, Annotation, ContigBoundary, PlotViewState } from './types';
+import { referenceFeaturesToAnnotations } from './referenceAnnotations';
 import { positionToAngle, createArcPath as geometryCreateArcPath, getColorIntensity as geometryGetColorIntensity } from './geometry';
 
 export interface RenderConfig {
@@ -17,15 +18,6 @@ export interface RenderConfig {
   labelFontSize: number;
   title: string;
   showLegend?: boolean;
-}
-
-/** View state to apply to the exported SVG so it matches the canvas preview. */
-export interface SVGViewState {
-  zoom: number;
-  panX: number;
-  panY: number;
-  gcLegendPos: { x: number; y: number } | null;
-  ringLegendPos: { x: number; y: number } | null;
 }
 
 export class CircularPlotRenderer {
@@ -1356,7 +1348,7 @@ export class CircularPlotRenderer {
     svg.appendChild(group);
   }
 
-  render(container: HTMLElement, data: CircularPlotData, viewState?: SVGViewState): SVGSVGElement {
+  render(container: HTMLElement, data: CircularPlotData, viewState?: PlotViewState): SVGSVGElement {
     // Apply legend positions from view state if provided
     if (viewState) {
       this.gcLegendPos = viewState.gcLegendPos;
@@ -1421,14 +1413,7 @@ export class CircularPlotRenderer {
     // GenBank reference features sit inside the reference ring, matching the canvas preview.
     if (data.reference.features && data.reference.features.length > 0) {
       const featureInner = Math.max(10, this.config.innerRadius - 30);
-      const featureAnnotations: Annotation[] = data.reference.features.map((feature, index) => ({
-        id: `ref-feat-${index}`,
-        start: feature.start,
-        end: feature.end,
-        label: feature.name || feature.product || feature.type,
-        shape: (feature.strand === '+' ? 'arrow-forward' : 'arrow-reverse') as AnnotationShape,
-        color: feature.color || '#4a90e2',
-      }));
+      const featureAnnotations = referenceFeaturesToAnnotations(data.reference.features);
       this.renderAnnotations(
         mainGroup,
         cx,

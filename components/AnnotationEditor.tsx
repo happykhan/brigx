@@ -26,6 +26,7 @@ interface AnnotationEditorProps {
 
 /** Row shape used internally by Handsontable. */
 interface TableRow {
+  id?: string;
   start: number;
   end: number;
   label: string;
@@ -33,9 +34,45 @@ interface TableRow {
   color: string;
 }
 
+const ANNOTATION_SHAPES: AnnotationShape[] = [
+  'block',
+  'arrow-forward',
+  'arrow-reverse',
+  'arc',
+  'hidden',
+];
+
+function normalizeShape(shape: string): AnnotationShape {
+  switch (shape) {
+    case 'arrow-forward':
+    case 'arrow-reverse':
+    case 'arc':
+    case 'hidden':
+      return shape;
+    default:
+      return 'block';
+  }
+}
+
+type FeatureImportKind = 'genbank' | 'gff3';
+
+const FEATURE_IMPORT_CONFIG = {
+  genbank: {
+    label: 'GenBank',
+    accept: '.gbk,.gb,.genbank,.gbff',
+    fileLabel: 'Choose .gbk File',
+  },
+  gff3: {
+    label: 'GFF3',
+    accept: '.gff3,.gff',
+    fileLabel: 'Choose .gff3 File',
+  },
+} as const;
+
 /** Convert Annotation[] to the flat row objects Handsontable works with. */
 function toTableData(anns: Annotation[]): TableRow[] {
   return anns.map(a => ({
+    id: a.id,
     start: a.start,
     end: a.end,
     label: a.label,
@@ -45,16 +82,16 @@ function toTableData(anns: Annotation[]): TableRow[] {
 }
 
 /** Read Handsontable's current data back into Annotation objects. */
-function readHotData(hot: Handsontable, existingIds: string[]): Annotation[] {
+function readHotData(hot: Handsontable): Annotation[] {
   const src = hot.getSourceData() as TableRow[];
   return src
     .filter(r => r && (r.label || r.start || r.end)) // skip completely empty spare rows
     .map((r, i) => ({
-      id: existingIds[i] || `ann-${Date.now()}-${i}`,
+      id: r.id || `ann-${Date.now()}-${i}`,
       start: Number(r.start) || 1,
       end: Number(r.end) || 1,
       label: r.label || '',
-      shape: (r.shape || 'block') as AnnotationShape,
+      shape: normalizeShape(r.shape),
       color: r.color || '#666666',
     }));
 }
@@ -68,9 +105,6 @@ export default function AnnotationEditor({
   onAnnotationsChange,
   onClose
 }: AnnotationEditorProps) {
-  // Annotation IDs are kept in sync so we can preserve identity across edits
-  const idsRef = useRef<string[]>(annotations.map(a => a.id));
-
   // The source-of-truth data array is held in a ref so Handsontable can
   // mutate it directly without React re-renders overwriting cell edits.
   const tableDataRef = useRef<TableRow[]>(toTableData(annotations));
@@ -80,18 +114,14 @@ export default function AnnotationEditor({
   const [count, setCount] = useState(annotations.length);
 
   const hotRef = useRef<Handsontable | null>(null);
-  const [showGenbankImport, setShowGenbankImport] = useState(false);
-  const [gbFeatureType, setGbFeatureType] = useState('CDS');
-  const [gbTextFilter, setGbTextFilter] = useState('');
-  const [showGFF3Import, setShowGFF3Import] = useState(false);
-  const [gff3FeatureType, setGff3FeatureType] = useState('CDS');
-  const [gff3TextFilter, setGff3TextFilter] = useState('');
+  const [featureImportKind, setFeatureImportKind] = useState<FeatureImportKind | null>(null);
+  const [featureType, setFeatureType] = useState('CDS');
+  const [featureTextFilter, setFeatureTextFilter] = useState('');
 
   /** Push new data into Handsontable without a full re-render. */
   const loadDataIntoHot = useCallback((anns: Annotation[]) => {
     const rows = toTableData(anns);
     tableDataRef.current = rows;
-    idsRef.current = anns.map(a => a.id);
     selectedRowsRef.current = [];
     setCount(anns.length);
     const hot = hotRef.current;
@@ -104,7 +134,7 @@ export default function AnnotationEditor({
   const readAnnotations = useCallback((): Annotation[] => {
     const hot = hotRef.current;
     if (!hot || hot.isDestroyed) return [];
-    return readHotData(hot, idsRef.current);
+    return readHotData(hot);
   }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -207,62 +237,35 @@ export default function AnnotationEditor({
     toast.success('Exported annotations');
   };
 
-  const handleGenBankImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFeatureImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    const kind = featureImportKind;
+    if (!file || !kind) return;
 
     try {
       const text = await readFileText(file);
-      const { extractGenBankFeatures } = await import('@/workers/parser.worker');
-      const features = extractGenBankFeatures(text, gbFeatureType, gbTextFilter || undefined);
+      const { extractGenBankFeatures, extractGFF3Features } = await import('@/workers/parser.worker');
+      const extract = kind === 'genbank' ? extractGenBankFeatures : extractGFF3Features;
+      const features = extract(text, featureType, featureTextFilter || undefined);
 
       if (features.length === 0) {
-        toast.error(`No ${gbFeatureType} features found`);
+        toast.error(`No ${featureType} features found`);
         return;
       }
 
-      // Use ring colour for GenBank features (they default to #000000)
+      // Imported features default to black; use the ring colour in the editor.
       const coloured = features.map(f => ({ ...f, color: ringColor }));
       const current = readAnnotations();
       loadDataIntoHot([...current, ...coloured]);
       if (features.length > 200) {
         toast.success(`Imported ${features.length} features. Labels auto-disabled (too many).`);
       } else {
-        toast.success(`Imported ${features.length} ${gbFeatureType} feature(s)`);
+        const suffix = kind === 'gff3' ? ' from GFF3' : '';
+        toast.success(`Imported ${features.length} ${featureType} feature(s)${suffix}`);
       }
-      setShowGenbankImport(false);
+      setFeatureImportKind(null);
     } catch (error) {
-      toast.error(`GenBank parse error: ${error instanceof Error ? error.message : String(error)}`);
-    }
-
-    e.target.value = '';
-  };
-
-  const handleGFF3Import = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await readFileText(file);
-      const { extractGFF3Features } = await import('@/workers/parser.worker');
-      const features = extractGFF3Features(text, gff3FeatureType, gff3TextFilter || undefined);
-
-      if (features.length === 0) {
-        toast.error(`No ${gff3FeatureType} features found`);
-        return;
-      }
-
-      const coloured = features.map(f => ({ ...f, color: ringColor }));
-      const current = readAnnotations();
-      loadDataIntoHot([...current, ...coloured]);
-      if (features.length > 200) {
-        toast.success(`Imported ${features.length} features. Labels auto-disabled (too many).`);
-      } else {
-        toast.success(`Imported ${features.length} ${gff3FeatureType} feature(s) from GFF3`);
-      }
-      setShowGFF3Import(false);
-    } catch (error) {
-      toast.error(`GFF3 parse error: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error(`${FEATURE_IMPORT_CONFIG[kind].label} parse error: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     e.target.value = '';
@@ -283,15 +286,9 @@ export default function AnnotationEditor({
     syncCount();
   }, [syncCount]);
 
-  // afterRemoveRow / afterCreateRow: keep count and IDs in sync
+  // afterRemoveRow / afterCreateRow: keep the displayed count in sync
   const afterRemoveRow = useCallback(() => {
     syncCount();
-    // Rebuild IDs from current hot data length
-    const hot = hotRef.current;
-    if (hot && !hot.isDestroyed) {
-      const src = hot.getSourceData() as TableRow[];
-      idsRef.current = src.map((_, i) => idsRef.current[i] || `ann-${Date.now()}-${i}`);
-    }
   }, [syncCount]);
 
   const afterCreateRow = useCallback(() => {
@@ -365,13 +362,13 @@ export default function AnnotationEditor({
             Export TSV
           </button>
           <button
-            onClick={() => setShowGenbankImport(!showGenbankImport)}
+            onClick={() => setFeatureImportKind(current => current === 'genbank' ? null : 'genbank')}
             className="btn-secondary text-sm"
           >
             Import GenBank Features
           </button>
           <button
-            onClick={() => setShowGFF3Import(!showGFF3Import)}
+            onClick={() => setFeatureImportKind(current => current === 'gff3' ? null : 'gff3')}
             className="btn-secondary text-sm"
           >
             Import GFF3 Features
@@ -381,14 +378,14 @@ export default function AnnotationEditor({
           </div>
         </div>
 
-        {/* GenBank Import Panel */}
-        {showGenbankImport && (
+        {/* GenBank/GFF3 Import Panel */}
+        {featureImportKind && (
           <div className="px-4 pb-4 flex gap-2 items-end flex-wrap" style={{ borderBottom: '1px solid var(--gx-border)' }}>
             <div>
               <label className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>Feature Type</label>
               <select
-                value={gbFeatureType}
-                onChange={(e) => setGbFeatureType(e.target.value)}
+                value={featureType}
+                onChange={(e) => setFeatureType(e.target.value)}
                 className="input-field text-sm"
               >
                 <option value="CDS">CDS</option>
@@ -402,57 +399,18 @@ export default function AnnotationEditor({
               <label className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>Text Filter (optional)</label>
               <input
                 type="text"
-                value={gbTextFilter}
-                onChange={(e) => setGbTextFilter(e.target.value)}
+                value={featureTextFilter}
+                onChange={(e) => setFeatureTextFilter(e.target.value)}
                 placeholder="e.g. kinase"
                 className="input-field text-sm"
               />
             </div>
             <label className="btn-primary text-sm cursor-pointer">
-              Choose .gbk File
+              {FEATURE_IMPORT_CONFIG[featureImportKind].fileLabel}
               <input
                 type="file"
-                accept=".gbk,.gb,.genbank,.gbff"
-                onChange={handleGenBankImport}
-                className="hidden"
-              />
-            </label>
-          </div>
-        )}
-
-        {/* GFF3 Import Panel */}
-        {showGFF3Import && (
-          <div className="px-4 pb-4 flex gap-2 items-end flex-wrap" style={{ borderBottom: '1px solid var(--gx-border)' }}>
-            <div>
-              <label className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>Feature Type</label>
-              <select
-                value={gff3FeatureType}
-                onChange={(e) => setGff3FeatureType(e.target.value)}
-                className="input-field text-sm"
-              >
-                <option value="CDS">CDS</option>
-                <option value="gene">gene</option>
-                <option value="rRNA">rRNA</option>
-                <option value="tRNA">tRNA</option>
-                <option value="misc_feature">misc_feature</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>Text Filter (optional)</label>
-              <input
-                type="text"
-                value={gff3TextFilter}
-                onChange={(e) => setGff3TextFilter(e.target.value)}
-                placeholder="e.g. kinase"
-                className="input-field text-sm"
-              />
-            </div>
-            <label className="btn-primary text-sm cursor-pointer">
-              Choose .gff3 File
-              <input
-                type="file"
-                accept=".gff3,.gff"
-                onChange={handleGFF3Import}
+                accept={FEATURE_IMPORT_CONFIG[featureImportKind].accept}
+                onChange={handleFeatureImport}
                 className="hidden"
               />
             </label>
@@ -472,7 +430,7 @@ export default function AnnotationEditor({
               {
                 data: 'shape',
                 type: 'dropdown',
-                source: ['block', 'arrow-forward', 'arrow-reverse', 'arc', 'hidden']
+                source: ANNOTATION_SHAPES
               },
               { data: 'color', type: 'text' }
             ]}

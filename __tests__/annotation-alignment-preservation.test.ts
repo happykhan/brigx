@@ -1,323 +1,110 @@
-/**
- * Tests for annotation and alignment data preservation
- *
- * Critical scenarios:
- * 1. Annotations must be preserved when alignments complete
- * 2. Alignments must be preserved when annotations are updated
- * 3. Multiple operations should not lose data
- */
+import { describe, expect, it } from 'vitest';
+import { mergeAlignmentRings, synchronizeConfiguredRings, updatePlotAnnotations } from '@/lib/ringState';
+import type { Annotation, CircularPlotData, RingConfig, RingData } from '@/lib/types';
 
-import { describe, it, expect, beforeEach } from 'vitest';
-import type { CircularPlotData, RingData, Annotation } from '@/lib/types';
+const annotations: Annotation[] = [
+  { id: 'ann-1', start: 1000, end: 2000, label: 'Sp 12', shape: 'arrow-forward', color: '#ff0000' },
+  { id: 'ann-2', start: 3000, end: 4000, label: 'Sp 13', shape: 'block', color: '#00ff00' },
+];
 
-// Mock data helpers
-function createMockAnnotations(): Annotation[] {
-  return [
-    {
-      id: 'ann-1',
-      start: 1000,
-      end: 2000,
-      label: 'Sp 12',
-      shape: 'arrow-forward',
-      color: '#ff0000'
-    },
-    {
-      id: 'ann-2',
-      start: 3000,
-      end: 4000,
-      label: 'Sp 13',
-      shape: 'block',
-      color: '#00ff00'
-    }
-  ];
-}
-
-function createMockRingData(queryId: string, queryName: string): RingData {
+function createRing(hits = 1): RingData {
   return {
-    queryId,
-    queryName,
+    queryId: 'ring-1',
+    queryName: 'E_coli_K12',
     color: '#666666',
     visible: true,
-    hits: [
-      {
-        queryName: 'query1',
-        refStart: 100,
-        refEnd: 200,
-        queryStart: 100,
-        queryEnd: 200,
-        percentIdentity: 95,
-        alignmentLength: 100,
-        strand: '+'
-      }
-    ],
-    statistics: {
-      meanIdentity: 95,
-      genomeCoverage: 50,
-      totalAlignedBases: 1000
-    },
+    hits: Array.from({ length: hits }, (_, index) => ({
+      queryName: 'query1',
+      refStart: index * 100,
+      refEnd: (index + 1) * 100,
+      queryStart: index * 100,
+      queryEnd: (index + 1) * 100,
+      percentIdentity: 95,
+      alignmentLength: 100,
+      strand: '+' as const,
+    })),
+    statistics: { meanIdentity: 95, genomeCoverage: 50, totalAlignedBases: hits * 100 },
     alignmentOutput: 'mock alignment output',
-    annotations: []
   };
 }
 
-function createMockPlotData(): CircularPlotData {
+function createPlot(ring: RingData): CircularPlotData {
   return {
-    reference: {
-      name: 'Reference',
-      length: 5000000,
-      gcContent: [0.5, 0.5],
-      gcSkew: [0.1, -0.1]
-    },
-    rings: [],
-    config: {
-      minIdentity: 70,
-      minAlignmentLength: 50
-    }
+    reference: { name: 'Reference', length: 5_000_000 },
+    rings: [ring],
+    config: { minIdentity: 70, minAlignmentLength: 50 },
   };
 }
 
-describe('Annotation and Alignment Preservation', () => {
-  let mockPlotData: CircularPlotData;
-  let mockRing: RingData;
-  let mockAnnotations: Annotation[];
+describe('annotation and alignment preservation', () => {
+  it('preserves annotations while replacing computed alignment data', () => {
+    const existing = { ...createRing(0), annotations };
+    const incoming = createRing(2);
 
-  beforeEach(() => {
-    mockPlotData = createMockPlotData();
-    mockRing = createMockRingData('ring-1', 'E_coli_K12');
-    mockAnnotations = createMockAnnotations();
+    const [merged] = mergeAlignmentRings([existing], [incoming], {});
+
+    expect(merged.annotations).toEqual(annotations);
+    expect(merged.hits).toHaveLength(2);
+    expect(merged.statistics.totalAlignedBases).toBe(200);
   });
 
-  describe('Alignment completion preserves annotations', () => {
-    it('should preserve existing annotations when partial alignment results arrive', () => {
-      // Setup: Ring with annotations but no alignment data
-      const ringWithAnnotations: RingData = {
-        ...mockRing,
-        hits: [],
-        annotations: mockAnnotations
-      };
-      mockPlotData.rings = [ringWithAnnotations];
+  it('preserves alignment data while replacing annotations', () => {
+    const original = createRing(2);
+    const plot = createPlot(original);
 
-      // Simulate partial alignment result (has alignment data, no annotations)
-      const partialAlignmentResult: RingData = {
-        ...mockRing,
-        hits: [
-          { queryName: 'q1', refStart: 100, refEnd: 200, queryStart: 100, queryEnd: 200, percentIdentity: 95, alignmentLength: 100, strand: '+' },
-          { queryName: 'q1', refStart: 300, refEnd: 400, queryStart: 300, queryEnd: 400, percentIdentity: 90, alignmentLength: 100, strand: '+' }
-        ],
-        annotations: [] // Worker doesn't include annotations
-      };
+    const updated = updatePlotAnnotations(plot, original.queryId, annotations);
 
-      // Merge logic (from page.tsx partial update)
-      const mergedRing = {
-        ...ringWithAnnotations,
-        hits: partialAlignmentResult.hits,
-        statistics: partialAlignmentResult.statistics,
-        alignmentOutput: partialAlignmentResult.alignmentOutput,
-        annotations: ringWithAnnotations.annotations || []
-      };
-
-      // Assertions
-      expect(mergedRing.annotations).toHaveLength(2);
-      expect(mergedRing.annotations[0].label).toBe('Sp 12');
-      expect(mergedRing.hits).toHaveLength(2);
-    });
-
-    it('should preserve annotations during final alignment merge', () => {
-      // Setup: Cached data with annotations
-      const cachedRing: RingData = {
-        ...mockRing,
-        annotations: mockAnnotations
-      };
-      // Final alignment result (no annotations from worker)
-      const finalAlignmentResult: RingData = {
-        ...mockRing,
-        hits: [{ queryName: 'q1', refStart: 500, refEnd: 600, queryStart: 500, queryEnd: 600, percentIdentity: 98, alignmentLength: 100, strand: '+' }],
-        annotations: []
-      };
-
-      // Final merge logic (from page.tsx final merge)
-      const finalRing = {
-        ...cachedRing,
-        hits: finalAlignmentResult.hits,
-        statistics: finalAlignmentResult.statistics,
-        alignmentOutput: finalAlignmentResult.alignmentOutput,
-        annotations: cachedRing.annotations || []
-      };
-
-      // Assertions
-      expect(finalRing.annotations).toHaveLength(2);
-      expect(finalRing.annotations).toEqual(mockAnnotations);
-      expect(finalRing.hits).toHaveLength(1);
-      expect(finalRing.hits[0].percentIdentity).toBe(98);
-    });
+    expect(updated?.rings[0].annotations).toEqual(annotations);
+    expect(updated?.rings[0].hits).toEqual(original.hits);
+    expect(updated?.rings[0].statistics).toEqual(original.statistics);
+    expect(updated?.rings[0].alignmentOutput).toBe(original.alignmentOutput);
   });
 
-  describe('Annotation updates preserve alignment data', () => {
-    it('should preserve alignment results when annotations are updated', () => {
-      // Setup: Ring with both annotations and alignment data
-      const ringWithBoth: RingData = {
-        ...mockRing,
-        hits: [
-          { queryName: 'q1', refStart: 1000, refEnd: 2000, queryStart: 1000, queryEnd: 2000, percentIdentity: 92, alignmentLength: 1000, strand: '+' }
-        ],
-        statistics: {
-          meanIdentity: 92,
-          genomeCoverage: 60,
-          totalAlignedBases: 2000
-        },
-        alignmentOutput: 'existing alignment output',
-        annotations: mockAnnotations
-      };
+  it('supports deleting every annotation without restoring stale values', () => {
+    const original = { ...createRing(1), annotations };
+    const cleared = updatePlotAnnotations(createPlot(original), original.queryId, []);
+    const [merged] = mergeAlignmentRings(cleared?.rings, [createRing(2)], { [original.queryId]: [] });
 
-      // User adds new annotation
-      const newAnnotations: Annotation[] = [
-        ...mockAnnotations,
-        {
-          id: 'ann-3',
-          start: 5000,
-          end: 6000,
-          label: 'Sp 14',
-          shape: 'arrow-reverse',
-          color: '#0000ff'
-        }
-      ];
-
-      // Update logic (from handleAnnotationsChange)
-      const updatedRing = {
-        ...ringWithBoth,
-        annotations: newAnnotations,
-        // CRITICAL: Explicitly preserve alignment data
-        hits: ringWithBoth.hits || [],
-        statistics: ringWithBoth.statistics || { meanIdentity: 0, genomeCoverage: 0, totalAlignedBases: 0 },
-        alignmentOutput: ringWithBoth.alignmentOutput || ''
-      };
-
-      // Assertions
-      expect(updatedRing.annotations).toHaveLength(3);
-      expect(updatedRing.annotations[2].label).toBe('Sp 14');
-      expect(updatedRing.hits).toHaveLength(1);
-      expect(updatedRing.hits[0].percentIdentity).toBe(92);
-      expect(updatedRing.statistics.meanIdentity).toBe(92);
-      expect(updatedRing.alignmentOutput).toBe('existing alignment output');
-    });
-
-    it('should handle annotation deletion without losing alignment data', () => {
-      const ringWithBoth: RingData = {
-        ...mockRing,
-        annotations: mockAnnotations
-      };
-
-      // User deletes one annotation
-      const updatedAnnotations = [mockAnnotations[0]]; // Keep only Sp 12
-
-      const updatedRing = {
-        ...ringWithBoth,
-        annotations: updatedAnnotations,
-        hits: ringWithBoth.hits || [],
-        statistics: ringWithBoth.statistics || { meanIdentity: 0, genomeCoverage: 0, totalAlignedBases: 0 },
-        alignmentOutput: ringWithBoth.alignmentOutput || ''
-      };
-
-      expect(updatedRing.annotations).toHaveLength(1);
-      expect(updatedRing.annotations[0].label).toBe('Sp 12');
-      expect(updatedRing.hits).toHaveLength(1);
-      expect(updatedRing.statistics).toBeDefined();
-    });
+    expect(merged.annotations).toEqual([]);
+    expect(merged.hits).toHaveLength(2);
   });
 
-  describe('Multiple operations maintain data integrity', () => {
-    it('should preserve both annotations and alignments through multiple updates', () => {
-      // Start with ring that has annotations
-      let currentRing: RingData = {
-        ...mockRing,
-        hits: [],
-        annotations: [mockAnnotations[0]]
-      };
+  it('leaves unrelated rings unchanged', () => {
+    const first = createRing(1);
+    const second = { ...createRing(3), queryId: 'ring-2', queryName: 'Second' };
+    const plot = { ...createPlot(first), rings: [first, second] };
 
-      // Step 1: Run alignment (should keep annotations)
-      currentRing = {
-        ...currentRing,
-        hits: [{ queryName: 'q1', refStart: 100, refEnd: 200, queryStart: 100, queryEnd: 200, percentIdentity: 95, alignmentLength: 100, strand: '+' }],
-        annotations: currentRing.annotations || []
-      };
+    const updated = updatePlotAnnotations(plot, first.queryId, annotations);
 
-      expect(currentRing.annotations).toHaveLength(1);
-      expect(currentRing.hits).toHaveLength(1);
-
-      // Step 2: Add more annotations (should keep alignments)
-      currentRing = {
-        ...currentRing,
-        annotations: [...(currentRing.annotations ?? []), mockAnnotations[1]],
-        hits: currentRing.hits || []
-      };
-
-      expect(currentRing.annotations).toHaveLength(2);
-      expect(currentRing.hits).toHaveLength(1);
-
-      // Step 3: Run alignment again (should keep all annotations)
-      currentRing = {
-        ...currentRing,
-        hits: [
-          ...currentRing.hits,
-          { queryName: 'q1', refStart: 300, refEnd: 400, queryStart: 300, queryEnd: 400, percentIdentity: 90, alignmentLength: 100, strand: '+' }
-        ],
-        annotations: currentRing.annotations || []
-      };
-
-      // Final check: Everything should still be there
-      expect(currentRing.annotations).toHaveLength(2);
-      expect(currentRing.hits).toHaveLength(2);
-    });
+    expect(updated?.rings[1]).toBe(second);
   });
 
-  describe('Edge cases', () => {
-    it('should handle undefined annotations gracefully', () => {
-      const ringWithUndefinedAnnotations: RingData = {
-        ...mockRing,
-        annotations: undefined as any
-      };
+  it('handles an absent plot while the reference is still loading', () => {
+    expect(updatePlotAnnotations(null, 'ring-1', annotations)).toBeNull();
+  });
 
-      const merged = {
-        ...ringWithUndefinedAnnotations,
-        annotations: ringWithUndefinedAnnotations.annotations || []
-      };
+  it('applies ring settings without discarding computed data', () => {
+    const original = { ...createRing(2), annotations };
+    const config: RingConfig = {
+      id: original.queryId,
+      legendText: 'Renamed ring',
+      files: [],
+      color: '#123456',
+      upperThreshold: 99,
+      lowerThreshold: 75,
+      customWidth: 24,
+    };
 
-      expect(merged.annotations).toEqual([]);
-      expect(merged.hits).toBeDefined();
-    });
+    const [updated] = synchronizeConfiguredRings([original], [config], {});
 
-    it('should handle empty arrays correctly', () => {
-      const ringWithEmptyArrays: RingData = {
-        ...mockRing,
-        hits: [],
-        annotations: []
-      };
-
-      const updated = {
-        ...ringWithEmptyArrays,
-        annotations: mockAnnotations,
-        hits: ringWithEmptyArrays.hits || []
-      };
-
-      expect(updated.annotations).toHaveLength(2);
-      expect(updated.hits).toEqual([]);
-    });
-
-    it('should handle missing statistics gracefully', () => {
-      const ringWithoutStats: RingData = {
-        ...mockRing,
-        statistics: undefined as any
-      };
-
-      const updated = {
-        ...ringWithoutStats,
-        annotations: mockAnnotations,
-        statistics: ringWithoutStats.statistics || { meanIdentity: 0, genomeCoverage: 0, totalAlignedBases: 0 }
-      };
-
-      expect(updated.statistics).toBeDefined();
-      expect(updated.statistics.meanIdentity).toBe(0);
-      expect(updated.statistics.genomeCoverage).toBe(0);
+    expect(updated).toMatchObject({
+      queryName: 'Renamed ring',
+      color: '#123456',
+      upperThreshold: 99,
+      lowerThreshold: 75,
+      customWidth: 24,
+      hits: original.hits,
+      annotations,
     });
   });
 });

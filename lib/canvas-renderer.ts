@@ -1,16 +1,35 @@
 // Canvas 2D renderer for circular genome plot (display only; SVG renderer kept for export)
 
-import type { CircularPlotData, RingData, Annotation, AnnotationShape, ContigBoundary } from './types';
+import type { CircularPlotData, RingData, Annotation, ContigBoundary } from './types';
+import { referenceFeaturesToAnnotations } from './referenceAnnotations';
 import type { RenderConfig } from './renderer';
 import { positionToAngle, hexToRGB, getColorIntensity, calculateRingLayout } from './geometry';
 
 // ----- Hit region index for mouse interaction -----
+export interface PlotTooltip {
+  type?: string;
+  queryName?: string;
+  start?: number;
+  end?: number;
+  identity?: number;
+  coverage?: number;
+  position?: number;
+  windowSize?: number;
+  gc?: string;
+  skew?: string;
+  name?: string;
+  length?: number;
+  value?: string;
+  label?: string;
+  strand?: string;
+}
+
 interface HitRegion {
   innerR: number;
   outerR: number;
   startAngle: number;
   endAngle: number;
-  tooltip: Record<string, unknown>;
+  tooltip: PlotTooltip;
 }
 
 // ----- Cached geometry for efficient redraw -----
@@ -88,7 +107,7 @@ export class CanvasPlotRenderer {
   /**
    * Hit-test a CSS-pixel position on the canvas and return the tooltip payload, or null.
    */
-  hitTest(canvasX: number, canvasY: number, zoom: number, panX: number, panY: number): Record<string, unknown> | null {
+  hitTest(canvasX: number, canvasY: number, zoom: number, panX: number, panY: number): PlotTooltip | null {
     // Convert CSS mouse coords to logical coords (undo zoom/pan)
     const cx = this.config.width / 2;
     const cy = this.config.height / 2;
@@ -205,14 +224,7 @@ export class CanvasPlotRenderer {
     if (data.reference.features && data.reference.features.length > 0) {
       const featureInner = Math.max(10, this.config.innerRadius - 30);
       const featureOuter = this.config.innerRadius;
-      const featureAnnotations: Annotation[] = data.reference.features.map((f, i) => ({
-        id: `ref-feat-${i}`,
-        start: f.start,
-        end: f.end,
-        label: f.name || f.product || f.type,
-        shape: (f.strand === '+' ? 'arrow-forward' : 'arrow-reverse') as AnnotationShape,
-        color: f.color || '#4a90e2',
-      }));
+      const featureAnnotations = referenceFeaturesToAnnotations(data.reference.features);
       this.drawAnnotations(ctx, cx, cy, refLength, featureAnnotations, featureInner, featureOuter, true, true);
     }
 
@@ -326,7 +338,7 @@ export class CanvasPlotRenderer {
     ctx.restore();
   }
 
-  private addHitRegion(innerR: number, outerR: number, startAngle: number, endAngle: number, tooltip: Record<string, unknown>): void {
+  private addHitRegion(innerR: number, outerR: number, startAngle: number, endAngle: number, tooltip: PlotTooltip): void {
     this.hitRegions.push({ innerR, outerR, startAngle, endAngle, tooltip });
   }
 

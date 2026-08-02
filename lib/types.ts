@@ -119,6 +119,15 @@ export interface CircularPlotData {
   };
 }
 
+/** Interactive plot state shared by the canvas preview and exported renderers. */
+export interface PlotViewState {
+  zoom: number;
+  panX: number;
+  panY: number;
+  gcLegendPos: { x: number; y: number } | null;
+  ringLegendPos: { x: number; y: number } | null;
+}
+
 export interface ParsedGenome {
   id: string;
   name: string;

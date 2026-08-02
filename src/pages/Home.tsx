@@ -3,7 +3,6 @@ import { useState as useReactState, useCallback, useMemo } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { NavBar, AppFooter, LogConsole } from '@genomicx/ui';
 import CircularPlot from '@/components/CircularPlot';
-import type { PlotViewState } from '@/components/CircularPlot';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ExportPanel from '@/components/ExportPanel';
 import AnnotationEditor from '@/components/AnnotationEditor';
@@ -14,6 +13,7 @@ import StatisticsPanel from '@/components/StatisticsPanel';
 import ImagePropertiesPanel from '@/components/ImagePropertiesPanel';
 import { useBRIGController } from '@/hooks/useBRIGController';
 import { APP_VERSION } from '@/lib/version';
+import type { PlotViewState } from '@/lib/types';
 
 function sameLegendPosition(
   left: PlotViewState['gcLegendPos'],

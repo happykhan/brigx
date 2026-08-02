@@ -2,10 +2,9 @@
 
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import type { CircularPlotData } from '@/lib/types';
+import type { CircularPlotData, PlotViewState } from '@/lib/types';
 import { CircularPlotRenderer } from '@/lib/renderer';
 import type { ImagePropertiesConfig } from './ImageProperties';
-import type { PlotViewState } from './CircularPlot';
 
 interface ExportPanelProps {
   plotData: CircularPlotData;
@@ -17,15 +16,17 @@ interface ExportPanelProps {
 // SVG exports must use the same system so pan and dragged legend coordinates match exactly.
 const PLOT_LOGICAL_SIZE = 1000;
 
-export default function ExportPanel({ plotData, imageProperties, viewState }: ExportPanelProps) {
-  const [isExporting, setIsExporting] = useState(false);
-  const exportSVG = () => {
-    // Create temporary container
-    const container = document.createElement('div');
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
-    document.body.appendChild(container);
+function renderPlotSVG(
+  plotData: CircularPlotData,
+  imageProperties: ImagePropertiesConfig,
+  viewState: PlotViewState | null | undefined,
+): string {
+  const container = document.createElement('div');
+  container.style.position = 'absolute';
+  container.style.left = '-9999px';
+  document.body.appendChild(container);
 
+  try {
     const renderer = new CircularPlotRenderer({
       width: PLOT_LOGICAL_SIZE,
       height: PLOT_LOGICAL_SIZE,
@@ -40,71 +41,49 @@ export default function ExportPanel({ plotData, imageProperties, viewState }: Ex
       titleFontSize: imageProperties.titleFontSize,
       labelFontSize: imageProperties.labelFontSize,
       title: imageProperties.title,
-      showLegend: imageProperties.showLegend
+      showLegend: imageProperties.showLegend,
     });
+    renderer.render(container, plotData, viewState ?? undefined);
+    return renderer.exportSVG();
+  } finally {
+    container.remove();
+  }
+}
 
-    // Thread the current view state (zoom, pan, legend positions) so the SVG
-    // matches what the user sees in the canvas preview.
-    const exportViewState = viewState ? {
-      zoom: viewState.zoom,
-      panX: viewState.panX,
-      panY: viewState.panY,
-      gcLegendPos: viewState.gcLegendPos,
-      ringLegendPos: viewState.ringLegendPos,
-    } : undefined;
-
-    renderer.render(container, plotData, exportViewState);
-    const svgString = renderer.exportSVG();
-
-    // Download
-    const blob = new Blob([svgString], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `brig-plot-${Date.now()}.svg`;
-    a.click();
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+  } finally {
     URL.revokeObjectURL(url);
+  }
+}
 
-    document.body.removeChild(container);
+function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (blob) resolve(blob);
+      else reject(new Error(`Failed to create ${type} blob`));
+    }, type);
+  });
+}
+
+export default function ExportPanel({ plotData, imageProperties, viewState }: ExportPanelProps) {
+  const [isExporting, setIsExporting] = useState(false);
+  const exportSVG = () => {
+    const svgString = renderPlotSVG(plotData, imageProperties, viewState);
+    const blob = new Blob([svgString], { type: 'image/svg+xml' });
+    downloadBlob(blob, `brig-plot-${Date.now()}.svg`);
     toast.success('SVG exported successfully!');
   };
 
   const exportPNG = async () => {
     setIsExporting(true);
     try {
-      // Create temporary container
-      const container = document.createElement('div');
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      document.body.appendChild(container);
-
-      const renderer = new CircularPlotRenderer({
-        width: PLOT_LOGICAL_SIZE,
-        height: PLOT_LOGICAL_SIZE,
-        innerRadius: imageProperties.innerRadius,
-        ringWidth: imageProperties.ringWidth,
-        gcRingWidth: imageProperties.gcRingWidth,
-        ringSpacing: imageProperties.ringSpacing,
-        minIdentity: plotData.config.minIdentity,
-        maxIdentity: 100,
-        legendFontSize: imageProperties.legendFontSize,
-        scaleFontSize: imageProperties.scaleFontSize,
-        titleFontSize: imageProperties.titleFontSize,
-        labelFontSize: imageProperties.labelFontSize,
-        title: imageProperties.title,
-        showLegend: imageProperties.showLegend
-      });
-
-      const pngViewState = viewState ? {
-        zoom: viewState.zoom,
-        panX: viewState.panX,
-        panY: viewState.panY,
-        gcLegendPos: viewState.gcLegendPos,
-        ringLegendPos: viewState.ringLegendPos,
-      } : undefined;
-
-      renderer.render(container, plotData, pngViewState);
-      const svgString = renderer.exportSVG();
+      const svgString = renderPlotSVG(plotData, imageProperties, viewState);
 
       // Convert SVG to PNG
       const canvas = document.createElement('canvas');
@@ -127,7 +106,7 @@ export default function ExportPanel({ plotData, imageProperties, viewState }: Ex
 
       await new Promise((resolve, reject) => {
         img.onload = () => {
-          ctx.drawImage(img, 0, 0);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           URL.revokeObjectURL(url);
           resolve(undefined);
         };
@@ -138,21 +117,9 @@ export default function ExportPanel({ plotData, imageProperties, viewState }: Ex
         img.src = url;
       });
 
-      // Convert canvas to PNG and download
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          throw new Error('Failed to create PNG blob');
-        }
-        const pngUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = pngUrl;
-        a.download = `brig-plot-${Date.now()}.png`;
-        a.click();
-        URL.revokeObjectURL(pngUrl);
-        toast.success('PNG exported successfully!');
-      }, 'image/png');
-
-      document.body.removeChild(container);
+      const pngBlob = await canvasToBlob(canvas, 'image/png');
+      downloadBlob(pngBlob, `brig-plot-${Date.now()}.png`);
+      toast.success('PNG exported successfully!');
     } catch (error) {
       console.error('PNG export error:', error);
       toast.error('Failed to export PNG');
@@ -164,12 +131,7 @@ export default function ExportPanel({ plotData, imageProperties, viewState }: Ex
   const exportJSON = () => {
     const json = JSON.stringify(plotData, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `brig-data-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, `brig-data-${Date.now()}.json`);
     toast.success('Data exported successfully!');
   };
 

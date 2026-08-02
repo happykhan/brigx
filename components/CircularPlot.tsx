@@ -1,18 +1,10 @@
 
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { CircularPlotData } from '@/lib/types';
+import type { CircularPlotData, PlotViewState } from '@/lib/types';
 import type { ImagePropertiesConfig } from './ImageProperties';
 import { CanvasPlotRenderer } from '@/lib/canvas-renderer';
-
-/** View state exposed by CircularPlot so the export panel can reproduce the same view. */
-export interface PlotViewState {
-  zoom: number;
-  panX: number;
-  panY: number;
-  gcLegendPos: { x: number; y: number } | null;
-  ringLegendPos: { x: number; y: number } | null;
-}
+import type { PlotTooltip } from '@/lib/canvas-renderer';
 
 interface CircularPlotProps {
   data: CircularPlotData;
@@ -20,22 +12,7 @@ interface CircularPlotProps {
   onViewStateChange?: (state: PlotViewState) => void;
 }
 
-interface TooltipInfo {
-  type?: string;
-  queryName?: string;
-  start?: number;
-  end?: number;
-  identity?: number;
-  coverage?: number;
-  position?: number;
-  windowSize?: number;
-  gc?: string;
-  skew?: string;
-  name?: string;
-  length?: number;
-  value?: string;
-  label?: string;
-  strand?: string;
+interface TooltipInfo extends PlotTooltip {
   x: number;
   y: number;
 }
@@ -219,7 +196,7 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange 
     const hit = rendererRef.current.hitTest(canvasX, canvasY, zoom, pan.x, pan.y);
     if (hit) {
       setTooltip({
-        ...(hit as unknown as Omit<TooltipInfo, 'x' | 'y'>),
+        ...hit,
         x: e.clientX,
         y: e.clientY,
       });

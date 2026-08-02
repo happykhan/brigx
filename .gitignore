@@ -37,6 +37,8 @@ pnpm-debug.log*
 test-results/
 playwright-report/
 *.tgz
+*.pyc
+__pycache__/
 Thumbs.db
 *.tsbuildinfo
 # TypeScript

@@ -4,15 +4,10 @@ import fs from 'fs/promises'
 
 const FIXTURES = path.join(process.cwd(), 'tests/fixtures')
 const REFERENCE = path.join(FIXTURES, 'reference.fa')
+const QUERY = path.join(FIXTURES, 'query.fa')
 const BAKTA_GFF3 = path.join(FIXTURES, 'bakta.gff3')
 
 test.describe('BRIGX e2e — circular genome plot', () => {
-  test.beforeEach(async ({ page }) => {
-    // Fonts are cosmetic and should not make local tests depend on Google being reachable.
-    await page.route('https://fonts.googleapis.com/**', route => route.abort())
-    await page.route('https://fonts.gstatic.com/**', route => route.abort())
-  })
-
   test('loads the app with Reference Genome section visible', async ({ page }) => {
     await page.goto('/')
 
@@ -26,7 +21,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     const refInput = page.locator('input[type="file"][accept*=".fa"]').first()
     await refInput.setInputFiles(REFERENCE)
 
-    await expect(page.getByText('reference.fa')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('reference.fa', { exact: true })).toBeVisible({ timeout: 10_000 })
   })
 
   test('uploading reference shows the Run button', async ({ page }) => {
@@ -35,7 +30,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     const refInput = page.locator('input[type="file"][accept*=".fa"]').first()
     await refInput.setInputFiles(REFERENCE)
 
-    await expect(page.getByText('reference.fa')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('reference.fa', { exact: true })).toBeVisible({ timeout: 10_000 })
 
     const runButton = page.getByRole('button', { name: /run|generate|build/i })
     await expect(runButton.first()).toBeVisible()
@@ -48,22 +43,14 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     const pageErrors: Error[] = []
     page.on('pageerror', error => pageErrors.push(error))
 
-    const refInput = page.locator('input[type="file"][accept*=".fa"]').first()
-    await refInput.setInputFiles(REFERENCE)
-    await expect(page.getByText('reference.fa')).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 30_000 })
-
     await page.getByRole('button', { name: 'Add New Ring' }).click()
     await page.getByRole('button', { name: 'Custom Ring Overlay' }).click()
     await expect(page.getByRole('heading', { name: 'Annotations for Ring 1' })).toBeVisible()
     await page.getByRole('button', { name: 'Add New', exact: true }).click()
 
-    const firstLabelCell = page.locator('.ht_master tbody tr').first().locator('td').nth(2)
-    await firstLabelCell.dblclick()
-    const cellEditor = page.locator('textarea.handsontableInput')
-    await cellEditor.fill('edited gene')
-    await cellEditor.press('Enter')
-    await expect(firstLabelCell).toContainText('edited gene')
+    const firstLabelCell = page.getByRole('textbox', { name: 'Label row 1' })
+    await firstLabelCell.fill('edited gene')
+    await expect(firstLabelCell).toHaveValue('edited gene')
 
     await page.getByRole('button', { name: 'Reset All' }).click()
     await expect(page.getByText(/^0 annotation\(s\) \| Reference:/)).toBeVisible()
@@ -71,11 +58,12 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await page.evaluate(() => navigator.clipboard.writeText(
       '100\t200\tgene A\tblock\t#ff0000\n300\t450\tgene B\tarrow-forward\t#00ff00',
     ))
-    const firstStartCell = page.locator('.ht_master tbody tr').first().locator('td').first()
-    await firstStartCell.click()
+    const emptyStartCell = page.getByRole('spinbutton', { name: 'Paste annotations here' })
+    await emptyStartCell.click()
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+V' : 'Control+V')
     await expect(page.getByText(/^2 annotation\(s\) \| Reference:/)).toBeVisible()
 
+    const firstStartCell = page.getByRole('spinbutton', { name: 'Start row 1' })
     await firstStartCell.click()
     await page.getByRole('button', { name: 'Delete Selected' }).click()
     await expect(page.getByText(/^1 annotation\(s\) \| Reference:/)).toBeVisible()
@@ -91,6 +79,38 @@ test.describe('BRIGX e2e — circular genome plot', () => {
 
     await expect(page.getByText(/bakta\.gff3 — 2 CDS feature\(s\)/)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Centre' })).toBeVisible()
+  })
+
+  test('about page discloses privacy, licences, and third-party software', async ({ page }) => {
+    await page.goto('/about')
+
+    await expect(page.getByRole('heading', { name: 'About BRIGX' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Data handling and privacy' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Third-party software' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'GNU General Public License v3.0' })).toHaveAttribute('href', /LICENSE$/)
+    await expect(page.getByRole('link', { name: 'complete third-party notice' })).toHaveAttribute('href', /THIRD_PARTY_NOTICES\.md$/)
+    await expect(page.getByText('Handsontable and LAST are not included in this release.')).toBeVisible()
+  })
+
+  test('runs an alignment with the bundled integrity-checked BLAST assets', async ({ page }) => {
+    const pageErrors: Error[] = []
+    page.on('pageerror', error => pageErrors.push(error))
+    await page.goto('/')
+
+    await page.getByLabel('Reference genome file').setInputFiles(REFERENCE)
+    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 30_000 })
+    await page.getByRole('button', { name: 'Add New Ring' }).click()
+    await page.locator('input[type="file"][multiple]').setInputFiles(QUERY)
+
+    const assetNames = ['formatdb.js', 'formatdb.wasm', 'blastall.js', 'blastall.wasm']
+    const assetResponses = assetNames.map(assetName => page.waitForResponse(
+      response => response.url().endsWith(`/wasm/blast/${assetName}`) && response.status() === 200,
+    ))
+
+    await page.getByRole('button', { name: 'Run Alignments' }).click()
+    await Promise.all(assetResponses)
+    await expect(page.getByText('Alignments completed successfully!')).toBeVisible({ timeout: 30_000 })
+    expect(pageErrors).toEqual([])
   })
 
   test('expanded plot controls remain clickable and SVG downloads', async ({ page }) => {

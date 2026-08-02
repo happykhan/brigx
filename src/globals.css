@@ -1,7 +1,11 @@
 @import '@genomicx/ui/styles/tokens.css';
 @import '@genomicx/ui/styles/components.css';
 
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+@source ".";
+@source "../components";
+@source "../hooks";
+@source "../index.html";
 
 /* BRIGx-specific animations */
 @layer utilities {

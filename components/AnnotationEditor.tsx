@@ -1,20 +1,17 @@
-
-
-
-import { useState, useRef, useCallback } from 'react';
-import { HotTable } from '@handsontable/react';
-import Handsontable from 'handsontable';
-import { registerAllModules } from 'handsontable/registry';
-import 'handsontable/styles/handsontable.min.css';
-import 'handsontable/styles/ht-theme-main.min.css';
-import type { Annotation, AnnotationShape } from '@/lib/types';
+import { useEffect, useRef, useState } from 'react';
+import toast from 'react-hot-toast';
+import type { Annotation } from '@/lib/types';
+import {
+  ANNOTATION_SHAPES,
+  annotationsToRows,
+  pasteAnnotationCells,
+  rowsToAnnotations,
+  type AnnotationColumn,
+  type AnnotationTableRow,
+} from '@/lib/annotationTable';
 import { parseAnnotationFile, exportAnnotationsToTSV } from '@/lib/annotationParser';
 import { readFileText } from '@/lib/fileAccess';
-import toast from 'react-hot-toast';
 import { extractGenBankFeatures, extractGFF3Features } from '@/lib/featureParser';
-
-// Register all Handsontable modules (including cell types)
-registerAllModules();
 
 interface AnnotationEditorProps {
   ringId: string;
@@ -24,36 +21,6 @@ interface AnnotationEditorProps {
   referenceLength: number;
   onAnnotationsChange: (ringId: string, annotations: Annotation[]) => void;
   onClose: () => void;
-}
-
-/** Row shape used internally by Handsontable. */
-interface TableRow {
-  id?: string;
-  start: number;
-  end: number;
-  label: string;
-  shape: string;
-  color: string;
-}
-
-const ANNOTATION_SHAPES: AnnotationShape[] = [
-  'block',
-  'arrow-forward',
-  'arrow-reverse',
-  'arc',
-  'hidden',
-];
-
-function normalizeShape(shape: string): AnnotationShape {
-  switch (shape) {
-    case 'arrow-forward':
-    case 'arrow-reverse':
-    case 'arc':
-    case 'hidden':
-      return shape;
-    default:
-      return 'block';
-  }
 }
 
 type FeatureImportKind = 'genbank' | 'gff3';
@@ -71,32 +38,11 @@ const FEATURE_IMPORT_CONFIG = {
   },
 } as const;
 
-/** Convert Annotation[] to the flat row objects Handsontable works with. */
-function toTableData(anns: Annotation[]): TableRow[] {
-  return anns.map(a => ({
-    id: a.id,
-    start: a.start,
-    end: a.end,
-    label: a.label,
-    shape: a.shape,
-    color: a.color || '#666666',
-  }));
-}
-
-/** Read Handsontable's current data back into Annotation objects. */
-function readHotData(hot: Handsontable): Annotation[] {
-  const src = hot.getSourceData() as TableRow[];
-  return src
-    .filter(r => r && (r.label || r.start || r.end)) // skip completely empty spare rows
-    .map((r, i) => ({
-      id: r.id || `ann-${Date.now()}-${i}`,
-      start: Number(r.start) || 1,
-      end: Number(r.end) || 1,
-      label: r.label || '',
-      shape: normalizeShape(r.shape),
-      color: r.color || '#666666',
-    }));
-}
+const CELL_STYLE = {
+  borderColor: 'var(--gx-border)',
+  background: 'var(--gx-bg)',
+  color: 'var(--gx-text)',
+};
 
 export default function AnnotationEditor({
   ringId,
@@ -105,42 +51,63 @@ export default function AnnotationEditor({
   annotations,
   referenceLength,
   onAnnotationsChange,
-  onClose
+  onClose,
 }: AnnotationEditorProps) {
-  // The source-of-truth data array is held in a ref so Handsontable can
-  // mutate it directly without React re-renders overwriting cell edits.
-  const tableDataRef = useRef<TableRow[]>(toTableData(annotations));
-  const selectedRowsRef = useRef<number[]>([]);
-
-  // Counter displayed in the toolbar (updated on sync)
-  const [count, setCount] = useState(annotations.length);
-
-  const hotRef = useRef<Handsontable | null>(null);
+  const [rows, setRows] = useState<AnnotationTableRow[]>(() => annotationsToRows(annotations));
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(() => new Set());
+  const [focusedRow, setFocusedRow] = useState<number | null>(null);
   const [featureImportKind, setFeatureImportKind] = useState<FeatureImportKind | null>(null);
   const [featureType, setFeatureType] = useState('CDS');
   const [featureTextFilter, setFeatureTextFilter] = useState('');
+  const nextRowId = useRef(annotations.length);
 
-  /** Push new data into Handsontable without a full re-render. */
-  const loadDataIntoHot = useCallback((anns: Annotation[]) => {
-    const rows = toTableData(anns);
-    tableDataRef.current = rows;
-    selectedRowsRef.current = [];
-    setCount(anns.length);
-    const hot = hotRef.current;
-    if (hot && !hot.isDestroyed) {
-      hot.loadData(rows);
-    }
-  }, []);
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [onClose]);
 
-  /** Read current table state back into Annotation objects. */
-  const readAnnotations = useCallback((): Annotation[] => {
-    const hot = hotRef.current;
-    if (!hot || hot.isDestroyed) return [];
-    return readHotData(hot);
-  }, []);
+  const createRowId = () => `annotation-${Date.now()}-${nextRowId.current++}`;
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const replaceRows = (nextRows: AnnotationTableRow[]) => {
+    setRows(nextRows);
+    setSelectedRows(new Set());
+    setFocusedRow(null);
+  };
+
+  const currentAnnotations = () => rowsToAnnotations(rows, referenceLength);
+
+  const appendAnnotations = (newAnnotations: Annotation[]) => {
+    setRows(current => [...current, ...annotationsToRows(newAnnotations)]);
+    setSelectedRows(new Set());
+  };
+
+  const updateRow = <Column extends AnnotationColumn>(
+    rowIndex: number,
+    column: Column,
+    value: AnnotationTableRow[Column],
+  ) => {
+    setRows(current => current.map((row, index) => (
+      index === rowIndex ? { ...row, [column]: value } : row
+    )));
+  };
+
+  const handlePaste = (
+    event: React.ClipboardEvent<HTMLInputElement | HTMLSelectElement>,
+    rowIndex: number,
+    column: AnnotationColumn,
+  ) => {
+    const clipboardText = event.clipboardData.getData('text/plain');
+    if (!clipboardText) return;
+    event.preventDefault();
+    setRows(current => pasteAnnotationCells(current, rowIndex, column, clipboardText, createRowId));
+    setFocusedRow(rowIndex);
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     try {
@@ -157,90 +124,71 @@ export default function AnnotationEditor({
         return;
       }
 
-      // Use ring colour as default for annotations without a specified colour
-      const coloured = result.annotations.map(a => ({
-        ...a,
-        color: a.color === '#666666' ? ringColor : a.color
-      }));
-      const current = readAnnotations();
-      loadDataIntoHot([...current, ...coloured]);
+      appendAnnotations(result.annotations.map(annotation => ({
+        ...annotation,
+        color: annotation.color === '#666666' ? ringColor : annotation.color,
+      })));
       toast.success(`Loaded ${result.annotations.length} annotation(s)`);
     } catch (error) {
       toast.error('Failed to parse annotation file');
       console.error('Parse error:', error);
+    } finally {
+      event.target.value = '';
     }
-
-    // Reset input
-    e.target.value = '';
   };
 
   const handleAddNew = () => {
-    const current = readAnnotations();
-    const newAnnotation: Annotation = {
-      id: `ann-${Date.now()}`,
+    const newRow: AnnotationTableRow = {
+      id: createRowId(),
       start: 1,
       end: Math.min(1000, referenceLength),
-      label: `Annotation ${current.length + 1}`,
+      label: `Annotation ${rows.length + 1}`,
       shape: 'block',
-      color: ringColor
+      color: ringColor,
     };
-    loadDataIntoHot([...current, newAnnotation]);
+    setRows(current => [...current, newRow]);
+    setFocusedRow(rows.length);
     toast.success('Added new annotation');
   };
 
   const handleDeleteSelected = () => {
-    const hot = hotRef.current;
-    if (!hot) return;
-
-    const selected = hot.getSelected();
-    const rowsToDelete = new Set<number>(selectedRowsRef.current);
-
-    if (selected) {
-      selected.forEach(([startRow, , endRow]) => {
-        const first = Math.min(startRow, endRow);
-        const last = Math.max(startRow, endRow);
-        for (let row = first; row <= last; row++) rowsToDelete.add(row);
-      });
-    }
+    const rowsToDelete = new Set(selectedRows);
+    if (focusedRow !== null) rowsToDelete.add(focusedRow);
 
     if (rowsToDelete.size === 0) {
       toast.error('No rows selected');
       return;
     }
 
-    const current = readAnnotations();
-    const remaining = current.filter((_, idx) => !rowsToDelete.has(idx));
-    loadDataIntoHot(remaining);
+    replaceRows(rows.filter((_, index) => !rowsToDelete.has(index)));
     toast.success(`Deleted ${rowsToDelete.size} annotation(s)`);
   };
 
   const handleReset = () => {
-    loadDataIntoHot([]);
+    replaceRows([]);
     toast.success('All annotations cleared');
   };
 
   const handleSave = () => {
-    const current = readAnnotations();
-    onAnnotationsChange(ringId, current);
+    onAnnotationsChange(ringId, currentAnnotations());
     toast.success('Annotations updated');
     onClose();
   };
 
   const handleExport = () => {
-    const current = readAnnotations();
-    const tsv = exportAnnotationsToTSV(current);
+    const tsv = exportAnnotationsToTSV(currentAnnotations());
     const blob = new Blob([tsv], { type: 'text/tab-separated-values' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${ringName.replace(/\s+/g, '_')}_annotations.tsv`;
-    a.click();
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${ringName.replace(/\s+/g, '_')}_annotations.tsv`;
+    anchor.click();
     URL.revokeObjectURL(url);
     toast.success('Exported annotations');
   };
 
-  const handleFeatureImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFeatureImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     const kind = featureImportKind;
     if (!file || !kind) return;
 
@@ -254,145 +202,88 @@ export default function AnnotationEditor({
         return;
       }
 
-      // Imported features default to black; use the ring colour in the editor.
-      const coloured = features.map(f => ({ ...f, color: ringColor }));
-      const current = readAnnotations();
-      loadDataIntoHot([...current, ...coloured]);
-      if (features.length > 200) {
-        toast.success(`Imported ${features.length} features. Labels auto-disabled (too many).`);
-      } else {
-        const suffix = kind === 'gff3' ? ' from GFF3' : '';
-        toast.success(`Imported ${features.length} ${featureType} feature(s)${suffix}`);
-      }
+      appendAnnotations(features.map(feature => ({ ...feature, color: ringColor })));
+      toast.success(features.length > 200
+        ? `Imported ${features.length} features. Labels auto-disabled (too many).`
+        : `Imported ${features.length} ${featureType} feature(s)${kind === 'gff3' ? ' from GFF3' : ''}`);
       setFeatureImportKind(null);
     } catch (error) {
       toast.error(`${FEATURE_IMPORT_CONFIG[kind].label} parse error: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      event.target.value = '';
     }
-
-    e.target.value = '';
   };
 
-  // Keep the count in sync when Handsontable rows change via context menu or paste
-  const syncCount = useCallback(() => {
-    const hot = hotRef.current;
-    if (!hot || hot.isDestroyed) return;
-    const src = hot.getSourceData() as TableRow[];
-    const realRows = src.filter(r => r && (r.label || r.start || r.end)).length;
-    setCount(realRows);
-  }, []);
+  const toggleSelectedRow = (rowIndex: number) => {
+    setSelectedRows(current => {
+      const next = new Set(current);
+      if (next.has(rowIndex)) next.delete(rowIndex);
+      else next.add(rowIndex);
+      return next;
+    });
+  };
 
-  // afterChange: update count (Handsontable handles its own data in uncontrolled mode)
-  const afterChange = useCallback((_changes: Handsontable.CellChange[] | null, source: string) => {
-    if (source === 'loadData') return; // ignore initial load
-    syncCount();
-  }, [syncCount]);
-
-  // afterRemoveRow / afterCreateRow: keep the displayed count in sync
-  const afterRemoveRow = useCallback(() => {
-    syncCount();
-  }, [syncCount]);
-
-  const afterCreateRow = useCallback(() => {
-    syncCount();
-  }, [syncCount]);
-
-  const afterPaste = useCallback(() => {
-    syncCount();
-  }, [syncCount]);
-
-  const handleSelection = useCallback((row: number, _column: number, row2: number) => {
-    const first = Math.min(row, row2);
-    const last = Math.max(row, row2);
-    selectedRowsRef.current = Array.from({ length: last - first + 1 }, (_, index) => first + index);
-  }, []);
+  const toggleAllRows = () => {
+    setSelectedRows(current => (
+      current.size === rows.length ? new Set() : new Set(rows.map((_, index) => index))
+    ));
+  };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(0, 0, 0, 0.6)' }}>
+    <div
+      className="fixed inset-0 flex items-center justify-center z-50 p-4"
+      style={{ background: 'rgba(0, 0, 0, 0.6)' }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="annotation-editor-title"
+    >
       <div className="rounded-lg max-w-6xl w-full max-h-[90vh] flex flex-col" style={{ background: 'var(--gx-bg-alt)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
-        {/* Header */}
         <div className="p-4 flex justify-between items-center" style={{ borderBottom: '1px solid var(--gx-border)' }}>
-          <h2 className="text-xl font-bold" style={{ color: 'var(--gx-text)' }}>
+          <h2 id="annotation-editor-title" className="text-xl font-bold" style={{ color: 'var(--gx-text)' }}>
             Annotations for {ringName}
           </h2>
-          <button
-            onClick={onClose}
-            style={{ color: 'var(--gx-text-muted)' }}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button type="button" onClick={onClose} aria-label="Close annotation editor" style={{ color: 'var(--gx-text-muted)' }}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         <p className="px-4 py-2 text-xs" style={{ color: 'var(--gx-text-muted)', borderBottom: '1px solid var(--gx-border)' }}>
-          This is an optional overlay on the selected query ring. Load shared reference features in the Reference Genome card instead.
+          This is an optional overlay on the selected query ring. Paste rows from a spreadsheet, or load shared reference features in the Reference Genome card.
         </p>
 
-        {/* Toolbar */}
         <div className="p-4 flex gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--gx-border)' }}>
           <label className="btn-primary cursor-pointer text-sm">
-            <input
-              type="file"
-              accept=".csv,.tsv,.txt"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
+            <input type="file" accept=".csv,.tsv,.txt" onChange={handleFileUpload} className="hidden" />
             Load File
           </label>
-          <button
-            onClick={handleAddNew}
-            className="btn-secondary text-sm"
-          >
-            Add New
-          </button>
-          <button
-            onClick={handleDeleteSelected}
-            className="btn-secondary text-sm"
-            style={{ borderColor: 'var(--gx-error)', color: 'var(--gx-error)' }}
-          >
+          <button type="button" onClick={handleAddNew} className="btn-secondary text-sm">Add New</button>
+          <button type="button" onClick={handleDeleteSelected} className="btn-secondary text-sm" style={{ borderColor: 'var(--gx-error)', color: 'var(--gx-error)' }}>
             Delete Selected
           </button>
-          <button
-            onClick={handleReset}
-            className="btn-secondary text-sm"
-            style={{ borderColor: 'var(--gx-error)', color: 'var(--gx-error)' }}
-          >
+          <button type="button" onClick={handleReset} className="btn-secondary text-sm" style={{ borderColor: 'var(--gx-error)', color: 'var(--gx-error)' }}>
             Reset All
           </button>
-          <button
-            onClick={handleExport}
-            disabled={count === 0}
-            className="btn-secondary text-sm disabled:opacity-50"
-          >
+          <button type="button" onClick={handleExport} disabled={rows.length === 0} className="btn-secondary text-sm disabled:opacity-50">
             Export TSV
           </button>
-          <button
-            onClick={() => setFeatureImportKind(current => current === 'genbank' ? null : 'genbank')}
-            className="btn-secondary text-sm"
-          >
+          <button type="button" onClick={() => setFeatureImportKind(current => current === 'genbank' ? null : 'genbank')} className="btn-secondary text-sm">
             Import GenBank Features
           </button>
-          <button
-            onClick={() => setFeatureImportKind(current => current === 'gff3' ? null : 'gff3')}
-            className="btn-secondary text-sm"
-          >
+          <button type="button" onClick={() => setFeatureImportKind(current => current === 'gff3' ? null : 'gff3')} className="btn-secondary text-sm">
             Import GFF3 Features
           </button>
-          <div className="ml-auto text-sm self-center" style={{ color: 'var(--gx-text-muted)' }}>
-            {count} annotation(s) | Reference: {referenceLength.toLocaleString()} bp
+          <div className="ml-auto text-sm self-center" style={{ color: 'var(--gx-text-muted)' }} aria-live="polite">
+            {rows.length} annotation(s) | Reference: {referenceLength.toLocaleString()} bp
           </div>
         </div>
 
-        {/* GenBank/GFF3 Import Panel */}
         {featureImportKind && (
           <div className="px-4 pb-4 flex gap-2 items-end flex-wrap" style={{ borderBottom: '1px solid var(--gx-border)' }}>
             <div>
-              <label className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>Feature Type</label>
-              <select
-                value={featureType}
-                onChange={(e) => setFeatureType(e.target.value)}
-                className="input-field text-sm"
-              >
+              <label htmlFor="feature-type" className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>Feature Type</label>
+              <select id="feature-type" value={featureType} onChange={event => setFeatureType(event.target.value)} className="input-field text-sm">
                 <option value="CDS">CDS</option>
                 <option value="gene">gene</option>
                 <option value="rRNA">rRNA</option>
@@ -401,78 +292,93 @@ export default function AnnotationEditor({
               </select>
             </div>
             <div>
-              <label className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>Text Filter (optional)</label>
-              <input
-                type="text"
-                value={featureTextFilter}
-                onChange={(e) => setFeatureTextFilter(e.target.value)}
-                placeholder="e.g. kinase"
-                className="input-field text-sm"
-              />
+              <label htmlFor="feature-filter" className="block text-xs mb-1" style={{ color: 'var(--gx-text-muted)' }}>Text Filter (optional)</label>
+              <input id="feature-filter" type="text" value={featureTextFilter} onChange={event => setFeatureTextFilter(event.target.value)} placeholder="e.g. kinase" className="input-field text-sm" />
             </div>
             <label className="btn-primary text-sm cursor-pointer">
               {FEATURE_IMPORT_CONFIG[featureImportKind].fileLabel}
-              <input
-                type="file"
-                accept={FEATURE_IMPORT_CONFIG[featureImportKind].accept}
-                onChange={handleFeatureImport}
-                className="hidden"
-              />
+              <input type="file" accept={FEATURE_IMPORT_CONFIG[featureImportKind].accept} onChange={handleFeatureImport} className="hidden" />
             </label>
           </div>
         )}
 
-        {/* Spreadsheet — uncontrolled mode: data is passed once via ref, not re-rendered */}
-        <div className="flex-1 overflow-hidden p-4" style={{ minHeight: '400px' }}>
-          <HotTable
-            ref={(ref) => { hotRef.current = ref?.hotInstance || null; }}
-            data={tableDataRef.current}
-            colHeaders={['Start', 'End', 'Label', 'Shape', 'Colour']}
-            columns={[
-              { data: 'start', type: 'numeric' },
-              { data: 'end', type: 'numeric' },
-              { data: 'label', type: 'text' },
-              {
-                data: 'shape',
-                type: 'dropdown',
-                source: ANNOTATION_SHAPES
-              },
-              { data: 'color', type: 'text' }
-            ]}
-            rowHeaders={true}
-            width="100%"
-            height={450}
-            licenseKey="non-commercial-and-evaluation"
-            themeName="ht-theme-main-dark-auto"
-            afterChange={afterChange}
-            afterRemoveRow={afterRemoveRow}
-            afterCreateRow={afterCreateRow}
-            afterPaste={afterPaste}
-            afterSelection={handleSelection}
-            afterSelectionEnd={handleSelection}
-            contextMenu={['row_above', 'row_below', 'remove_row', '---------', 'copy', 'cut']}
-            manualRowResize={true}
-            manualColumnResize={true}
-            stretchH="all"
-            minRows={10}
-            minSpareRows={1}
-          />
+        <div className="flex-1 overflow-auto p-4" style={{ minHeight: '400px' }}>
+          <table className="w-full border-collapse text-sm" aria-label="Annotations">
+            <caption className="sr-only">Editable annotations. Use the checkboxes to select rows for deletion.</caption>
+            <thead className="sticky top-0 z-10" style={{ background: 'var(--gx-bg-alt)' }}>
+              <tr>
+                <th className="border p-2 w-12" style={{ borderColor: 'var(--gx-border)' }} scope="col">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all annotation rows"
+                    checked={rows.length > 0 && selectedRows.size === rows.length}
+                    onChange={toggleAllRows}
+                  />
+                </th>
+                <th className="border p-2 text-left" style={{ borderColor: 'var(--gx-border)' }} scope="col">Start</th>
+                <th className="border p-2 text-left" style={{ borderColor: 'var(--gx-border)' }} scope="col">End</th>
+                <th className="border p-2 text-left" style={{ borderColor: 'var(--gx-border)' }} scope="col">Label</th>
+                <th className="border p-2 text-left" style={{ borderColor: 'var(--gx-border)' }} scope="col">Shape</th>
+                <th className="border p-2 text-left" style={{ borderColor: 'var(--gx-border)' }} scope="col">Colour</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIndex) => (
+                <tr key={row.id} data-testid="annotation-row" style={selectedRows.has(rowIndex) ? { background: 'color-mix(in srgb, var(--gx-accent) 12%, transparent)' } : undefined}>
+                  <th className="border p-2 text-center" style={{ borderColor: 'var(--gx-border)' }} scope="row">
+                    <input type="checkbox" aria-label={`Select annotation row ${rowIndex + 1}`} checked={selectedRows.has(rowIndex)} onChange={() => toggleSelectedRow(rowIndex)} />
+                  </th>
+                  <td className="border p-0" style={{ borderColor: 'var(--gx-border)' }}>
+                    <input type="number" min={1} max={referenceLength} value={row.start} aria-label={`Start row ${rowIndex + 1}`} className="w-full p-2 bg-transparent" style={CELL_STYLE} onFocus={() => setFocusedRow(rowIndex)} onPaste={event => handlePaste(event, rowIndex, 'start')} onChange={event => updateRow(rowIndex, 'start', event.target.valueAsNumber || 1)} />
+                  </td>
+                  <td className="border p-0" style={{ borderColor: 'var(--gx-border)' }}>
+                    <input type="number" min={1} max={referenceLength} value={row.end} aria-label={`End row ${rowIndex + 1}`} className="w-full p-2 bg-transparent" style={CELL_STYLE} onFocus={() => setFocusedRow(rowIndex)} onPaste={event => handlePaste(event, rowIndex, 'end')} onChange={event => updateRow(rowIndex, 'end', event.target.valueAsNumber || 1)} />
+                  </td>
+                  <td className="border p-0" style={{ borderColor: 'var(--gx-border)' }}>
+                    <input type="text" value={row.label} aria-label={`Label row ${rowIndex + 1}`} className="w-full p-2 bg-transparent" style={CELL_STYLE} onFocus={() => setFocusedRow(rowIndex)} onPaste={event => handlePaste(event, rowIndex, 'label')} onChange={event => updateRow(rowIndex, 'label', event.target.value)} />
+                  </td>
+                  <td className="border p-0" style={{ borderColor: 'var(--gx-border)' }}>
+                    <select value={row.shape} aria-label={`Shape row ${rowIndex + 1}`} className="w-full p-2" style={CELL_STYLE} onFocus={() => setFocusedRow(rowIndex)} onPaste={event => handlePaste(event, rowIndex, 'shape')} onChange={event => updateRow(rowIndex, 'shape', event.target.value as AnnotationTableRow['shape'])}>
+                      {ANNOTATION_SHAPES.map(shape => <option key={shape} value={shape}>{shape}</option>)}
+                    </select>
+                  </td>
+                  <td className="border p-0" style={{ borderColor: 'var(--gx-border)' }}>
+                    <input type="text" value={row.color} aria-label={`Colour row ${rowIndex + 1}`} className="w-full p-2 bg-transparent font-mono" style={CELL_STYLE} onFocus={() => setFocusedRow(rowIndex)} onPaste={event => handlePaste(event, rowIndex, 'color')} onChange={event => updateRow(rowIndex, 'color', event.target.value)} />
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr>
+                  <td className="border p-2 text-center" style={{ borderColor: 'var(--gx-border)', color: 'var(--gx-text-muted)' }}>1</td>
+                  <td className="border p-0" style={{ borderColor: 'var(--gx-border)' }}>
+                    <input
+                      type="number"
+                      min={1}
+                      max={referenceLength}
+                      aria-label="Paste annotations here"
+                      placeholder="Paste here"
+                      className="w-full p-2 bg-transparent"
+                      style={CELL_STYLE}
+                      onPaste={event => handlePaste(event, 0, 'start')}
+                      onChange={event => {
+                        if (!event.target.value) return;
+                        setRows([{ id: createRowId(), start: event.target.valueAsNumber || 1, end: 1, label: '', shape: 'block', color: ringColor }]);
+                        setFocusedRow(0);
+                      }}
+                    />
+                  </td>
+                  <td colSpan={4} className="border p-2" style={{ borderColor: 'var(--gx-border)', color: 'var(--gx-text-muted)' }}>
+                    Paste tab-separated rows here, load a file, or add an annotation.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
 
-        {/* Footer */}
         <div className="p-4 flex justify-end gap-2" style={{ borderTop: '1px solid var(--gx-border)' }}>
-          <button
-            onClick={onClose}
-            className="btn-secondary"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            className="btn-primary"
-          >
-            Save & Close
-          </button>
+          <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+          <button type="button" onClick={handleSave} className="btn-primary">Save &amp; Close</button>
         </div>
       </div>
     </div>

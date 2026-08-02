@@ -1,23 +1,20 @@
-# Security Policy
+# Security policy
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
-Please **do not** open a public GitHub issue for security vulnerabilities.
+Do not open a public GitHub issue for a suspected security vulnerability. Email **nabil@happykhan.com** with a description, impact, reproduction steps, and any suggested mitigation. You should receive an initial response within five business days.
 
-Instead, email **nabil@happykhan.com** with:
+## Current security boundary
 
-- A description of the vulnerability and its potential impact
-- Steps to reproduce or a proof-of-concept
-- Any suggested mitigations (optional)
+BRIGX is a static browser application with no authentication, server-side analysis, account storage, or file-upload endpoint. Its principal security surfaces are:
 
-You will receive a response within 5 business days. Once confirmed, a fix will be released as soon as practicable and the reporter credited (unless anonymity is requested).
+- parsing genome, annotation, graph, session, and compressed files supplied by the user;
+- executing the bundled BLAST WebAssembly modules;
+- browser rendering and export of user-controlled labels and metadata;
+- the JavaScript package supply chain and production hosting.
 
-## Scope
+BLAST assets are served from the BRIGX origin and checked against committed SHA-256 values before execution. Production hosting applies a restrictive Content Security Policy and related browser security headers. Dependencies are checked in CI with `npm run quality:licenses` and `npm run quality:security`.
 
-BRIGx runs entirely in the browser — no server-side code, no data upload, no authentication. The main security surface is:
+## Audit exception
 
-- **Client-side file parsing** (FASTA, GenBank, GFF3, SAV, graph files supplied by the user)
-- **WASM binaries** (BLAST, minimap2) fetched from a CDN on first load
-- **CDN-hosted resources** (biowasm, phylocanvas.gl)
-
-Dependencies are tracked in `package.json`. Please report supply-chain concerns (malicious packages, compromised CDN assets) via the contact above.
+As of 2 August 2026, npm advisory 1124282 reports a high-severity React Router CSRF issue affecting React Server Components mode. BRIGX uses React Router only for static client-side navigation and has no React Server Components, actions, server rendering, or action endpoints, so the vulnerable execution path is absent. No patched version is currently published in the configured npm registry. The security check accepts only this exact advisory and fails if any other production advisory appears. Reassess this exception when a patched compatible release becomes available, or by 1 September 2026, whichever is earlier.

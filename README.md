@@ -18,16 +18,19 @@ Live at [brigx.genomicx.org](https://brigx.genomicx.org) · Part of the [Genomic
 
 ## Quick start
 
+BRIGX requires Node.js 24 LTS for development and release builds.
+
 ```bash
 npm install
 npm run dev      # http://localhost:3000
-npm test         # 132 tests (Vitest)
+npm test         # 157 tests (Vitest)
 npm run build    # Production build
+npm run verify   # Full release verification, including Chromium workflows
 ```
 
 ## How it works
 
-BRIGx runs entirely in the browser. BLAST binaries are compiled to WebAssembly and fetched from `static.genomicx.org`. Alignments run inside Web Workers so the UI stays responsive. No data ever leaves your machine.
+BRIGx runs entirely in the browser. Versioned BLAST binaries are compiled to WebAssembly, served from the BRIGX origin, and verified with SHA-256 before execution. Alignments run inside Web Workers so the UI stays responsive. Genome and annotation file contents are not uploaded to an analysis server.
 
 ## Tech stack
 
@@ -65,4 +68,4 @@ Developed by [Nabil-Fareed Alikhan](https://happykhan.com), CGPS Oxford.
 
 ## License
 
-GPL-3.0
+BRIGX is GPL-3.0. Commercial use is permitted subject to the licence terms. See [the third-party notices](THIRD_PARTY_NOTICES.md) and [example-data provenance](examples/README.md).

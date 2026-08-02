@@ -14,7 +14,11 @@ import {
   calculateGCSkewWindows,
   mergeGenomes,
 } from '@/lib/genomeParser';
-import { extractGenBankFeatures, extractGFF3Features } from '@/lib/featureParser';
+import {
+  extractGenBankFeatures,
+  extractGFF3Features,
+  extractReferenceAnnotationFile,
+} from '@/lib/featureParser';
 import { parseAnnotationFile, exportAnnotationsToTSV, resolveColour, resolveDecoration } from '@/lib/annotationParser';
 import type { ParsedGenome, Annotation } from '@/lib/types';
 import * as fs from 'fs';
@@ -585,5 +589,27 @@ chr1\tBakta\ttRNA\t950\t1020\t.\t+\t.\tID=trna1;Name=tRNA-Lys
     const features = extractGFF3Features(gff3, 'CDS', 'surface adhesin');
     expect(features).toHaveLength(1);
     expect(features[0].label).toBe('adhesin A');
+  });
+
+  it('detects Bakta GFF3 and GBFF companion annotation formats', () => {
+    expect(extractReferenceAnnotationFile(gff3, 'bakta.gff3')).toHaveLength(2);
+
+    const gbff = `LOCUS       BaktaRef 1000 bp DNA circular BCT 01-JAN-2020
+FEATURES             Location/Qualifiers
+     CDS             10..100
+                     /locus_tag="BAKTA_0001"
+ORIGIN
+        1 acgt
+//
+`;
+    expect(extractReferenceAnnotationFile(gbff, 'bakta.gbff')).toMatchObject([
+      { label: 'BAKTA_0001', start: 10, end: 100 },
+    ]);
+  });
+
+  it('rejects unsupported companion annotation extensions', () => {
+    expect(() => extractReferenceAnnotationFile(gff3, 'annotations.csv')).toThrow(
+      'Reference annotations must be GFF3, GFF, GenBank, or GBFF format.',
+    );
   });
 });

@@ -11,3 +11,14 @@ export function referenceFeaturesToAnnotations(features: readonly Feature[]): An
     color: feature.color || '#4a90e2',
   }));
 }
+
+/** Combine annotations embedded in GenBank/GBFF with an optional companion annotation file. */
+export function collectReferenceAnnotations(
+  features: readonly Feature[] | undefined,
+  annotations: readonly Annotation[] | undefined,
+): Annotation[] {
+  return [
+    ...referenceFeaturesToAnnotations(features ?? []),
+    ...(annotations ?? []),
+  ];
+}

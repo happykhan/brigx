@@ -91,11 +91,37 @@ export function extractGFF3Features(
       id: `gff-${annotations.length}-${start}`,
       start,
       end,
-      label: attributes.gene || attributes.locus_tag || attributes.Name || attributes.ID || featureType,
+      label: attributes.gene
+        || attributes.locus_tag
+        || attributes.Name
+        || attributes.product
+        || attributes.ID
+        || featureType,
       shape,
       color: '#000000',
     });
   }
 
   return annotations;
+}
+
+/** Parse a companion reference-annotation file by its standard extension. */
+export function extractReferenceAnnotationFile(
+  text: string,
+  fileName: string,
+  featureType = 'CDS',
+): Annotation[] {
+  const normalizedName = fileName.toLowerCase();
+  if (normalizedName.endsWith('.gff3') || normalizedName.endsWith('.gff')) {
+    return extractGFF3Features(text, featureType);
+  }
+  if (
+    normalizedName.endsWith('.gbff')
+    || normalizedName.endsWith('.gbk')
+    || normalizedName.endsWith('.gb')
+    || normalizedName.endsWith('.genbank')
+  ) {
+    return extractGenBankFeatures(text, featureType);
+  }
+  throw new Error('Reference annotations must be GFF3, GFF, GenBank, or GBFF format.');
 }

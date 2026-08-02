@@ -272,7 +272,7 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations, 
                       style={{ color: 'var(--gx-indigo)' }}
                       title="Add custom region highlights or import gene features (GenBank/GFF3) to overlay on this ring"
                     >
-                      Custom Annotations
+                      Custom Ring Overlay
                     </button>
                   )}
                   <label className="flex items-center gap-1 text-xs cursor-pointer" style={{ color: 'var(--gx-text-muted)' }} title="Show annotation labels on the ring">

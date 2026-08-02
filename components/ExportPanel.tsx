@@ -52,14 +52,14 @@ function renderPlotSVG(
 
 function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
-  try {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Revoking synchronously can cancel downloads in Safari and embedded browsers.
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {

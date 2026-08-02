@@ -7,6 +7,7 @@ import { APP_VERSION } from '@/lib/version';
 import type { BRIGController as BRIGControllerType } from '@/lib/controller';
 import { exportSession, importSession } from '@/lib/session';
 import { readFileText } from '@/lib/fileAccess';
+import { extractReferenceAnnotationFile } from '@/lib/featureParser';
 import { INITIAL_PLOT_STATE, plotStateReducer } from '@/lib/plotState';
 import type { ImagePropertiesConfig } from '@/components/ImageProperties';
 import { useConsoleCapture } from './useConsoleCapture';
@@ -52,6 +53,10 @@ export function useBRIGController() {
   const [ringAnnotations, setRingAnnotations] = useState<Record<string, Annotation[]>>({});
   const ringAnnotationsRef = useRef(ringAnnotations);
   ringAnnotationsRef.current = ringAnnotations;
+  const [referenceAnnotations, setReferenceAnnotations] = useState<Annotation[]>([]);
+  const referenceAnnotationsRef = useRef(referenceAnnotations);
+  referenceAnnotationsRef.current = referenceAnnotations;
+  const [referenceAnnotationFileName, setReferenceAnnotationFileName] = useState<string | null>(null);
   const referenceLength = plotData?.reference.length ?? 0;
 
   useEffect(() => () => {
@@ -73,6 +78,44 @@ export function useBRIGController() {
   const handleOpenAnnotationEditor = (ringId: string) => {
     setEditingRingId(ringId);
     setAnnotationEditorOpen(true);
+  };
+
+  const handleReferenceAnnotationsFileChange = async (file: File) => {
+    if (referenceLength <= 0) {
+      toast.error('Load the reference genome before its annotation file');
+      return;
+    }
+
+    try {
+      const text = await readFileText(file);
+      const parsed = extractReferenceAnnotationFile(text, file.name, 'CDS');
+      const annotations = parsed
+        .filter(annotation => annotation.end >= 1 && annotation.start <= referenceLength)
+        .map(annotation => ({
+          ...annotation,
+          start: Math.max(1, Math.min(annotation.start, referenceLength)),
+          end: Math.max(1, Math.min(annotation.end, referenceLength)),
+          color: annotation.color === '#000000' ? '#4a90e2' : annotation.color,
+        }));
+
+      if (annotations.length === 0) {
+        toast.error('No CDS features matched the reference coordinates');
+        return;
+      }
+
+      setReferenceAnnotations(annotations);
+      setReferenceAnnotationFileName(file.name);
+      dispatchPlot({ type: 'reference-annotations', annotations });
+      toast.success(`Loaded ${annotations.length} reference CDS feature(s)`);
+    } catch (error) {
+      toast.error(`Reference annotation error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const handleClearReferenceAnnotations = () => {
+    setReferenceAnnotations([]);
+    setReferenceAnnotationFileName(null);
+    dispatchPlot({ type: 'reference-annotations', annotations: [] });
   };
 
   // Auto-generate plot skeleton when reference file is loaded
@@ -118,6 +161,10 @@ export function useBRIGController() {
 
       const plotDataWithRings = {
         ...skeletonResult,
+        reference: {
+          ...skeletonResult.reference,
+          annotations: referenceAnnotationsRef.current,
+        },
         rings: ringPlaceholders
       };
 
@@ -201,7 +248,13 @@ export function useBRIGController() {
 
             dispatchPlot({
               type: 'partial',
-              data: { ...update.partialData, rings: update.partialData.rings },
+              data: {
+                ...update.partialData,
+                reference: update.partialData.reference
+                  ? { ...update.partialData.reference, annotations: referenceAnnotationsRef.current }
+                  : undefined,
+                rings: update.partialData.rings,
+              },
               annotationsByRing: ringAnnotationsRef.current,
             });
           }
@@ -213,7 +266,10 @@ export function useBRIGController() {
       if (runGeneration !== referenceGenerationRef.current) return;
       dispatchPlot({
         type: 'commit',
-        data: result,
+        data: {
+          ...result,
+          reference: { ...result.reference, annotations: referenceAnnotationsRef.current },
+        },
         annotationsByRing: ringAnnotationsRef.current,
       });
       setProgress({ step: 'Complete!', percent: 100 });
@@ -231,6 +287,10 @@ export function useBRIGController() {
 
   const handleReferenceFileChange = (file: File) => {
     referenceGenerationRef.current += 1;
+    if (referenceFile) {
+      setReferenceAnnotations([]);
+      setReferenceAnnotationFileName(null);
+    }
     setReferenceFile(file);
     // Reset plot when reference changes
     dispatchPlot({ type: 'clear' });
@@ -247,7 +307,8 @@ export function useBRIGController() {
       rings,
       ringAnnotations,
       params,
-      imageProperties
+      imageProperties,
+      referenceAnnotations,
     );
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -291,6 +352,11 @@ export function useBRIGController() {
       });
       setRingAnnotations(restoredAnnotations);
 
+      const restoredReferenceAnnotations = session.referenceAnnotations ?? [];
+      setReferenceAnnotations(restoredReferenceAnnotations);
+      setReferenceAnnotationFileName(restoredReferenceAnnotations.length > 0 ? 'Loaded from session' : null);
+      dispatchPlot({ type: 'reference-annotations', annotations: restoredReferenceAnnotations });
+
       // Restore params and image config
       setParams(session.params);
       setImageProperties(session.imageConfig);
@@ -323,11 +389,15 @@ export function useBRIGController() {
     editingRingId,
     setEditingRingId,
     ringAnnotations,
+    referenceAnnotations,
+    referenceAnnotationFileName,
     referenceLength,
     // Handlers
     handleReferenceFileChange,
     handleAnnotationsChange,
     handleOpenAnnotationEditor,
+    handleReferenceAnnotationsFileChange,
+    handleClearReferenceAnnotations,
     handleRun,
     handleSaveSession,
     handleLoadSession,

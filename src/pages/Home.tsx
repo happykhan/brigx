@@ -39,8 +39,9 @@ export default function Home() {
     isProcessing, consoleLogs, imageProperties, setImageProperties,
     plotExpanded, setPlotExpanded,
     annotationEditorOpen, setAnnotationEditorOpen, editingRingId, setEditingRingId,
-    ringAnnotations, referenceLength,
+    ringAnnotations, referenceAnnotations, referenceAnnotationFileName, referenceLength,
     handleReferenceFileChange, handleAnnotationsChange, handleOpenAnnotationEditor,
+    handleReferenceAnnotationsFileChange, handleClearReferenceAnnotations,
     handleRun, handleSaveSession, handleLoadSession,
   } = useBRIGController();
 
@@ -101,19 +102,35 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 lg:items-start">
               <div className="lg:col-span-1 space-y-6 animate-fade-in lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-2">
-                <ReferenceInput referenceFile={referenceFile} onFileChange={handleReferenceFileChange} />
+                <ReferenceInput
+                  referenceFile={referenceFile}
+                  onFileChange={handleReferenceFileChange}
+                  referenceReady={referenceLength > 0}
+                  referenceAnnotationFileName={referenceAnnotationFileName}
+                  referenceAnnotationCount={referenceAnnotations.length}
+                  onReferenceAnnotationFileChange={handleReferenceAnnotationsFileChange}
+                  onClearReferenceAnnotations={handleClearReferenceAnnotations}
+                />
                 <RingsPanel rings={rings} setRings={setRings} onEditAnnotations={handleOpenAnnotationEditor} ringDataList={plotData?.rings} />
                 <ControlPanel params={params} setParams={setParams} isProcessing={isProcessing} referenceFile={referenceFile} rings={rings} plotData={plotData} onRun={handleRun} />
               </div>
 
-              <div className="lg:col-span-2 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto animate-slide-up">
+              <div
+                className="lg:col-span-2 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto animate-slide-up"
+                style={plotExpanded ? { zIndex: 10_000 } : undefined}
+              >
                 <ImagePropertiesPanel imageProperties={imageProperties} onChange={setImageProperties} />
 
-                <div className={`card ${plotExpanded ? 'fixed inset-0 z-50 flex flex-col' : ''}`} style={plotExpanded ? { background: 'var(--gx-bg-alt)', borderRadius: 0 } : undefined}>
+                <div
+                  className={`card ${plotExpanded ? 'fixed inset-0 flex flex-col' : ''}`}
+                  style={plotExpanded
+                    ? { background: 'var(--gx-bg-alt)', borderRadius: 0, zIndex: 10_000 }
+                    : undefined}
+                >
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="section-title mb-0">Circular Plot</h2>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => setPlotExpanded(!plotExpanded)} className="btn-secondary text-xs px-2 py-1" title={plotExpanded ? 'Shrink plot' : 'Expand plot'}>
+                      <button onClick={() => setPlotExpanded(value => !value)} className="btn-secondary text-xs px-2 py-1" title={plotExpanded ? 'Shrink plot' : 'Expand plot'}>
                         {plotExpanded ? (
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                         ) : (

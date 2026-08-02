@@ -1,7 +1,7 @@
 // Canvas 2D renderer for circular genome plot (display only; SVG renderer kept for export)
 
 import type { CircularPlotData, RingData, Annotation, ContigBoundary } from './types';
-import { referenceFeaturesToAnnotations } from './referenceAnnotations';
+import { collectReferenceAnnotations } from './referenceAnnotations';
 import type { LegendBounds, PlotTooltip, RenderConfig } from './rendering/types';
 import { positionToAngle, hexToRGB, getColorIntensity, calculateRingLayout } from './geometry';
 import { drawCanvasAnnotations } from './rendering/canvasAnnotations';
@@ -128,10 +128,13 @@ export class CanvasPlotRenderer {
    * Test if a logical coordinate is over a legend. Returns 'gc' | 'ring' | null.
    */
   legendHitTest(canvasX: number, canvasY: number, zoom: number, panX: number, panY: number): 'gc' | 'ring' | null {
-    const cx = this.config.width / 2;
-    const cy = this.config.height / 2;
-    const logicalX = (canvasX - cx - panX) / zoom + cx;
-    const logicalY = (canvasY - cy - panY) / zoom + cy;
+    // Legends are screen-space overlays and are deliberately independent of
+    // the plot zoom/pan transform.
+    void zoom;
+    void panX;
+    void panY;
+    const logicalX = canvasX;
+    const logicalY = canvasY;
 
     if (this.gcLegendBounds) {
       const b = this.gcLegendBounds;
@@ -152,8 +155,9 @@ export class CanvasPlotRenderer {
    * Move a legend by a delta in logical coordinates.
    */
   moveLegend(which: 'gc' | 'ring', deltaX: number, deltaY: number, zoom: number): void {
-    const dx = deltaX / zoom;
-    const dy = deltaY / zoom;
+    void zoom;
+    const dx = deltaX;
+    const dy = deltaY;
     if (which === 'gc') {
       const cur = this.gcLegendPos || { x: 20, y: 20 };
       this.gcLegendPos = { x: cur.x + dx, y: cur.y + dy };
@@ -196,12 +200,15 @@ export class CanvasPlotRenderer {
     // --- Reference ring ---
     drawCircle(ctx, cx, cy, this.config.innerRadius, '#333', 2);
 
-    // Reference features (from GenBank reference file)
-    if (data.reference.features && data.reference.features.length > 0) {
+    // Reference features from GenBank/GBFF or a companion annotation file.
+    const referenceAnnotations = collectReferenceAnnotations(
+      data.reference.features,
+      data.reference.annotations,
+    );
+    if (referenceAnnotations.length > 0) {
       const featureInner = Math.max(10, this.config.innerRadius - 30);
       const featureOuter = this.config.innerRadius;
-      const featureAnnotations = referenceFeaturesToAnnotations(data.reference.features);
-      this.drawAnnotations(ctx, cx, cy, refLength, featureAnnotations, featureInner, featureOuter, true, true);
+      this.drawAnnotations(ctx, cx, cy, refLength, referenceAnnotations, featureInner, featureOuter, true, true);
     }
 
     // --- Ring layout ---
@@ -263,7 +270,10 @@ export class CanvasPlotRenderer {
     // Title
     this.drawTitle(ctx, cx, cy, refLength);
 
-    // Legends
+    // Finish the transformed map before drawing screen-space legend overlays.
+    ctx.restore();
+
+    // Legends remain fixed while the map is panned or zoomed.
     if (this.config.showLegend !== false) {
       if (data.reference.gcContent || data.reference.gcSkew) {
         this.drawGCLegend(ctx, !!data.reference.gcContent, !!data.reference.gcSkew);
@@ -273,7 +283,6 @@ export class CanvasPlotRenderer {
       }
     }
 
-    ctx.restore();
   }
 
  private addHitRegion(innerR: number, outerR: number, startAngle: number, endAngle: number, tooltip: PlotTooltip): void {

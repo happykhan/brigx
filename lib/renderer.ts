@@ -1,6 +1,6 @@
 // Circular Plot SVG Renderer
 import type { CircularPlotData, RingData, Annotation, ContigBoundary, PlotViewState } from './types';
-import { referenceFeaturesToAnnotations } from './referenceAnnotations';
+import { collectReferenceAnnotations } from './referenceAnnotations';
 import { positionToAngle, createArcPath as geometryCreateArcPath, getColorIntensity as geometryGetColorIntensity } from './geometry';
 import type { RenderConfig } from './rendering/types';
 import type { TooltipCallback } from './rendering/types';
@@ -743,6 +743,7 @@ export class CircularPlotRenderer {
     const mainGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     mainGroup.setAttribute('id', 'main-content');
     mainGroup.setAttribute('inkscape:label', 'Plot Content');
+    mainGroup.setAttribute('inkscape:groupmode', 'layer');
     mainGroup.setAttribute('transform-origin', 'center');
 
     // Apply zoom/pan transform if view state is provided (matches canvas renderer's transform)
@@ -764,16 +765,19 @@ export class CircularPlotRenderer {
     // Render reference ring first
     this.renderReferenceRing(mainGroup, cx, cy, refLength);
 
-    // GenBank reference features sit inside the reference ring, matching the canvas preview.
-    if (data.reference.features && data.reference.features.length > 0) {
+    // Reference features sit inside the reference ring, matching the canvas preview.
+    const referenceAnnotations = collectReferenceAnnotations(
+      data.reference.features,
+      data.reference.annotations,
+    );
+    if (referenceAnnotations.length > 0) {
       const featureInner = Math.max(10, this.config.innerRadius - 30);
-      const featureAnnotations = referenceFeaturesToAnnotations(data.reference.features);
       this.renderAnnotations(
         mainGroup,
         cx,
         cy,
         refLength,
-        featureAnnotations,
+        referenceAnnotations,
         featureInner,
         this.config.innerRadius,
         true,
@@ -838,13 +842,19 @@ export class CircularPlotRenderer {
 
     this.renderScaleMarkers(mainGroup, cx, cy, refLength);
     
-    // Add legends if enabled
+    // Legends are a separate top-level Inkscape layer. They preserve their
+    // dragged coordinates and do not inherit the map zoom/pan transform.
     if (this.config.showLegend !== false) {
+      const legendsGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      legendsGroup.setAttribute('id', 'legends');
+      legendsGroup.setAttribute('inkscape:label', 'Legends');
+      legendsGroup.setAttribute('inkscape:groupmode', 'layer');
+      this.svg.appendChild(legendsGroup);
       if (data.reference.gcContent || data.reference.gcSkew) {
-        this.renderGCLegend(mainGroup, !!data.reference.gcContent, !!data.reference.gcSkew);
+        this.renderGCLegend(legendsGroup, !!data.reference.gcContent, !!data.reference.gcSkew);
       }
       if (visibleRings.length > 0) {
-        this.renderRingLegend(mainGroup, visibleRings);
+        this.renderRingLegend(legendsGroup, visibleRings);
       }
     }
     

@@ -237,11 +237,12 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange 
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
           </button>
-          <button type="button" onClick={handleCenterView} className="p-1.5 rounded hover:opacity-80" style={{ color: 'var(--gx-text)' }} title="Centre the plot (keep current zoom)">
+          <button type="button" onClick={handleCenterView} className="p-1.5 rounded hover:opacity-80 flex items-center gap-1" style={{ color: 'var(--gx-text)' }} title="Centre the plot (keep current zoom)">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="3" strokeWidth={2} />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v4m0 12v4M2 12h4m12 0h4" />
             </svg>
+            <span className="text-xs">Centre</span>
           </button>
         </div>
         <button type="button" onClick={handleResetView} className="text-xs px-2 py-1 rounded hover:opacity-80" style={{ color: 'var(--gx-text-muted)' }} title="Reset zoom to 100% and centre the plot">

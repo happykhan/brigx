@@ -110,6 +110,8 @@ export interface CircularPlotData {
     gcContent?: number[];
     gcSkew?: number[];
     features?: Feature[];
+    /** Optional companion annotations, such as Bakta GFF3 features for a FASTA reference. */
+    annotations?: Annotation[];
     contigs?: ContigBoundary[]; // Contig boundaries for multi-FASTA reference
   };
   rings: RingData[];

@@ -324,6 +324,10 @@ export default function AnnotationEditor({
           </button>
         </div>
 
+        <p className="px-4 py-2 text-xs" style={{ color: 'var(--gx-text-muted)', borderBottom: '1px solid var(--gx-border)' }}>
+          This is an optional overlay on the selected query ring. Load shared reference features in the Reference Genome card instead.
+        </p>
+
         {/* Toolbar */}
         <div className="p-4 flex gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--gx-border)' }}>
           <label className="btn-primary cursor-pointer text-sm">

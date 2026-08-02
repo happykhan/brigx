@@ -1,0 +1,3 @@
+##gff-version 3
+reference	Bakta	CDS	100	500	.	+	0	ID=cds1;Name=reference_gene_A;product=example%20protein
+reference	Bakta	CDS	800	1400	.	-	0	ID=cds2;locus_tag=REF_0002;product=second%20protein

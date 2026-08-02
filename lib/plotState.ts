@@ -22,6 +22,7 @@ export type PlotStateAction =
   | { type: 'clear' }
   | { type: 'replace'; data: CircularPlotData }
   | { type: 'annotations'; ringId: string; annotations: readonly Annotation[] }
+  | { type: 'reference-annotations'; annotations: readonly Annotation[] }
   | {
       type: 'configure';
       rings: readonly RingConfig[];
@@ -69,6 +70,22 @@ export function plotStateReducer(state: PlotState, action: PlotStateAction): Plo
       return { committed, displayed };
     }
 
+    case 'reference-annotations': {
+      const updateReference = (plot: CircularPlotData | null): CircularPlotData | null => (
+        plot
+          ? {
+              ...plot,
+              reference: { ...plot.reference, annotations: [...action.annotations] },
+            }
+          : null
+      );
+      const committed = updateReference(state.committed);
+      const displayed = state.displayed === state.committed
+        ? committed
+        : updateReference(state.displayed);
+      return { committed, displayed };
+    }
+
     case 'configure': {
       if (!state.committed) return state;
       const committed = configurePlot(state.committed, action.rings, action.annotationsByRing);
@@ -82,8 +99,11 @@ export function plotStateReducer(state: PlotState, action: PlotStateAction): Plo
 
     case 'partial': {
       const baseline = state.committed;
+      const nextReference = action.data.reference ?? baseline?.reference ?? { name: '', length: 0 };
       const displayed: CircularPlotData = {
-        reference: action.data.reference ?? baseline?.reference ?? { name: '', length: 0 },
+        reference: baseline?.reference.annotations
+          ? { ...nextReference, annotations: baseline.reference.annotations }
+          : nextReference,
         rings: mergeAlignmentRings(baseline?.rings, action.data.rings, action.annotationsByRing),
         config: action.data.config ?? baseline?.config ?? {
           minIdentity: 70,

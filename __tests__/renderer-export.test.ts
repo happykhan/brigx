@@ -11,6 +11,9 @@ const plotData: CircularPlotData = {
     features: [
       { type: 'CDS', start: 100, end: 900, strand: '+', name: 'reference-gene' },
     ],
+    annotations: [
+      { id: 'companion-1', start: 1_100, end: 1_500, label: 'companion-gene', shape: 'arrow-reverse' },
+    ],
   },
   rings: [
     {
@@ -73,6 +76,9 @@ describe('editable SVG export', () => {
     );
     expect(svg.querySelector('#gc-legend rect')?.getAttribute('x')).toBe('35');
     expect(svg.querySelector('#ring-legend rect')?.getAttribute('x')).toBe('695');
+    expect(svg.querySelector('#gc-legend')?.parentElement?.id).toBe('legends');
+    expect(svg.querySelector('#ring-legend')?.parentElement?.id).toBe('legends');
+    expect(svg.querySelector('#main-content')?.contains(svg.querySelector('#gc-legend'))).toBe(false);
   });
 
   it('exports named Inkscape groups, top-level gradients, and reference features', () => {
@@ -86,6 +92,9 @@ describe('editable SVG export', () => {
     expect(svg.querySelector('#ring-ring-1')?.getAttribute('inkscape:label')).toBe('Ring: Query One');
     expect(svg.querySelector('#annotations-ring-1')?.getAttribute('inkscape:label')).toBe('Annotations: Query One');
     expect(svg.querySelector('#reference-annotations')?.textContent).toContain('reference-gene');
+    expect(svg.querySelector('#reference-annotations')?.textContent).toContain('companion-gene');
+    expect(svg.querySelector('#main-content')?.getAttribute('inkscape:groupmode')).toBe('layer');
+    expect(svg.querySelector('#legends')?.getAttribute('inkscape:groupmode')).toBe('layer');
     expect(svg.querySelector('#title-group')?.textContent).toContain('BRIGX test');
     expect(exported).toContain('xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"');
   });

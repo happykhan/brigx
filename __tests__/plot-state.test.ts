@@ -131,4 +131,27 @@ describe('plotStateReducer', () => {
     expect(state.displayed?.rings[0].annotations).toEqual([annotation]);
     expect(state.displayed?.rings[0].hits).toHaveLength(2);
   });
+
+  it('keeps companion reference annotations across partial plot updates', () => {
+    const baseline = plot([ring('a')]);
+    const annotation = {
+      id: 'reference-feature',
+      start: 25,
+      end: 75,
+      label: 'reference gene',
+      shape: 'arrow-forward' as const,
+    };
+    const annotated = plotStateReducer(
+      { committed: baseline, displayed: baseline },
+      { type: 'reference-annotations', annotations: [annotation] },
+    );
+    const partial = plotStateReducer(annotated, {
+      type: 'partial',
+      data: { reference: { name: 'reference', length: 1000 }, rings: [ring('a', 2)] },
+      annotationsByRing: {},
+    });
+
+    expect(partial.committed?.reference.annotations).toEqual([annotation]);
+    expect(partial.displayed?.reference.annotations).toEqual([annotation]);
+  });
 });

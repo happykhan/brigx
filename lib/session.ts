@@ -23,6 +23,7 @@ export interface BRIGXSession {
   version: string;
   timestamp: number;
   referenceFileName: string;
+  referenceAnnotations?: Annotation[];
   rings: RingSessionData[];
   params: PipelineParams;
   imageConfig: ImagePropertiesConfig;
@@ -37,12 +38,14 @@ export function exportSession(
   rings: readonly RingConfig[],
   ringAnnotations: Record<string, Annotation[]>,
   params: PipelineParams,
-  imageConfig: ImagePropertiesConfig
+  imageConfig: ImagePropertiesConfig,
+  referenceAnnotations: readonly Annotation[] = [],
 ): string {
   const session: BRIGXSession = {
     version,
     timestamp: Date.now(),
     referenceFileName,
+    referenceAnnotations: [...referenceAnnotations],
     rings: rings.map(r => ({
       id: r.id,
       legendText: r.legendText,
@@ -182,6 +185,10 @@ function isSession(value: unknown): value is BRIGXSession {
     && value.version.length > 0
     && isFiniteNumber(value.timestamp)
     && typeof value.referenceFileName === 'string'
+    && (
+      value.referenceAnnotations === undefined
+      || (Array.isArray(value.referenceAnnotations) && value.referenceAnnotations.every(isAnnotation))
+    )
     && Array.isArray(value.rings)
     && value.rings.every(isRing)
     && isPipelineParams(value.params)

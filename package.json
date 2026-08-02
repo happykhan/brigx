@@ -15,6 +15,7 @@
         "build": "tsc -b && vite build",
         "start": "vite preview",
         "lint": "eslint .",
+        "quality:architecture": "bash scripts/check-architecture.sh",
         "test": "vitest run",
         "test:watch": "vitest",
         "version:patch": "npm version patch --no-git-tag-version",

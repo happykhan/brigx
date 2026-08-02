@@ -24,7 +24,7 @@ import {
   calculateGCWindows,
   calculateGCSkewWindows,
   mergeGenomes
-} from '@/workers/parser.worker';
+} from '@/lib/genomeParser';
 import { parseAnnotationFile } from '@/lib/annotationParser';
 import type {
   ParsedGenome,

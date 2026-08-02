@@ -31,6 +31,7 @@ let blastallWasmBinary: ArrayBuffer | null = null;
 
 // Cache the formatdb index for the current reference
 let cachedRefName: string | null = null;
+let cachedRefSequence: string | null = null;
 let cachedDbFiles: Map<string, Uint8Array> | null = null;
 
 async function loadModuleFactory(name: string): Promise<{ factory: BlastModuleFactory; wasmBinary: ArrayBuffer }> {
@@ -87,7 +88,7 @@ async function createModuleInstance(factory: BlastModuleFactory, wasmBinary: Arr
 
 async function buildDatabase(referenceName: string, referenceSeq: string): Promise<Map<string, Uint8Array>> {
   // Return cached index if reference hasn't changed
-  if (cachedRefName === referenceName && cachedDbFiles) {
+  if (cachedRefName === referenceName && cachedRefSequence === referenceSeq && cachedDbFiles) {
     console.log('[Alignment Worker] Using cached formatdb index');
     return cachedDbFiles;
   }
@@ -127,6 +128,7 @@ async function buildDatabase(referenceName: string, referenceSeq: string): Promi
 
   // Cache for reuse with other queries against same reference
   cachedRefName = referenceName;
+  cachedRefSequence = referenceSeq;
   cachedDbFiles = dbFiles;
 
   return dbFiles;
@@ -248,27 +250,34 @@ async function alignGenomes(
   return { alignmentResult, rawOutput: output };
 }
 
+type AlignmentWorkerRequest =
+  | { type: 'init' }
+  | {
+      type: 'align';
+      referenceName: string;
+      referenceSeq: string;
+      queryName: string;
+      querySeq: string;
+      params: PipelineParams;
+    };
+
 // Worker message handler
-self.onmessage = async (e: MessageEvent) => {
-  console.log('[Alignment Worker] Received message:', e.data.type);
-  const { type, referenceName, referenceSeq, queryName, querySeq, params, blastProgram } = e.data;
-  // Merge blastProgram into params for the aligner
-  if (blastProgram && params) {
-    params.blastProgram = blastProgram;
-  }
+self.onmessage = async (event: MessageEvent<AlignmentWorkerRequest>) => {
+  const request = event.data;
+  console.log('[Alignment Worker] Received message:', request.type);
 
   try {
-    if (type === 'init') {
+    if (request.type === 'init') {
       await initializeBlast();
       self.postMessage({ type: 'initialized' });
-    } else if (type === 'align') {
-      console.log(`[Alignment Worker] Starting alignment: ${queryName}`);
+    } else {
+      console.log(`[Alignment Worker] Starting alignment: ${request.queryName}`);
       const { alignmentResult, rawOutput } = await alignGenomes(
-        referenceName,
-        referenceSeq,
-        queryName,
-        querySeq,
-        params
+        request.referenceName,
+        request.referenceSeq,
+        request.queryName,
+        request.querySeq,
+        request.params,
       );
       self.postMessage({ type: 'aligned', result: alignmentResult, rawOutput });
     }

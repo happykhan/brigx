@@ -1,11 +1,10 @@
 
-import { useState as useReactState, useCallback, useMemo } from 'react';
+import { lazy, Suspense, useState as useReactState, useCallback, useMemo } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { NavBar, AppFooter, LogConsole } from '@genomicx/ui';
 import CircularPlot from '@/components/CircularPlot';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ExportPanel from '@/components/ExportPanel';
-import AnnotationEditor from '@/components/AnnotationEditor';
 import ReferenceInput from '@/components/ReferenceInput';
 import RingsPanel from '@/components/RingsPanel';
 import ControlPanel from '@/components/ControlPanel';
@@ -14,6 +13,8 @@ import ImagePropertiesPanel from '@/components/ImagePropertiesPanel';
 import { useBRIGController } from '@/hooks/useBRIGController';
 import { APP_VERSION } from '@/lib/version';
 import type { PlotViewState } from '@/lib/types';
+
+const AnnotationEditor = lazy(() => import('@/components/AnnotationEditor'));
 
 function sameLegendPosition(
   left: PlotViewState['gcLegendPos'],
@@ -154,15 +155,21 @@ export default function Home() {
       </div>
 
       {annotationEditorOpen && editingRingId && (
-        <AnnotationEditor
-          ringId={editingRingId}
-          ringName={rings.find(r => r.id === editingRingId)?.legendText || 'Unknown Ring'}
-          ringColor={rings.find(r => r.id === editingRingId)?.color}
-          annotations={ringAnnotations[editingRingId] || []}
-          referenceLength={referenceLength}
-          onAnnotationsChange={handleAnnotationsChange}
-          onClose={() => { setAnnotationEditorOpen(false); setEditingRingId(null); }}
-        />
+        <Suspense fallback={(
+          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0, 0, 0, 0.6)' }}>
+            <div className="card">Loading annotation editor…</div>
+          </div>
+        )}>
+          <AnnotationEditor
+            ringId={editingRingId}
+            ringName={rings.find(r => r.id === editingRingId)?.legendText || 'Unknown Ring'}
+            ringColor={rings.find(r => r.id === editingRingId)?.color}
+            annotations={ringAnnotations[editingRingId] || []}
+            referenceLength={referenceLength}
+            onAnnotationsChange={handleAnnotationsChange}
+            onClose={() => { setAnnotationEditorOpen(false); setEditingRingId(null); }}
+          />
+        </Suspense>
       )}
     </>
   );

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { CircularPlotData, PlotViewState } from '@/lib/types';
 import type { ImagePropertiesConfig } from './ImageProperties';
 import { CanvasPlotRenderer } from '@/lib/canvas-renderer';
-import type { PlotTooltip } from '@/lib/canvas-renderer';
+import type { PlotTooltip } from '@/lib/rendering/types';
 
 interface CircularPlotProps {
   data: CircularPlotData;

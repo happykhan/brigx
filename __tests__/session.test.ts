@@ -72,6 +72,14 @@ describe('Session Export/Import', () => {
   it('should reject invalid session JSON', () => {
     expect(() => importSession('{}')).toThrow('Invalid BRIGX session file');
     expect(() => importSession('not json')).toThrow();
+    expect(() => importSession(JSON.stringify({
+      version: '0.2.0',
+      timestamp: Date.now(),
+      referenceFileName: 'ref.fna',
+      rings: [{ id: 'ring-1' }],
+      params: mockParams,
+      imageConfig: mockImageConfig,
+    }))).toThrow('Invalid BRIGX session file');
   });
 
   it('should include timestamp', () => {
@@ -95,5 +103,6 @@ describe('Profile Export/Import', () => {
 
   it('should reject invalid profile JSON', () => {
     expect(() => importProfile('{}')).toThrow('Invalid BRIGX profile file');
+    expect(() => importProfile('{"imageConfig":{"title":"Incomplete"}}')).toThrow('Invalid BRIGX profile file');
   });
 });

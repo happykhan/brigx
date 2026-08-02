@@ -13,9 +13,8 @@ import {
   calculateGCWindows,
   calculateGCSkewWindows,
   mergeGenomes,
-  extractGenBankFeatures,
-  extractGFF3Features,
-} from '@/workers/parser.worker';
+} from '@/lib/genomeParser';
+import { extractGenBankFeatures, extractGFF3Features } from '@/lib/featureParser';
 import { parseAnnotationFile, exportAnnotationsToTSV, resolveColour, resolveDecoration } from '@/lib/annotationParser';
 import type { ParsedGenome, Annotation } from '@/lib/types';
 import * as fs from 'fs';

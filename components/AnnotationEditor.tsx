@@ -5,11 +5,13 @@ import { useState, useRef, useCallback } from 'react';
 import { HotTable } from '@handsontable/react';
 import Handsontable from 'handsontable';
 import { registerAllModules } from 'handsontable/registry';
-import 'handsontable/dist/handsontable.full.min.css';
+import 'handsontable/styles/handsontable.min.css';
+import 'handsontable/styles/ht-theme-main.min.css';
 import type { Annotation, AnnotationShape } from '@/lib/types';
 import { parseAnnotationFile, exportAnnotationsToTSV } from '@/lib/annotationParser';
 import { readFileText } from '@/lib/fileAccess';
 import toast from 'react-hot-toast';
+import { extractGenBankFeatures, extractGFF3Features } from '@/lib/featureParser';
 
 // Register all Handsontable modules (including cell types)
 registerAllModules();
@@ -244,7 +246,6 @@ export default function AnnotationEditor({
 
     try {
       const text = await readFileText(file);
-      const { extractGenBankFeatures, extractGFF3Features } = await import('@/workers/parser.worker');
       const extract = kind === 'genbank' ? extractGenBankFeatures : extractGFF3Features;
       const features = extract(text, featureType, featureTextFilter || undefined);
 
@@ -299,7 +300,7 @@ export default function AnnotationEditor({
     syncCount();
   }, [syncCount]);
 
-  const afterSelectionEnd = useCallback((row: number, _column: number, row2: number) => {
+  const handleSelection = useCallback((row: number, _column: number, row2: number) => {
     const first = Math.min(row, row2);
     const last = Math.max(row, row2);
     selectedRowsRef.current = Array.from({ length: last - first + 1 }, (_, index) => first + index);
@@ -438,11 +439,13 @@ export default function AnnotationEditor({
             width="100%"
             height={450}
             licenseKey="non-commercial-and-evaluation"
+            themeName="ht-theme-main-dark-auto"
             afterChange={afterChange}
             afterRemoveRow={afterRemoveRow}
             afterCreateRow={afterCreateRow}
             afterPaste={afterPaste}
-            afterSelectionEnd={afterSelectionEnd}
+            afterSelection={handleSelection}
+            afterSelectionEnd={handleSelection}
             contextMenu={['row_above', 'row_below', 'remove_row', '---------', 'copy', 'cut']}
             manualRowResize={true}
             manualColumnResize={true}

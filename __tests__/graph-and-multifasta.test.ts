@@ -8,7 +8,7 @@ import { isGraphFileName } from '@/lib/controller';
 import {
   parseFasta,
   mergeGenomes
-} from '@/workers/parser.worker';
+} from '@/lib/genomeParser';
 import type { ContigBoundary } from '@/lib/types';
 import * as fs from 'fs';
 import * as path from 'path';

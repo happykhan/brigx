@@ -1,21 +1,25 @@
 
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useReducer } from 'react';
 import toast from 'react-hot-toast';
-import type { CircularPlotData, PipelineParams, ProgressUpdate, RingConfig, Annotation } from '@/lib/types';
+import type { PipelineParams, ProgressUpdate, RingConfig, Annotation } from '@/lib/types';
 import { APP_VERSION } from '@/lib/version';
 import type { BRIGController as BRIGControllerType } from '@/lib/controller';
 import { exportSession, importSession } from '@/lib/session';
 import { readFileText } from '@/lib/fileAccess';
-import { mergeAlignmentRings, synchronizeConfiguredRings, updatePlotAnnotations } from '@/lib/ringState';
+import { INITIAL_PLOT_STATE, plotStateReducer } from '@/lib/plotState';
 import type { ImagePropertiesConfig } from '@/components/ImageProperties';
+import { useConsoleCapture } from './useConsoleCapture';
 
 export function useBRIGController() {
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
   const [rings, setRings] = useState<RingConfig[]>([]);
+  const ringsRef = useRef(rings);
+  ringsRef.current = rings;
 
   // Store controller instance in ref to persist alignment cache across runs
   const controllerRef = useRef<BRIGControllerType | null>(null);
+  const referenceGenerationRef = useRef(0);
   const [params, setParams] = useState<PipelineParams>({
     minIdentity: 70,
     minAlignmentLength: 1000,
@@ -24,10 +28,10 @@ export function useBRIGController() {
     alignerOptions: ''
   });
   const [progress, setProgress] = useState<ProgressUpdate>({ step: 'idle', percent: 0 });
-  const [plotData, setPlotData] = useState<CircularPlotData | null>(null);
+  const [plotState, dispatchPlot] = useReducer(plotStateReducer, INITIAL_PLOT_STATE);
+  const plotData = plotState.displayed;
   const [isProcessing, setIsProcessing] = useState(false);
-  const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
-  const [cachedPlotData, setCachedPlotData] = useState<CircularPlotData | null>(null);
+  const { logs: consoleLogs, clearLogs: clearConsoleLogs } = useConsoleCapture();
   const [imageProperties, setImageProperties] = useState<ImagePropertiesConfig>({
     innerRadius: 200,
     ringWidth: 20,
@@ -46,61 +50,14 @@ export function useBRIGController() {
   const [annotationEditorOpen, setAnnotationEditorOpen] = useState(false);
   const [editingRingId, setEditingRingId] = useState<string | null>(null);
   const [ringAnnotations, setRingAnnotations] = useState<Record<string, Annotation[]>>({});
-  const [referenceLength, setReferenceLength] = useState<number>(0);
+  const ringAnnotationsRef = useRef(ringAnnotations);
+  ringAnnotationsRef.current = ringAnnotations;
+  const referenceLength = plotData?.reference.length ?? 0;
 
-  // Intercept console.log messages
-  useEffect(() => {
-    const originalLog = console.log;
-    const originalError = console.error;
-    const originalWarn = console.warn;
-
-    // Summarize objects for display - avoid dumping raw arrays
-    const summarizeArg = (arg: unknown): string => {
-      if (arg == null) return String(arg);
-      if (typeof arg !== 'object') return String(arg);
-      if (Array.isArray(arg)) {
-        if (arg.length > 5) return `[Array(${arg.length})]`;
-        return JSON.stringify(arg);
-      }
-      // Summarize known large fields
-      const clone: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(arg as Record<string, unknown>)) {
-        if (Array.isArray(v) && v.length > 5) {
-          clone[k] = `[${v.length} items]`;
-        } else if (k === 'partialData' || k === 'sequence') {
-          clone[k] = '[omitted]';
-        } else if (typeof v === 'object' && v !== null) {
-          clone[k] = summarizeArg(v);
-        } else {
-          clone[k] = v;
-        }
-      }
-      return JSON.stringify(clone);
-    };
-
-    console.log = (...args: unknown[]) => {
-      const message = args.map(summarizeArg).join(' ');
-      setConsoleLogs(prev => [...prev, `[LOG] ${message}`]);
-      originalLog.apply(console, args);
-    };
-
-    console.error = (...args: unknown[]) => {
-      const message = args.map(summarizeArg).join(' ');
-      setConsoleLogs(prev => [...prev, `[ERROR] ${message}`]);
-      originalError.apply(console, args);
-    };
-
-    console.warn = (...args: unknown[]) => {
-      const message = args.map(summarizeArg).join(' ');
-      setConsoleLogs(prev => [...prev, `[WARN] ${message}`]);
-      originalWarn.apply(console, args);
-    };
-
-    return () => {
-      console.log = originalLog;
-      console.error = originalError;
-      console.warn = originalWarn;
-    };
+  useEffect(() => () => {
+    referenceGenerationRef.current += 1;
+    controllerRef.current?.cleanup();
+    controllerRef.current = null;
   }, []);
 
   // Handle annotation changes
@@ -110,8 +67,7 @@ export function useBRIGController() {
       [ringId]: annotations
     }));
 
-    setCachedPlotData(prev => updatePlotAnnotations(prev, ringId, annotations));
-    setPlotData(prev => updatePlotAnnotations(prev, ringId, annotations));
+    dispatchPlot({ type: 'annotations', ringId, annotations });
   };
 
   const handleOpenAnnotationEditor = (ringId: string) => {
@@ -123,20 +79,21 @@ export function useBRIGController() {
   useEffect(() => {
     if (referenceFile && !plotData) {
       console.log('[Page] Reference file loaded, generating plot skeleton...');
-      generatePlotSkeleton();
+      void generatePlotSkeleton(referenceFile, referenceGenerationRef.current);
     }
   }, [referenceFile]);
 
   // Generate initial plot structure without running alignments
-  const generatePlotSkeleton = async () => {
+  const generatePlotSkeleton = async (file: File, generation: number) => {
+    let controller: BRIGControllerType | null = null;
     try {
       const { BRIGController } = await import('@/lib/controller');
-      const controller = new BRIGController();
+      controller = new BRIGController();
       await controller.initialize();
 
       // Run pipeline without any ring files to just get reference data (GC content/skew)
       const skeletonResult = await controller.runFullPipeline(
-        referenceFile!,
+        file,
         [], // No rings for alignment
         [],
         params,
@@ -144,14 +101,14 @@ export function useBRIGController() {
       );
 
       // Create ring placeholders for configured rings
-      const ringPlaceholders = rings.map((ringConfig) => ({
+      const ringPlaceholders = ringsRef.current.map((ringConfig) => ({
         queryId: ringConfig.id,
         queryName: ringConfig.legendText,
         color: ringConfig.color,
         visible: true,
         customWidth: ringConfig.customWidth,
         hits: [],
-        annotations: ringAnnotations[ringConfig.id] || [],
+        annotations: ringAnnotationsRef.current[ringConfig.id] || [],
         statistics: {
           meanIdentity: 0,
           genomeCoverage: 0,
@@ -164,35 +121,32 @@ export function useBRIGController() {
         rings: ringPlaceholders
       };
 
-      setPlotData(plotDataWithRings);
-      setCachedPlotData(plotDataWithRings);
-      setReferenceLength(skeletonResult.reference.length);
+      if (generation === referenceGenerationRef.current) {
+        dispatchPlot({ type: 'replace', data: plotDataWithRings });
+        setProgress({ step: 'Reference ready', percent: 100 });
+      }
     } catch (error) {
+      if (generation !== referenceGenerationRef.current) return;
       const msg = error instanceof Error ? error.message : String(error);
       console.error('[Page] Error generating skeleton:', error);
       toast.error(`Error: ${msg}`);
+    } finally {
+      controller?.cleanup();
     }
   };
 
   // Auto-update plot when ring settings change (colors, thresholds, visibility, annotations)
   // NOTE: This should NOT depend on cachedPlotData to avoid overwriting alignment results
   useEffect(() => {
-    if (!cachedPlotData) return;
-
     console.log('[Page] Ring settings changed, updating plot');
-
-    const updatedRings = synchronizeConfiguredRings(cachedPlotData.rings, rings, ringAnnotations);
-
-    const updated = { ...cachedPlotData, rings: updatedRings };
-    setPlotData(updated);
-    setCachedPlotData(updated);
+    dispatchPlot({ type: 'configure', rings, annotationsByRing: ringAnnotations });
   }, [rings, ringAnnotations]); // Removed cachedPlotData from dependencies!
 
   const handleRun = async () => {
     console.log(`[BRIGX v${APP_VERSION}] Starting alignment pipeline`);
 
     // Clear console logs on each run
-    setConsoleLogs([]);
+    clearConsoleLogs();
 
     if (!referenceFile) {
       toast.error('Please select a reference genome');
@@ -210,13 +164,20 @@ export function useBRIGController() {
 
     setIsProcessing(true);
     setProgress({ step: 'Starting alignments...', percent: 0 });
+    const runGeneration = referenceGenerationRef.current;
 
     try {
       // Reuse existing controller instance to preserve alignment cache
       if (!controllerRef.current) {
         const { BRIGController } = await import('@/lib/controller');
-        controllerRef.current = new BRIGController();
-        await controllerRef.current.initialize();
+        const controller = new BRIGController();
+        try {
+          await controller.initialize();
+          controllerRef.current = controller;
+        } catch (error) {
+          controller.cleanup();
+          throw error;
+        }
         console.log('[Page] Created new BRIGController instance');
       } else {
         console.log('[Page] Reusing existing BRIGController instance (cache preserved)');
@@ -230,6 +191,7 @@ export function useBRIGController() {
         [],
         params,
         (update) => {
+          if (runGeneration !== referenceGenerationRef.current) return;
           console.log(`[Page] ${update.step} (${update.percent}%)${update.message ? ' - ' + update.message : ''}`);
           setProgress(update);
 
@@ -237,48 +199,27 @@ export function useBRIGController() {
           if (update.partialData?.rings && update.partialData.rings.length > 0) {
             console.log('[Page] Received partial data with', update.partialData.rings.length, 'rings');
 
-            const mergedRings = mergeAlignmentRings(
-              cachedPlotData?.rings,
-              update.partialData.rings,
-              ringAnnotations,
-            );
-
-            const updatedPlotData = {
-              reference: update.partialData.reference || cachedPlotData?.reference || { name: '', length: 0 },
-              rings: mergedRings,
-              config: update.partialData.config || cachedPlotData?.config || { minIdentity: 70, minAlignmentLength: 100 }
-            };
-
-            setPlotData(updatedPlotData);
+            dispatchPlot({
+              type: 'partial',
+              data: { ...update.partialData, rings: update.partialData.rings },
+              annotationsByRing: ringAnnotationsRef.current,
+            });
           }
         }
       );
 
       console.log(`[Page] Alignments complete. ${result.rings?.length || 0} rings: ${result.rings?.map(r => r.queryName).join(', ')}`);
 
-      const finalRings = mergeAlignmentRings(cachedPlotData?.rings, result.rings, ringAnnotations);
-
-      console.log(`[Page] Final merge: ${finalRings?.length || 0} rings`);
-
-      // Keep existing skeleton (reference, GC data), only update rings with alignment data
-      if (cachedPlotData) {
-        const finalPlotData = {
-          ...cachedPlotData,
-          rings: finalRings
-        };
-
-        console.log('[Page] Setting final plot data with rings:', finalPlotData.rings?.length);
-        setPlotData(finalPlotData);
-        setCachedPlotData(finalPlotData);
-      } else {
-        // Fallback if no cached data (shouldn't happen)
-        console.warn('[Page] No cached data, using result directly');
-        setPlotData(result);
-        setCachedPlotData(result);
-      }
+      if (runGeneration !== referenceGenerationRef.current) return;
+      dispatchPlot({
+        type: 'commit',
+        data: result,
+        annotationsByRing: ringAnnotationsRef.current,
+      });
       setProgress({ step: 'Complete!', percent: 100 });
       toast.success('Alignments completed successfully!');
     } catch (error) {
+      if (runGeneration !== referenceGenerationRef.current) return;
       const msg = error instanceof Error ? error.message : String(error);
       console.error('[Page] Alignment error:', error);
       toast.error(`Error: ${msg}`, { duration: 6000 });
@@ -289,11 +230,10 @@ export function useBRIGController() {
   };
 
   const handleReferenceFileChange = (file: File) => {
+    referenceGenerationRef.current += 1;
     setReferenceFile(file);
     // Reset plot when reference changes
-    setPlotData(null);
-    setCachedPlotData(null);
-    setReferenceLength(0);
+    dispatchPlot({ type: 'clear' });
     if (controllerRef.current) {
       controllerRef.current.cleanup();
       controllerRef.current = null;
@@ -335,6 +275,9 @@ export function useBRIGController() {
         upperThreshold: r.upperThreshold,
         lowerThreshold: r.lowerThreshold,
         customWidth: r.customWidth,
+        blastType: r.blastType,
+        showLabels: r.showLabels,
+        graphMaxCap: r.graphMaxCap,
         files: []
       }));
       setRings(restoredRings);

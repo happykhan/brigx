@@ -2,28 +2,17 @@
 import type { CircularPlotData, RingData, Annotation, ContigBoundary, PlotViewState } from './types';
 import { referenceFeaturesToAnnotations } from './referenceAnnotations';
 import { positionToAngle, createArcPath as geometryCreateArcPath, getColorIntensity as geometryGetColorIntensity } from './geometry';
+import type { RenderConfig } from './rendering/types';
+import type { TooltipCallback } from './rendering/types';
+import { renderSVGAnnotations } from './rendering/svgAnnotations';
+import { renderSVGGCLegend, renderSVGRingLegend } from './rendering/svgLegends';
 
-export interface RenderConfig {
-  width: number;
-  height: number;
-  innerRadius: number;
-  ringWidth: number;
-  gcRingWidth: number;
-  ringSpacing: number;
-  minIdentity: number;
-  maxIdentity: number;
-  legendFontSize: number;
-  scaleFontSize: number;
-  titleFontSize: number;
-  labelFontSize: number;
-  title: string;
-  showLegend?: boolean;
-}
+export type { RenderConfig } from './rendering/types';
 
 export class CircularPlotRenderer {
   private svg: SVGSVGElement | null = null;
   private config: RenderConfig;
-  private tooltipCallback?: (info: Record<string, unknown> | null) => void;
+  private tooltipCallback?: TooltipCallback;
   private gcLegendPos: { x: number; y: number } | null = null;
   private ringLegendPos: { x: number; y: number } | null = null;
 
@@ -597,388 +586,34 @@ export class CircularPlotRenderer {
   }
 
   private renderAnnotations(
-    svg: SVGElement,
-    cx: number,
-    cy: number,
-    refLength: number,
+    parent: SVGElement,
+    centerX: number,
+    centerY: number,
+    referenceLength: number,
     annotations: Annotation[],
     innerRadius: number,
     outerRadius: number,
-    showLabels: boolean = true,
-    labelInward: boolean = false,
-    groupId: string = `annotations-${innerRadius.toFixed(0)}`,
-    groupLabel: string = 'Annotations',
-  ) {
-    if (!annotations || annotations.length === 0) return;
-
-    // Failsafe: disable labels if too many annotations (prevents browser lockup)
-    const MAX_LABELS = 200;
-    if (showLabels && annotations.length > MAX_LABELS) {
-      console.warn(`[Renderer] ${annotations.length} annotations exceeds label limit (${MAX_LABELS}), disabling labels`);
-      showLabels = false;
-    }
-
-    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    group.setAttribute('id', groupId);
-    group.setAttribute('inkscape:label', groupLabel);
-    group.setAttribute('class', 'annotations');
-
-    // Collect label positions for collision detection
-    interface LabelPosition {
-      annotation: Annotation;
-      midAngle: number;
-      adjustedAngle: number;
-      labelX: number;
-      labelY: number;
-      width: number;
-      height: number;
-    }
-    const labelPositions: LabelPosition[] = [];
-    
-    // First pass: calculate initial positions (skip empty labels)
-    annotations.forEach(ann => {
-      // Skip annotations without labels
-      if (!ann.label || ann.label.trim() === '') {
-        return;
-      }
-      
-      const start = Math.max(1, Math.min(ann.start, refLength));
-      const end = Math.max(1, Math.min(ann.end, refLength));
-      const startAngle = positionToAngle(start, refLength);
-      const endAngle = positionToAngle(end, refLength);
-      const midAngle = (startAngle + endAngle) / 2;
-      
-      const textWidth = ann.label.length * (this.config.labelFontSize * 0.6);
-      const textHeight = this.config.labelFontSize + 4;
-      
-      labelPositions.push({
-        annotation: ann,
-        midAngle,
-        adjustedAngle: midAngle,
-        labelX: 0,
-        labelY: 0,
-        width: textWidth,
-        height: textHeight
-      });
+    showLabels = true,
+    labelInward = false,
+    groupId = `annotations-${innerRadius.toFixed(0)}`,
+    groupLabel = 'Annotations',
+  ): void {
+    renderSVGAnnotations({
+      parent,
+      centerX,
+      centerY,
+      referenceLength,
+      annotations,
+      innerRadius,
+      outerRadius,
+      showLabels,
+      labelInward,
+      labelFontSize: this.config.labelFontSize,
+      groupId,
+      groupLabel,
+      tooltipCallback: this.tooltipCallback,
     });
-    
-    // Adjust angles to avoid overlaps (move along arc)
-    const labelDistance = labelInward ? Math.max(20, innerRadius - 30) : outerRadius + 30;
-    
-    // Sort by angle for easier collision detection
-    labelPositions.sort((a, b) => a.midAngle - b.midAngle);
-    
-    // Calculate minimum angular separation based on label widths
-    // Convert label width to angular distance at labelDistance radius
-    const getMinAngularSeparation = (lp1: LabelPosition, lp2: LabelPosition) => {
-      const avgWidth = (lp1.width + lp2.width) / 2;
-      const avgHeight = (lp1.height + lp2.height) / 2;
-      // Account for both width and height, use the larger dimension
-      const maxDimension = Math.max(avgWidth, avgHeight);
-      // Add some padding
-      const padding = 10;
-      return (maxDimension + padding) / labelDistance;
-    };
-    
-    // Iterative adjustment to spread out overlapping labels
-    for (let iteration = 0; iteration < 15; iteration++) {
-      let hasOverlap = false;
-      
-      // Check all pairs of labels for overlaps (not just adjacent)
-      for (let i = 0; i < labelPositions.length; i++) {
-        for (let j = i + 1; j < labelPositions.length; j++) {
-          const curr = labelPositions[i];
-          const next = labelPositions[j];
-          
-          const minSeparation = getMinAngularSeparation(curr, next);
-          let angleDiff = Math.abs(next.adjustedAngle - curr.adjustedAngle);
-          
-          // Handle wrap-around at 2π
-          if (angleDiff > Math.PI) {
-            angleDiff = 2 * Math.PI - angleDiff;
-          }
-          
-          if (angleDiff < minSeparation) {
-            hasOverlap = true;
-            // Push them apart with stronger force
-            const adjustment = (minSeparation - angleDiff);
-            const force = 0.8; // Higher force for stronger adjustment
-            
-            // Determine direction to push
-            const direction = (next.adjustedAngle > curr.adjustedAngle) ? 1 : -1;
-            
-            curr.adjustedAngle -= adjustment * force * 0.5 * direction;
-            next.adjustedAngle += adjustment * force * 0.5 * direction;
-          }
-        }
-      }
-      
-      if (!hasOverlap) break;
-    }
-    
-    // Calculate final label positions
-    labelPositions.forEach(lp => {
-      lp.labelX = cx + labelDistance * Math.cos(lp.adjustedAngle);
-      lp.labelY = cy + labelDistance * Math.sin(lp.adjustedAngle);
-    });
-    
-    // Create a lookup map for annotations with labels
-    const labelMap = new Map<string, LabelPosition>();
-    labelPositions.forEach(lp => {
-      const key = `${lp.annotation.start}-${lp.annotation.end}-${lp.annotation.label}`;
-      labelMap.set(key, lp);
-    });
-    
-    // Second pass: render all annotations
-    annotations.forEach(ann => {
-      const start = Math.max(1, Math.min(ann.start, refLength));
-      const end = Math.max(1, Math.min(ann.end, refLength));
-      
-      const startAngle = positionToAngle(start, refLength);
-      const endAngle = positionToAngle(end, refLength);
-      
-      const color = ann.color || '#666666';
-      
-      // Check if this annotation has a label
-      const key = `${ann.start}-${ann.end}-${ann.label}`;
-      const lp = labelMap.get(key);
-      
-      if (ann.shape === 'block') {
-        // Simple block arc
-        const path = this.createArcPath(
-          cx, cy,
-          innerRadius, outerRadius,
-          startAngle, endAngle
-        );
-        
-        const arcElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        arcElement.setAttribute('d', path);
-        arcElement.setAttribute('fill', color);
-        arcElement.setAttribute('stroke', '#000');
-        arcElement.setAttribute('stroke-width', '0.5');
-        arcElement.setAttribute('opacity', '0.7');
-        
-        // Tooltip
-        arcElement.addEventListener('mouseenter', () => {
-          arcElement.setAttribute('opacity', '0.9');
-          if (this.tooltipCallback) {
-            this.tooltipCallback({
-              type: 'annotation',
-              label: ann.label,
-              start: ann.start,
-              end: ann.end
-            });
-          }
-        });
-        
-        arcElement.addEventListener('mouseleave', () => {
-          arcElement.setAttribute('opacity', '0.7');
-        });
-        
-        group.appendChild(arcElement);
-        
-        // Add text label with leader line only if showLabels is true
-        if (showLabels && lp) {
-          const midAngle = (startAngle + endAngle) / 2;
-          const featureRadius = (innerRadius + outerRadius) / 2;
-          const featureX = cx + featureRadius * Math.cos(midAngle);
-          const featureY = cy + featureRadius * Math.sin(midAngle);
-          const labelX = lp.labelX;
-          const labelY = lp.labelY;
-
-          const leaderLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          leaderLine.setAttribute('x1', String(featureX));
-          leaderLine.setAttribute('y1', String(featureY));
-          leaderLine.setAttribute('x2', String(labelX));
-          leaderLine.setAttribute('y2', String(labelY));
-          leaderLine.setAttribute('stroke', '#333');
-          leaderLine.setAttribute('stroke-width', '1');
-          leaderLine.setAttribute('opacity', '0.6');
-          group.appendChild(leaderLine);
-
-          const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-          labelBg.setAttribute('x', String(labelX - lp.width / 2));
-          labelBg.setAttribute('y', String(labelY - lp.height / 2));
-          labelBg.setAttribute('width', String(lp.width));
-          labelBg.setAttribute('height', String(lp.height));
-          labelBg.setAttribute('fill', '#ffffff');
-          labelBg.setAttribute('stroke', '#333');
-          labelBg.setAttribute('stroke-width', '1');
-          labelBg.setAttribute('rx', '3');
-          labelBg.setAttribute('opacity', '0.9');
-          group.appendChild(labelBg);
-
-          const labelText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          labelText.setAttribute('x', String(labelX));
-          labelText.setAttribute('y', String(labelY));
-          labelText.setAttribute('text-anchor', 'middle');
-          labelText.setAttribute('dominant-baseline', 'middle');
-          labelText.setAttribute('font-size', String(this.config.labelFontSize));
-          labelText.setAttribute('font-weight', 'bold');
-          labelText.setAttribute('fill', '#000');
-          labelText.textContent = ann.label;
-          group.appendChild(labelText);
-        }
-
-      } else if (ann.shape === 'arrow-forward' || ann.shape === 'arrow-reverse') {
-        // Arrow shape (gene-like) - adaptive based on feature length
-        const isForward = ann.shape === 'arrow-forward';
-        
-        // Calculate total angle span in radians
-        const totalAngleSpan = endAngle - startAngle;
-        
-        // Adaptive rendering based on feature size:
-        // Small features: just triangle
-        // Medium features: triangle + some body
-        // Large features: triangle (10-15%) + rectangular body
-        
-        let arrowHeadAngle: number;
-        let hasBody: boolean;
-        
-        if (totalAngleSpan < 0.05) {
-          // Very small feature: entire thing is arrow head
-          arrowHeadAngle = totalAngleSpan;
-          hasBody = false;
-        } else if (totalAngleSpan < 0.15) {
-          // Medium feature: arrow head takes 50-70%
-          arrowHeadAngle = totalAngleSpan * 0.6;
-          hasBody = true;
-        } else {
-          // Large feature: arrow head takes 10-15%
-          arrowHeadAngle = Math.min(0.15, totalAngleSpan * 0.15);
-          hasBody = true;
-        }
-        
-        // Define body and head angles
-        const bodyStartAngle = isForward ? startAngle : startAngle + arrowHeadAngle;
-        const bodyEndAngle = isForward ? endAngle - arrowHeadAngle : endAngle;
-        const headTipAngle = isForward ? endAngle : startAngle;
-        const headBaseAngle = isForward ? bodyEndAngle : bodyStartAngle;
-        
-        // Calculate triangle points
-        const midRadius = (innerRadius + outerRadius) / 2;
-        const tipX = cx + midRadius * Math.cos(headTipAngle);
-        const tipY = cy + midRadius * Math.sin(headTipAngle);
-        
-        const innerBaseX = cx + innerRadius * Math.cos(headBaseAngle);
-        const innerBaseY = cy + innerRadius * Math.sin(headBaseAngle);
-        const outerBaseX = cx + outerRadius * Math.cos(headBaseAngle);
-        const outerBaseY = cy + outerRadius * Math.sin(headBaseAngle);
-        
-        let combinedPath: string;
-        
-        if (hasBody) {
-          // Draw as one continuous shape: body + arrow head
-          // Start at body start (inner), arc to body end (inner), 
-          // line to arrow tip, line back to body end (outer), arc back to start (outer)
-          
-          const bodyStartInnerX = cx + innerRadius * Math.cos(bodyStartAngle);
-          const bodyStartInnerY = cy + innerRadius * Math.sin(bodyStartAngle);
-          const bodyStartOuterX = cx + outerRadius * Math.cos(bodyStartAngle);
-          const bodyStartOuterY = cy + outerRadius * Math.sin(bodyStartAngle);
-          
-          const largeArcFlag = Math.abs(bodyEndAngle - bodyStartAngle) > Math.PI ? 1 : 0;
-          
-          combinedPath = `
-            M ${bodyStartInnerX} ${bodyStartInnerY}
-            A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} ${isForward ? 1 : 0} ${innerBaseX} ${innerBaseY}
-            L ${tipX} ${tipY}
-            L ${outerBaseX} ${outerBaseY}
-            A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} ${isForward ? 0 : 1} ${bodyStartOuterX} ${bodyStartOuterY}
-            Z
-          `.replace(/\s+/g, ' ').trim();
-        } else {
-          // Just the triangle
-          combinedPath = `
-            M ${innerBaseX} ${innerBaseY}
-            L ${tipX} ${tipY}
-            L ${outerBaseX} ${outerBaseY}
-            Z
-          `.replace(/\s+/g, ' ').trim();
-        }
-        
-        const arrowElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        arrowElement.setAttribute('d', combinedPath);
-        arrowElement.setAttribute('fill', color);
-        arrowElement.setAttribute('stroke', '#000');
-        arrowElement.setAttribute('stroke-width', '0.5');
-        arrowElement.setAttribute('opacity', '0.7');
-        
-        group.appendChild(arrowElement);
-        
-        // Add hover effects
-        arrowElement.addEventListener('mouseenter', () => {
-          arrowElement.setAttribute('opacity', '0.9');
-          if (this.tooltipCallback) {
-            this.tooltipCallback({
-              type: 'annotation',
-              label: ann.label,
-              start: ann.start,
-              end: ann.end,
-              strand: isForward ? '+' : '-'
-            });
-          }
-        });
-        
-        arrowElement.addEventListener('mouseleave', () => {
-          arrowElement.setAttribute('opacity', '0.7');
-        });
-        
-        // Add text label with leader line for arrow only if showLabels is true
-        if (showLabels && lp) {
-          const midAngle = (startAngle + endAngle) / 2;
-          const featureRadius = (innerRadius + outerRadius) / 2;
-          const featureX = cx + featureRadius * Math.cos(midAngle);
-          const featureY = cy + featureRadius * Math.sin(midAngle);
-          
-          // Use adjusted label position from collision detection
-          const labelX = lp.labelX;
-          const labelY = lp.labelY;
-          
-          // Draw leader line
-          const leaderLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          leaderLine.setAttribute('x1', String(featureX));
-          leaderLine.setAttribute('y1', String(featureY));
-          leaderLine.setAttribute('x2', String(labelX));
-          leaderLine.setAttribute('y2', String(labelY));
-          leaderLine.setAttribute('stroke', '#333');
-          leaderLine.setAttribute('stroke-width', '1');
-          leaderLine.setAttribute('opacity', '0.6');
-          group.appendChild(leaderLine);
-          
-          // Draw label background
-          const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-          const textWidth = lp.width;
-          const textHeight = lp.height;
-          labelBg.setAttribute('x', String(labelX - textWidth / 2));
-          labelBg.setAttribute('y', String(labelY - textHeight / 2));
-          labelBg.setAttribute('width', String(textWidth));
-          labelBg.setAttribute('height', String(textHeight));
-          labelBg.setAttribute('fill', '#ffffff');
-          labelBg.setAttribute('stroke', '#333');
-          labelBg.setAttribute('stroke-width', '1');
-          labelBg.setAttribute('rx', '3');
-          labelBg.setAttribute('opacity', '0.9');
-          group.appendChild(labelBg);
-          
-          // Draw label text
-          const labelText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          labelText.setAttribute('x', String(labelX));
-          labelText.setAttribute('y', String(labelY));
-          labelText.setAttribute('text-anchor', 'middle');
-          labelText.setAttribute('dominant-baseline', 'middle');
-          labelText.setAttribute('font-size', String(this.config.labelFontSize));
-          labelText.setAttribute('font-weight', 'bold');
-          labelText.setAttribute('fill', '#000');
-          labelText.textContent = ann.label;
-          group.appendChild(labelText);
-        }
-      }
-    });
-    
-    svg.appendChild(group);
   }
-
   // Color intensity scaling based on identity and thresholds (delegates to shared geometry utility)
   private getColorIntensity(baseColor: string, percentIdentity: number, lowerThreshold?: number, upperThreshold?: number): string {
     const lower = lowerThreshold ?? this.config.minIdentity;
@@ -986,160 +621,18 @@ export class CircularPlotRenderer {
     return geometryGetColorIntensity(baseColor, percentIdentity, lower, upper);
   }
 
-  private renderGCLegend(svg: SVGElement, hasGCContent: boolean, hasGCSkew: boolean) {
-    const legendX = this.gcLegendPos?.x ?? 20;
-    const legendY = this.gcLegendPos?.y ?? 20;
-    const fs = this.config.legendFontSize;
-    const barW = 120;
-    const barH = 10;
-    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    group.setAttribute('id', 'gc-legend');
-    group.setAttribute('inkscape:label', 'GC Legend');
-    group.setAttribute('class', 'gc-legend');
-
-    // Hoist gradients to the top-level <defs> (for Inkscape compatibility)
-    const topDefs = this.svg?.querySelector('#defs') || null;
-
-    let y = legendY + fs;
-
-    // --- GC Content gradient bar (red -> green) ---
-    if (hasGCContent) {
-    const gcTitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    gcTitle.setAttribute('x', String(legendX));
-    gcTitle.setAttribute('y', String(y));
-    gcTitle.setAttribute('font-size', String(fs));
-    gcTitle.setAttribute('font-weight', 'bold');
-    gcTitle.setAttribute('fill', '#333');
-    gcTitle.textContent = 'GC Content';
-    group.appendChild(gcTitle);
-    y += fs + 2;
-
-    const gcGrad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
-    gcGrad.setAttribute('id', 'gc-content-grad');
-    const gcStop0 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
-    gcStop0.setAttribute('offset', '0%');
-    gcStop0.setAttribute('stop-color', 'rgb(255, 55, 50)');
-    gcGrad.appendChild(gcStop0);
-    const gcStop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
-    gcStop1.setAttribute('offset', '100%');
-    gcStop1.setAttribute('stop-color', 'rgb(55, 255, 50)');
-    gcGrad.appendChild(gcStop1);
-    if (topDefs) { topDefs.appendChild(gcGrad); } // Hoist to top-level defs
-
-    const gcBar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    gcBar.setAttribute('x', String(legendX));
-    gcBar.setAttribute('y', String(y));
-    gcBar.setAttribute('width', String(barW));
-    gcBar.setAttribute('height', String(barH));
-    gcBar.setAttribute('fill', 'url(#gc-content-grad)');
-    gcBar.setAttribute('rx', '2');
-    gcBar.setAttribute('stroke', '#ccc');
-    gcBar.setAttribute('stroke-width', '0.5');
-    group.appendChild(gcBar);
-
-    // Ticks: Low / Average / High
-    const gcTicks = [
-      { label: '0%', x: legendX },
-      { label: '50%', x: legendX + barW / 2 },
-      { label: '100%', x: legendX + barW }
-    ];
-    gcTicks.forEach(tick => {
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', String(tick.x));
-      line.setAttribute('y1', String(y));
-      line.setAttribute('x2', String(tick.x));
-      line.setAttribute('y2', String(y + barH + 3));
-      line.setAttribute('stroke', '#666');
-      line.setAttribute('stroke-width', '1');
-      group.appendChild(line);
-
-      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      label.setAttribute('x', String(tick.x));
-      label.setAttribute('y', String(y + barH + fs));
-      label.setAttribute('font-size', String(fs - 3));
-      label.setAttribute('fill', '#666');
-      label.setAttribute('text-anchor', 'middle');
-      label.textContent = tick.label;
-      group.appendChild(label);
-    });
-    y += barH + fs * 2 + 6;
-    } // end hasGCContent
-
-    // --- GC Skew gradient bar (purple -> green) ---
-    if (hasGCSkew) {
-      const skewTitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      skewTitle.setAttribute('x', String(legendX));
-      skewTitle.setAttribute('y', String(y));
-      skewTitle.setAttribute('font-size', String(fs));
-      skewTitle.setAttribute('font-weight', 'bold');
-      skewTitle.setAttribute('fill', '#333');
-      skewTitle.textContent = 'GC Skew';
-      group.appendChild(skewTitle);
-      y += fs + 2;
-
-      const skewGrad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
-      skewGrad.setAttribute('id', 'gc-skew-grad');
-      const skStop0 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
-      skStop0.setAttribute('offset', '0%');
-      skStop0.setAttribute('stop-color', '#a855f7');
-      skewGrad.appendChild(skStop0);
-      const skStop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
-      skStop1.setAttribute('offset', '100%');
-      skStop1.setAttribute('stop-color', '#22c55e');
-      skewGrad.appendChild(skStop1);
-      if (topDefs) { topDefs.appendChild(skewGrad); } // Hoist to top-level defs
-
-      const skewBar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      skewBar.setAttribute('x', String(legendX));
-      skewBar.setAttribute('y', String(y));
-      skewBar.setAttribute('width', String(barW));
-      skewBar.setAttribute('height', String(barH));
-      skewBar.setAttribute('fill', 'url(#gc-skew-grad)');
-      skewBar.setAttribute('rx', '2');
-      skewBar.setAttribute('stroke', '#ccc');
-      skewBar.setAttribute('stroke-width', '0.5');
-      group.appendChild(skewBar);
-
-      const skewTicks = [
-        { label: '-1', x: legendX },
-        { label: '0', x: legendX + barW / 2 },
-        { label: '+1', x: legendX + barW }
-      ];
-      skewTicks.forEach(tick => {
-        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('x1', String(tick.x));
-        line.setAttribute('y1', String(y));
-        line.setAttribute('x2', String(tick.x));
-        line.setAttribute('y2', String(y + barH + 3));
-        line.setAttribute('stroke', '#666');
-        line.setAttribute('stroke-width', '1');
-        group.appendChild(line);
-
-        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        label.setAttribute('x', String(tick.x));
-        label.setAttribute('y', String(y + barH + fs));
-        label.setAttribute('font-size', String(fs - 3));
-        label.setAttribute('fill', '#666');
-        label.setAttribute('text-anchor', 'middle');
-        label.textContent = tick.label;
-        group.appendChild(label);
-      });
-    }
-
-    // Transparent background rect so the legend is selectable as a unit in Inkscape
-    const totalHeight = y + barH + fs + 5 - legendY;
-    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    bgRect.setAttribute('x', String(legendX - 5));
-    bgRect.setAttribute('y', String(legendY));
-    bgRect.setAttribute('width', String(barW + 10));
-    bgRect.setAttribute('height', String(totalHeight));
-    bgRect.setAttribute('fill', 'white');
-    bgRect.setAttribute('fill-opacity', '0');
-    group.insertBefore(bgRect, group.firstChild);
-
-    svg.appendChild(group);
+  private renderGCLegend(parent: SVGElement, hasGCContent: boolean, hasGCSkew: boolean): void {
+    const definitions = this.svg?.querySelector<SVGDefsElement>('#defs');
+    if (!definitions) throw new Error('SVG definitions are unavailable');
+    renderSVGGCLegend(
+      parent,
+      definitions,
+      this.config,
+      this.gcLegendPos,
+      hasGCContent,
+      hasGCSkew,
+    );
   }
-
   private renderScaleMarkers(
     svg: SVGElement,
     cx: number,
@@ -1198,156 +691,17 @@ export class CircularPlotRenderer {
     svg.appendChild(group);
   }
 
-  private renderRingLegend(svg: SVGElement, rings: RingData[]) {
-    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    group.setAttribute('id', 'ring-legend');
-    group.setAttribute('inkscape:label', 'Ring Legend');
-    group.setAttribute('class', 'ring-legend');
-
-    const legendX = this.ringLegendPos?.x ?? (this.config.width - 200);
-    const legendY = this.ringLegendPos?.y ?? 20;
-    const fs = this.config.legendFontSize;
-    const hasBlastHits = (r: RingData) => r.hits && r.hits.length > 0;
-    const isGraphRing = (r: RingData) => r.graphPoints && r.graphPoints.length > 0;
-
-    // Hoist gradients to the top-level <defs> (for Inkscape compatibility)
-    const topDefs = this.svg?.querySelector('#defs') || null;
-
-    let y = legendY + fs;
-
-    rings.filter(r => r.visible).forEach((ring) => {
-      if (hasBlastHits(ring)) {
-        // Ring name (bold, own line)
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', String(legendX));
-        text.setAttribute('y', String(y));
-        text.setAttribute('font-size', String(fs));
-        text.setAttribute('font-weight', 'bold');
-        text.setAttribute('fill', '#333');
-        text.textContent = ring.queryName;
-        group.appendChild(text);
-        y += fs + 2;
-        const upper = ring.upperThreshold ?? this.config.maxIdentity;
-        const lower = ring.lowerThreshold ?? this.config.minIdentity;
-        const barW = 120;
-        const barH = 10;
-
-        // Create a unique gradient definition and hoist to top-level defs
-        const gradId = `grad-${ring.queryId}`;
-        const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
-        grad.setAttribute('id', gradId);
-        // Gradient: left = low identity (faded), right = high identity (full colour)
-        const hex = ring.color.replace('#', '');
-        const cr = parseInt(hex.substring(0, 2), 16);
-        const cg = parseInt(hex.substring(2, 4), 16);
-        const cb = parseInt(hex.substring(4, 6), 16);
-        const stop0 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
-        stop0.setAttribute('offset', '0%');
-        stop0.setAttribute('stop-color', `rgb(${Math.round(255 + (cr - 255) * 0.15)}, ${Math.round(255 + (cg - 255) * 0.15)}, ${Math.round(255 + (cb - 255) * 0.15)})`);
-        grad.appendChild(stop0);
-        const stop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
-        stop1.setAttribute('offset', '100%');
-        stop1.setAttribute('stop-color', ring.color);
-        grad.appendChild(stop1);
-        if (topDefs) { topDefs.appendChild(grad); } // Hoist to top-level defs
-
-        // Draw gradient bar
-        const bar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        bar.setAttribute('x', String(legendX));
-        bar.setAttribute('y', String(y - barH + 2));
-        bar.setAttribute('width', String(barW));
-        bar.setAttribute('height', String(barH));
-        bar.setAttribute('fill', `url(#${gradId})`);
-        bar.setAttribute('rx', '2');
-        bar.setAttribute('stroke', '#ccc');
-        bar.setAttribute('stroke-width', '0.5');
-        group.appendChild(bar);
-
-        // Tick marks and labels at lower, mid, upper
-        const ticks = [
-          { pct: lower, x: legendX },
-          { pct: Math.round((upper + lower) / 2), x: legendX + barW / 2 },
-          { pct: upper, x: legendX + barW }
-        ];
-        ticks.forEach(tick => {
-          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line.setAttribute('x1', String(tick.x));
-          line.setAttribute('y1', String(y - barH + 2));
-          line.setAttribute('x2', String(tick.x));
-          line.setAttribute('y2', String(y + 4));
-          line.setAttribute('stroke', '#666');
-          line.setAttribute('stroke-width', '1');
-          group.appendChild(line);
-
-          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          label.setAttribute('x', String(tick.x));
-          label.setAttribute('y', String(y + fs));
-          label.setAttribute('font-size', String(fs - 3));
-          label.setAttribute('fill', '#666');
-          label.setAttribute('text-anchor', 'middle');
-          label.textContent = `${tick.pct}%`;
-          group.appendChild(label);
-        });
-        y += fs + barH + 4;
-      } else if (isGraphRing(ring)) {
-        // Graph ring - colour swatch + name on same line
-        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('x', String(legendX));
-        rect.setAttribute('y', String(y - fs + 3));
-        rect.setAttribute('width', '12');
-        rect.setAttribute('height', String(fs));
-        rect.setAttribute('fill', ring.color);
-        rect.setAttribute('rx', '2');
-        group.appendChild(rect);
-
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', String(legendX + 16));
-        text.setAttribute('y', String(y));
-        text.setAttribute('font-size', String(fs));
-        text.setAttribute('font-weight', 'bold');
-        text.setAttribute('fill', '#333');
-        text.textContent = ring.queryName;
-        group.appendChild(text);
-        y += fs + 2;
-      } else {
-        // No data - colour swatch + name on same line
-        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('x', String(legendX));
-        rect.setAttribute('y', String(y - fs + 3));
-        rect.setAttribute('width', '12');
-        rect.setAttribute('height', String(fs));
-        rect.setAttribute('fill', ring.color);
-        rect.setAttribute('rx', '2');
-        group.appendChild(rect);
-
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', String(legendX + 16));
-        text.setAttribute('y', String(y));
-        text.setAttribute('font-size', String(fs));
-        text.setAttribute('font-weight', 'bold');
-        text.setAttribute('fill', '#333');
-        text.textContent = ring.queryName;
-        group.appendChild(text);
-        y += fs + 2;
-      }
-
-      y += fs; // gap between rings scales with font size
-    });
-
-    // Transparent background rect so the legend is selectable as a unit in Inkscape
-    const totalHeight = y - legendY + 5;
-    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    bgRect.setAttribute('x', String(legendX - 5));
-    bgRect.setAttribute('y', String(legendY));
-    bgRect.setAttribute('width', '200');
-    bgRect.setAttribute('height', String(totalHeight));
-    bgRect.setAttribute('fill', 'white');
-    bgRect.setAttribute('fill-opacity', '0');
-    group.insertBefore(bgRect, group.firstChild);
-
-    svg.appendChild(group);
+  private renderRingLegend(parent: SVGElement, rings: RingData[]): void {
+    const definitions = this.svg?.querySelector<SVGDefsElement>('#defs');
+    if (!definitions) throw new Error('SVG definitions are unavailable');
+    renderSVGRingLegend(
+      parent,
+      definitions,
+      this.config,
+      this.ringLegendPos,
+      rings,
+    );
   }
-
   render(container: HTMLElement, data: CircularPlotData, viewState?: PlotViewState): SVGSVGElement {
     // Apply legend positions from view state if provided
     if (viewState) {
@@ -1536,7 +890,7 @@ export class CircularPlotRenderer {
     svg.appendChild(group);
   }
 
-  setTooltipCallback(callback: (info: Record<string, unknown> | null) => void) {
+  setTooltipCallback(callback: TooltipCallback) {
     this.tooltipCallback = callback;
   }
 

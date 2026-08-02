@@ -12,7 +12,7 @@ import type {
   GraphPoint,
   Feature
 } from './types';
-import { extractGenBankFeatures } from '../workers/parser.worker';
+import { extractGenBankFeatures } from './featureParser';
 import { parseSAMCoverage } from '@/lib/samParser';
 import { parseGraphFile } from '@/lib/graphParser';
 import { normaliseFileAccessError, readFileText } from '@/lib/fileAccess';
@@ -22,6 +22,47 @@ export function isGraphFileName(fileName: string): boolean {
   return ['.graph', '.bedgraph', '.wig', '.bed'].some(extension => name.endsWith(extension));
 }
 
+const ALIGNMENT_WORKER_COUNT = 4;
+const WORKER_INITIALIZATION_TIMEOUT_MS = 30_000;
+
+function fileIdentity(file: File): string {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
+export function createAlignmentCacheKey(
+  referenceFile: File,
+  ring: RingConfig,
+  params: PipelineParams,
+): string {
+  return JSON.stringify([
+    fileIdentity(referenceFile),
+    ring.id,
+    ring.legendText,
+    ring.files.map(fileIdentity),
+    ring.blastType ?? params.blastProgram ?? 'blastn',
+    params.alignerOptions?.trim() ?? '',
+  ]);
+}
+
+function emptyAlignment(
+  ring: RingConfig,
+  queryLength: number,
+  alignerVersion: string,
+  params: Partial<PipelineParams> = {},
+): { result: AlignmentResult; rawOutput: string } {
+  return {
+    result: {
+      queryId: ring.id,
+      queryName: ring.legendText,
+      queryLength,
+      totalHits: 0,
+      hits: [],
+      metadata: { timestamp: Date.now(), alignerVersion, parameters: params },
+    },
+    rawOutput: '',
+  };
+}
+
 
 export class BRIGController {
   private parserWorker?: Worker;
@@ -29,54 +70,61 @@ export class BRIGController {
   private progressCallback?: (update: ProgressUpdate) => void;
   private alignmentCache: Map<string, AlignmentResult> = new Map();
 
-  async initialize() {
+  async initialize(): Promise<void> {
     console.log('[Controller] Starting initialization...');
-    
-    // Initialize parser worker
+    if (this.parserWorker) return;
+
     console.log('[Controller] Creating parser worker...');
     this.parserWorker = new Worker(
       new URL('../workers/parser.worker.ts', import.meta.url),
       { type: 'module' }
     );
     console.log('[Controller] Parser worker created');
+  }
 
-    // Initialize alignment workers (4 workers for balanced performance)
-    const numWorkers = 4;
-    console.log(`[Controller] Initializing ${numWorkers} alignment workers...`);
-    
-    for (let i = 0; i < numWorkers; i++) {
-      console.log(`[Controller] Creating alignment worker ${i + 1}/${numWorkers}...`);
-      const worker = new Worker(
+  private initializeAlignmentWorker(worker: Worker, index: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const workerNumber = index + 1;
+      const timeout = setTimeout(() => {
+        reject(new Error(`Worker ${workerNumber} initialization timeout`));
+      }, WORKER_INITIALIZATION_TIMEOUT_MS);
+
+      worker.onmessage = event => {
+        if (event.data.type === 'initialized') {
+          console.log(`[Controller] Worker ${workerNumber} initialized successfully`);
+          clearTimeout(timeout);
+          resolve();
+        } else if (event.data.type === 'error') {
+          clearTimeout(timeout);
+          reject(new Error(event.data.error));
+        }
+      };
+      worker.onerror = error => {
+        clearTimeout(timeout);
+        reject(error);
+      };
+      worker.postMessage({ type: 'init' });
+    });
+  }
+
+  private async ensureAlignmentWorkers(): Promise<void> {
+    if (this.alignmentWorkers.length > 0) return;
+    console.log(`[Controller] Initializing ${ALIGNMENT_WORKER_COUNT} alignment workers...`);
+    const workers = Array.from({ length: ALIGNMENT_WORKER_COUNT }, () => (
+      new Worker(
         new URL('../workers/alignment.worker.ts', import.meta.url),
         { type: 'module' }
-      );
-      this.alignmentWorkers.push(worker);
-      
-      // Initialize BLAST aligner in each worker
-      console.log(`[Controller] Initializing BLAST in worker ${i + 1}...`);
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error(`Worker ${i + 1} initialization timeout`));
-        }, 30000);
-        
-        worker.onmessage = (e) => {
-          if (e.data.type === 'initialized') {
-            console.log(`[Controller] Worker ${i + 1} initialized successfully`);
-            clearTimeout(timeout);
-            resolve();
-          } else if (e.data.type === 'error') {
-            console.error(`[Controller] Worker ${i + 1} initialization error:`, e.data.error);
-            clearTimeout(timeout);
-            reject(new Error(e.data.error));
-          }
-        };
-        worker.onerror = (error) => {
-          console.error(`[Controller] Worker ${i + 1} error:`, error);
-          clearTimeout(timeout);
-          reject(error);
-        };
-        worker.postMessage({ type: 'init' });
-      });
+      )
+    ));
+    this.alignmentWorkers = workers;
+    try {
+      await Promise.all(workers.map((worker, index) => (
+        this.initializeAlignmentWorker(worker, index)
+      )));
+    } catch (error) {
+      workers.forEach(worker => worker.terminate());
+      this.alignmentWorkers = [];
+      throw error;
     }
     console.log('[Controller] All workers initialized successfully');
   }
@@ -122,65 +170,32 @@ export class BRIGController {
     });
   }
 
-  private async calculateGC(sequence: string, windowSize: number): Promise<number[]> {
-    console.log(`[Controller] Calculating GC content, window size: ${windowSize}`);
+  private async calculateGCMetrics(
+    sequence: string,
+    windowSize: number,
+  ): Promise<{ gcContent: number[]; gcSkew: number[] }> {
+    console.log(`[Controller] Calculating GC metrics, window size: ${windowSize}`);
     return new Promise((resolve, reject) => {
       if (!this.parserWorker) {
-        console.error('[Controller] Parser worker not initialized for GC');
         reject(new Error('Parser worker not initialized'));
         return;
       }
 
       const timeout = setTimeout(() => {
-        console.error('[Controller] GC calculation timeout');
-        reject(new Error('GC calculation timeout'));
+        reject(new Error('GC metrics calculation timeout'));
       }, 60000);
 
       this.parserWorker.onmessage = (e) => {
-        if (e.data.type === 'gc') {
-          console.log(`[Controller] GC content calculated: ${e.data.gcContent.length} windows`);
+        if (e.data.type === 'gcMetrics') {
           clearTimeout(timeout);
-          resolve(e.data.gcContent);
+          resolve({ gcContent: e.data.gcContent, gcSkew: e.data.gcSkew });
         } else if (e.data.type === 'error') {
-          console.error('[Controller] GC calculation error:', e.data.error);
           clearTimeout(timeout);
           reject(new Error(e.data.error));
         }
       };
 
-      console.log('[Controller] Sending GC calculation request');
-      this.parserWorker.postMessage({ type: 'gc', sequence, windowSize });
-    });
-  }
-
-  private async calculateGCSkew(sequence: string, windowSize: number): Promise<number[]> {
-    console.log('[Controller] Calculating GC Skew with windowSize:', windowSize);
-    return new Promise((resolve, reject) => {
-      if (!this.parserWorker) {
-        console.error('[Controller] Parser worker not initialized for GC Skew');
-        reject(new Error('Parser worker not initialized'));
-        return;
-      }
-
-      const timeout = setTimeout(() => {
-        console.error('[Controller] GC Skew calculation timeout');
-        reject(new Error('GC Skew calculation timeout'));
-      }, 60000);
-
-      this.parserWorker.onmessage = (e) => {
-        if (e.data.type === 'gcSkew') {
-          console.log(`[Controller] GC Skew calculated: ${e.data.gcSkew.length} windows`);
-          clearTimeout(timeout);
-          resolve(e.data.gcSkew);
-        } else if (e.data.type === 'error') {
-          console.error('[Controller] GC Skew calculation error:', e.data.error);
-          clearTimeout(timeout);
-          reject(new Error(e.data.error));
-        }
-      };
-
-      console.log('[Controller] Sending GC Skew calculation request');
-      this.parserWorker.postMessage({ type: 'gcSkew', sequence, windowSize });
+      this.parserWorker.postMessage({ type: 'gcMetrics', sequence, windowSize });
     });
   }
 
@@ -220,7 +235,6 @@ export class BRIGController {
         queryName: query.name,
         querySeq: query.sequence,
         params,
-        blastProgram: params.blastProgram
       });
     });
   }
@@ -349,20 +363,16 @@ export class BRIGController {
         }
       }
 
-      // Calculate GC content
-      console.log('[Controller] Step 2: Calculating GC content');
-      this.updateProgress('Calculating GC content', 10);
+      console.log('[Controller] Step 2: Calculating GC content and skew');
+      this.updateProgress('Calculating GC content and skew', 10);
       // Adapt window size to reference length: aim for ~500-5000 windows
       // For small genomes (<50kb), use smaller windows to maintain resolution
       const gcWindowSize = Math.max(10, Math.min(1000, Math.floor(reference.length / 500)));
-      const gcContent = await this.calculateGC(reference.sequence, gcWindowSize);
-      console.log(`[Controller] GC content calculated: ${gcContent.length} windows`);
-
-      // Calculate GC Skew
-      console.log('[Controller] Step 2b: Calculating GC Skew');
-      this.updateProgress('Calculating GC Skew', 11);
-      const gcSkew = await this.calculateGCSkew(reference.sequence, gcWindowSize);
-      console.log(`[Controller] GC Skew calculated: ${gcSkew.length} windows`);
+      const { gcContent, gcSkew } = await this.calculateGCMetrics(
+        reference.sequence,
+        gcWindowSize,
+      );
+      console.log(`[Controller] GC metrics calculated: ${gcContent.length} windows`);
 
       // Send partial data with reference and GC content
       if (this.progressCallback) {
@@ -396,6 +406,7 @@ export class BRIGController {
       const queryGenomes: ParsedGenome[] = [];
       // Track which rings are graph rings (index in rings array -> graph data)
       const graphRingData: Map<number, { points: GraphPoint[]; maxValue: number; graphStats?: { mean: number; q3: number; max: number } }> = new Map();
+      const skippedRingIndices = new Set<number>();
 
       for (let i = 0; i < rings.length; i++) {
         const ring = rings[i];
@@ -451,6 +462,15 @@ export class BRIGController {
 
         if (allSequences.length === 0) {
           console.warn(`[Controller]   Warning: ${ring.legendText} has no sequences, skipping`);
+          skippedRingIndices.add(i);
+          queryGenomes.push({
+            id: `empty-${ring.id}`,
+            name: ring.legendText,
+            sequence: '',
+            length: 0,
+            gcContent: 0,
+            isCircular: false,
+          });
           continue;
         }
 
@@ -471,12 +491,19 @@ export class BRIGController {
       // Run alignments across worker pool
       console.log(`[Controller] Step 4: Running alignments for ${queryGenomes.length} rings`);
       this.updateProgress('Running alignments', 20);
+
+      const needsAlignment = queryGenomes.some((_, index) => (
+        !graphRingData.has(index) && !skippedRingIndices.has(index)
+      ));
+      if (needsAlignment) await this.ensureAlignmentWorkers();
       
       const alignmentResults: Array<{ result: AlignmentResult; rawOutput: string } | null> = new Array(queryGenomes.length).fill(null);
 
       // Process rings with worker pool (max 4 concurrent)
       let nextRingIndex = 0;
-      const maxConcurrent = Math.min(4, this.alignmentWorkers.length);
+      const maxConcurrent = needsAlignment
+        ? Math.min(ALIGNMENT_WORKER_COUNT, this.alignmentWorkers.length)
+        : Math.min(1, queryGenomes.length);
 
       const processNextRing = async (workerIndex: number): Promise<void> => {
         while (nextRingIndex < queryGenomes.length) {
@@ -487,17 +514,12 @@ export class BRIGController {
           // Skip graph rings - they don't need BLAST alignment
           if (graphRingData.has(ringIndex)) {
             console.log(`[Controller] Skipping alignment for graph ring: ${ring.legendText}`);
-            alignmentResults[ringIndex] = {
-              result: {
-                queryId: ring.id,
-                queryName: ring.legendText,
-                queryLength: 0,
-                totalHits: 0,
-                hits: [],
-                metadata: { timestamp: Date.now(), alignerVersion: 'graph', parameters: {} }
-              },
-              rawOutput: ''
-            };
+            alignmentResults[ringIndex] = emptyAlignment(ring, 0, 'graph');
+            continue;
+          }
+
+          if (skippedRingIndices.has(ringIndex)) {
+            alignmentResults[ringIndex] = emptyAlignment(ring, 0, 'skipped');
             continue;
           }
 
@@ -508,7 +530,7 @@ export class BRIGController {
           );
 
           try {
-            const cacheKey = `${reference.name}:${query.name}`;
+            const cacheKey = createAlignmentCacheKey(referenceFile, ring, params);
             let result: { result: AlignmentResult; rawOutput: string };
 
             if (!params.forceAlignment && this.alignmentCache.has(cacheKey)) {
@@ -521,7 +543,10 @@ export class BRIGController {
                 this.alignmentWorkers[workerIndex],
                 reference,
                 query,
-                params
+                {
+                  ...params,
+                  blastProgram: ring.blastType ?? params.blastProgram,
+                },
               );
               this.alignmentCache.set(cacheKey, result.result);
             }
@@ -530,17 +555,7 @@ export class BRIGController {
             console.log(`[Controller] Ring ${ringIndex + 1}/${queryGenomes.length} completed: ${result.result.hits?.length || 0} hits`);
           } catch (error) {
             console.error(`[Controller] Alignment error for ${query.name}:`, error);
-            alignmentResults[ringIndex] = {
-              result: {
-                queryId: ring.id,
-                queryName: ring.legendText,
-                queryLength: query.length,
-                totalHits: 0,
-                hits: [],
-                metadata: { timestamp: Date.now(), alignerVersion: 'BLAST', parameters: params }
-              },
-              rawOutput: ''
-            };
+            alignmentResults[ringIndex] = emptyAlignment(ring, query.length, 'BLAST', params);
           }
         }
       };
@@ -634,7 +649,7 @@ export class BRIGController {
           length: reference.length,
           gcContent,
           gcSkew,
-          features: [],
+          features: referenceFeatures,
           contigs: contigBoundaries
         },
         rings: ringDataArray,
@@ -657,5 +672,8 @@ export class BRIGController {
   cleanup() {
     this.parserWorker?.terminate();
     this.alignmentWorkers.forEach(w => w.terminate());
+    this.parserWorker = undefined;
+    this.alignmentWorkers = [];
+    this.progressCallback = undefined;
   }
 }

@@ -37,5 +37,8 @@ jobs:
       - name: Lint
         run: pixi run npm run lint
 
+      - name: Architecture guardrails
+        run: pixi run npm run quality:architecture
+
       - name: Unit tests
         run: pixi run npm test

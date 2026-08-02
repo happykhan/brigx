@@ -1,5 +1,5 @@
 
-import { useState as useReactState, useCallback } from 'react';
+import { useState as useReactState, useCallback, useMemo } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { NavBar, AppFooter, LogConsole } from '@genomicx/ui';
 import CircularPlot from '@/components/CircularPlot';
@@ -15,6 +15,23 @@ import ImagePropertiesPanel from '@/components/ImagePropertiesPanel';
 import { useBRIGController } from '@/hooks/useBRIGController';
 import { APP_VERSION } from '@/lib/version';
 
+function sameLegendPosition(
+  left: PlotViewState['gcLegendPos'],
+  right: PlotViewState['gcLegendPos'],
+) {
+  if (left === right) return true;
+  return left !== null && right !== null && left.x === right.x && left.y === right.y;
+}
+
+function samePlotViewState(left: PlotViewState | null, right: PlotViewState) {
+  return left !== null
+    && left.zoom === right.zoom
+    && left.panX === right.panX
+    && left.panY === right.panY
+    && sameLegendPosition(left.gcLegendPos, right.gcLegendPos)
+    && sameLegendPosition(left.ringLegendPos, right.ringLegendPos);
+}
+
 export default function Home() {
   const {
     referenceFile, rings, setRings, params, setParams, progress, plotData,
@@ -28,8 +45,19 @@ export default function Home() {
 
   const [plotViewState, setPlotViewState] = useReactState<PlotViewState | null>(null);
   const handleViewStateChange = useCallback((state: PlotViewState) => {
-    setPlotViewState(state);
+    setPlotViewState(previous => samePlotViewState(previous, state) ? previous : state);
   }, []);
+  const displayedPlotData = useMemo(() => {
+    if (!plotData) return null;
+    return {
+      ...plotData,
+      reference: {
+        ...plotData.reference,
+        gcContent: params.showGCContent !== false ? plotData.reference.gcContent : undefined,
+        gcSkew: params.showGCSkew !== false ? plotData.reference.gcSkew : undefined,
+      },
+    };
+  }, [plotData, params.showGCContent, params.showGCSkew]);
 
   return (
     <>
@@ -95,10 +123,10 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {plotData ? (
+                  {displayedPlotData ? (
                     <div className={plotExpanded ? 'flex-1 min-h-0' : ''}>
                       <ErrorBoundary>
-                        <CircularPlot data={{ ...plotData, reference: { ...plotData.reference, gcContent: params.showGCContent !== false ? plotData.reference.gcContent : undefined, gcSkew: params.showGCSkew !== false ? plotData.reference.gcSkew : undefined } }} imageProperties={imageProperties} onViewStateChange={handleViewStateChange} />
+                        <CircularPlot data={displayedPlotData} imageProperties={imageProperties} onViewStateChange={handleViewStateChange} />
                       </ErrorBoundary>
                     </div>
                   ) : (

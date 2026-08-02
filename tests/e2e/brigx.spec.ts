@@ -43,8 +43,17 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])
     await page.goto('/')
 
+    const pageErrors: Error[] = []
+    page.on('pageerror', error => pageErrors.push(error))
+
+    const refInput = page.locator('input[type="file"][accept*=".fa"]').first()
+    await refInput.setInputFiles(REFERENCE)
+    await expect(page.getByText('reference.fa')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 30_000 })
+
     await page.getByRole('button', { name: 'Add New Ring' }).click()
     await page.getByRole('button', { name: 'Custom Annotations' }).click()
+    await expect(page.getByRole('heading', { name: 'Annotations for Ring 1' })).toBeVisible()
     await page.getByRole('button', { name: 'Add New', exact: true }).click()
 
     const firstLabelCell = page.locator('.ht_master tbody tr').first().locator('td').nth(2)
@@ -68,5 +77,6 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await firstStartCell.click()
     await page.getByRole('button', { name: 'Delete Selected' }).click()
     await expect(page.getByText(/^1 annotation\(s\) \| Reference:/)).toBeVisible()
+    expect(pageErrors).toEqual([])
   })
 })

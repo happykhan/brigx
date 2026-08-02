@@ -87,6 +87,7 @@ const config: ForgeConfig = {
       config: {
         options: {
           name: 'brigx',
+          bin: 'BRIGX',
           productName: 'BRIGX',
           genericName: 'Genome comparison visualiser',
           description: 'Free, offline circular comparative genome visualisation',
@@ -105,6 +106,7 @@ const config: ForgeConfig = {
       config: {
         options: {
           name: 'brigx',
+          bin: 'BRIGX',
           productName: 'BRIGX',
           genericName: 'Genome comparison visualiser',
           description: 'Free, offline circular comparative genome visualisation',

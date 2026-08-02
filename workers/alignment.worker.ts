@@ -1,5 +1,6 @@
 // Alignment Worker - Runs BLAST (formatdb + blastall) alignments
 import type { AlignmentResult, AlignmentHit, PipelineParams } from '../lib/types';
+import { verifySha256 } from '../lib/assetIntegrity';
 
 interface EmscriptenFileSystem {
   writeFile(path: string, data: string | Uint8Array): void;
@@ -23,6 +24,19 @@ interface BlastModuleOptions {
 
 type BlastModuleFactory = (options: BlastModuleOptions) => Promise<BlastModule> | BlastModule;
 
+const BLAST_ASSET_HASHES = {
+  blastall: {
+    js: '1f9d7c8374d72cf03f5f2c2f81ba0e4c1ddeb2deb0bafa9ff08ca0541fddce0e',
+    wasm: 'f7f4e1b6ee56625f2f42ef9d278c5f270a7ade09aef11753c3e248c007d2c139',
+  },
+  formatdb: {
+    js: '760874788a0e65458c32e86c578ca0b7e1eb983c046576b819382d05ddb042b2',
+    wasm: 'ab867d4eabccde92b4a1e2452d5156d2838f4e7051828104f50cf7a4dbc0df63',
+  },
+} as const;
+
+type BlastAssetName = keyof typeof BLAST_ASSET_HASHES;
+
 // Cache module factories and WASM binaries
 let formatdbFactory: BlastModuleFactory | null = null;
 let formatdbWasmBinary: ArrayBuffer | null = null;
@@ -34,20 +48,26 @@ let cachedRefName: string | null = null;
 let cachedRefSequence: string | null = null;
 let cachedDbFiles: Map<string, Uint8Array> | null = null;
 
-async function loadModuleFactory(name: string): Promise<{ factory: BlastModuleFactory; wasmBinary: ArrayBuffer }> {
+async function loadModuleFactory(name: BlastAssetName): Promise<{ factory: BlastModuleFactory; wasmBinary: ArrayBuffer }> {
   const [jsResponse, wasmResponse] = await Promise.all([
-    fetch(`https://static.genomicx.org/wasm/${name}.js`),
-    fetch(`https://static.genomicx.org/wasm/${name}.wasm`)
+    fetch(`/wasm/blast/${name}.js`),
+    fetch(`/wasm/blast/${name}.wasm`),
   ]);
 
   if (!jsResponse.ok) throw new Error(`Failed to fetch ${name}.js: ${jsResponse.status}`);
   if (!wasmResponse.ok) throw new Error(`Failed to fetch ${name}.wasm: ${wasmResponse.status}`);
 
-  const [moduleText, wasmBinary] = await Promise.all([
-    jsResponse.text(),
+  const [moduleBinary, wasmBinary] = await Promise.all([
+    jsResponse.arrayBuffer(),
     wasmResponse.arrayBuffer()
   ]);
 
+  await Promise.all([
+    verifySha256(`${name}.js`, moduleBinary, BLAST_ASSET_HASHES[name].js),
+    verifySha256(`${name}.wasm`, wasmBinary, BLAST_ASSET_HASHES[name].wasm),
+  ]);
+
+  const moduleText = new TextDecoder().decode(moduleBinary);
   const moduleWrapper = new Function('Module', moduleText + '; return Module;');
   const factory = moduleWrapper({}) as BlastModuleFactory;
   return { factory, wasmBinary };

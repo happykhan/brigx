@@ -1,17 +1,39 @@
 // Alignment Worker - Runs BLAST (formatdb + blastall) alignments
-import type { AlignmentResult, AlignmentHit } from '../lib/types';
+import type { AlignmentResult, AlignmentHit, PipelineParams } from '../lib/types';
+
+interface EmscriptenFileSystem {
+  writeFile(path: string, data: string | Uint8Array): void;
+  readFile(path: string): Uint8Array;
+  readdir(path: string): string[];
+}
+
+interface BlastModule {
+  FS: EmscriptenFileSystem;
+  callMain(args: string[]): number | void;
+  _stdout: string[];
+  _stderr: string[];
+}
+
+interface BlastModuleOptions {
+  wasmBinary: ArrayBuffer;
+  print(text: string): void;
+  printErr(text: string): void;
+  noInitialRun: boolean;
+}
+
+type BlastModuleFactory = (options: BlastModuleOptions) => Promise<BlastModule> | BlastModule;
 
 // Cache module factories and WASM binaries
-let formatdbFactory: any = null;
+let formatdbFactory: BlastModuleFactory | null = null;
 let formatdbWasmBinary: ArrayBuffer | null = null;
-let blastallFactory: any = null;
+let blastallFactory: BlastModuleFactory | null = null;
 let blastallWasmBinary: ArrayBuffer | null = null;
 
 // Cache the formatdb index for the current reference
 let cachedRefName: string | null = null;
 let cachedDbFiles: Map<string, Uint8Array> | null = null;
 
-async function loadModuleFactory(name: string): Promise<{ factory: any; wasmBinary: ArrayBuffer }> {
+async function loadModuleFactory(name: string): Promise<{ factory: BlastModuleFactory; wasmBinary: ArrayBuffer }> {
   const [jsResponse, wasmResponse] = await Promise.all([
     fetch(`https://static.genomicx.org/wasm/${name}.js`),
     fetch(`https://static.genomicx.org/wasm/${name}.wasm`)
@@ -26,7 +48,7 @@ async function loadModuleFactory(name: string): Promise<{ factory: any; wasmBina
   ]);
 
   const moduleWrapper = new Function('Module', moduleText + '; return Module;');
-  const factory = moduleWrapper({});
+  const factory = moduleWrapper({}) as BlastModuleFactory;
   return { factory, wasmBinary };
 }
 
@@ -49,7 +71,7 @@ async function initializeBlast() {
   console.log('[Alignment Worker] BLAST modules ready');
 }
 
-async function createModuleInstance(factory: any, wasmBinary: ArrayBuffer): Promise<any> {
+async function createModuleInstance(factory: BlastModuleFactory, wasmBinary: ArrayBuffer): Promise<BlastModule> {
   const stdout: string[] = [];
   const stderr: string[] = [];
   const mod = await factory({
@@ -171,7 +193,7 @@ async function alignGenomes(
   referenceSeq: string,
   queryName: string,
   querySeq: string,
-  params: any
+  params: Partial<Pick<PipelineParams, 'blastProgram' | 'alignerOptions'>> = {}
 ): Promise<{ alignmentResult: AlignmentResult; rawOutput: string }> {
   console.log(`[Alignment Worker] alignGenomes: ${queryName} (${querySeq.length}bp query, ${referenceSeq.length}bp ref)`);
   await initializeBlast();

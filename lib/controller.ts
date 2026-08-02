@@ -15,6 +15,12 @@ import type {
 import { extractGenBankFeatures } from '../workers/parser.worker';
 import { parseSAMCoverage } from '@/lib/samParser';
 import { parseGraphFile } from '@/lib/graphParser';
+import { normaliseFileAccessError, readFileText } from '@/lib/fileAccess';
+
+export function isGraphFileName(fileName: string): boolean {
+  const name = fileName.toLowerCase();
+  return ['.graph', '.bedgraph', '.wig', '.bed'].some(extension => name.endsWith(extension));
+}
 
 
 export class BRIGController {
@@ -102,12 +108,17 @@ export class BRIGController {
           resolve(e.data.genomes);
         } else if (e.data.type === 'error') {
           clearTimeout(timeout);
-          reject(new Error(e.data.error));
+          reject(normaliseFileAccessError(new Error(e.data.error), file.name));
         }
       };
 
       console.log('[Controller] Sending parse request');
-      this.parserWorker.postMessage({ type: 'parse', file });
+      try {
+        this.parserWorker.postMessage({ type: 'parse', file });
+      } catch (error) {
+        clearTimeout(timeout);
+        reject(normaliseFileAccessError(error, file.name));
+      }
     });
   }
 
@@ -323,7 +334,7 @@ export class BRIGController {
       const refExt = referenceFile.name.toLowerCase();
       if (refExt.match(/\.(gbk|gb|genbank|gbff)(\.gz)?$/)) {
         try {
-          const refText = await referenceFile.text();
+          const refText = await readFileText(referenceFile);
           const annots = extractGenBankFeatures(refText, 'CDS');
           referenceFeatures = annots.map(a => ({
             type: 'CDS',
@@ -392,14 +403,11 @@ export class BRIGController {
 
         // Check if any file is a .sam or .graph file
         const samFile = ring.files.find(f => f.name.toLowerCase().endsWith('.sam'));
-        const graphFile = ring.files.find(f => {
-          const name = f.name.toLowerCase();
-          return name.endsWith('.graph') || name.endsWith('.bedgraph') || name.endsWith('.wig');
-        });
+        const graphFile = ring.files.find(f => isGraphFileName(f.name));
 
         if (samFile) {
           console.log(`[Controller]   SAM file detected: ${samFile.name}, computing coverage`);
-          const content = await samFile.text();
+          const content = await readFileText(samFile);
           const gcWindowSize = 1000;
           const result = parseSAMCoverage(content, gcWindowSize);
           graphRingData.set(i, { points: result.points, maxValue: result.maxValue });
@@ -411,7 +419,7 @@ export class BRIGController {
 
         if (graphFile) {
           console.log(`[Controller]   Graph file detected: ${graphFile.name}`);
-          const content = await graphFile.text();
+          const content = await readFileText(graphFile);
           const result = parseGraphFile(content);
           if (result.errors.length > 0) {
             console.warn(`[Controller]   Graph parse warnings: ${result.errors.slice(0, 3).join('; ')}`);

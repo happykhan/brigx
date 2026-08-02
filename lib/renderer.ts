@@ -1,5 +1,5 @@
 // Circular Plot SVG Renderer
-import type { CircularPlotData, RingData, Annotation, ContigBoundary } from './types';
+import type { CircularPlotData, RingData, Annotation, AnnotationShape, ContigBoundary } from './types';
 import { positionToAngle, createArcPath as geometryCreateArcPath, getColorIntensity as geometryGetColorIntensity } from './geometry';
 
 export interface RenderConfig {
@@ -31,7 +31,7 @@ export interface SVGViewState {
 export class CircularPlotRenderer {
   private svg: SVGSVGElement | null = null;
   private config: RenderConfig;
-  private tooltipCallback?: (info: any) => void;
+  private tooltipCallback?: (info: Record<string, unknown> | null) => void;
   private gcLegendPos: { x: number; y: number } | null = null;
   private ringLegendPos: { x: number; y: number } | null = null;
 
@@ -52,7 +52,7 @@ export class CircularPlotRenderer {
   }
 
   private renderReferenceRing(
-    svg: SVGSVGElement,
+    svg: SVGElement,
     cx: number,
     cy: number,
     _refLength: number
@@ -75,7 +75,7 @@ export class CircularPlotRenderer {
   }
 
   private renderGCSkewRing(
-    svg: SVGSVGElement,
+    svg: SVGElement,
     cx: number,
     cy: number,
     refLength: number,
@@ -197,7 +197,7 @@ export class CircularPlotRenderer {
   }
 
   private renderGCRing(
-    svg: SVGSVGElement,
+    svg: SVGElement,
     cx: number,
     cy: number,
     refLength: number,
@@ -322,7 +322,7 @@ export class CircularPlotRenderer {
   }
 
   private renderGraphRing(
-    svg: SVGSVGElement,
+    svg: SVGElement,
     cx: number,
     cy: number,
     refLength: number,
@@ -422,7 +422,7 @@ export class CircularPlotRenderer {
   }
 
   private renderContigBoundaries(
-    svg: SVGSVGElement,
+    svg: SVGElement,
     cx: number,
     cy: number,
     refLength: number,
@@ -507,7 +507,7 @@ export class CircularPlotRenderer {
   }
 
   private renderQueryRing(
-    svg: SVGSVGElement,
+    svg: SVGElement,
     cx: number,
     cy: number,
     refLength: number,
@@ -605,14 +605,17 @@ export class CircularPlotRenderer {
   }
 
   private renderAnnotations(
-    svg: SVGSVGElement,
+    svg: SVGElement,
     cx: number,
     cy: number,
     refLength: number,
     annotations: Annotation[],
     innerRadius: number,
     outerRadius: number,
-    showLabels: boolean = true
+    showLabels: boolean = true,
+    labelInward: boolean = false,
+    groupId: string = `annotations-${innerRadius.toFixed(0)}`,
+    groupLabel: string = 'Annotations',
   ) {
     if (!annotations || annotations.length === 0) return;
 
@@ -624,8 +627,8 @@ export class CircularPlotRenderer {
     }
 
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    group.setAttribute('id', `annotations-${innerRadius.toFixed(0)}`);
-    group.setAttribute('inkscape:label', 'Annotations');
+    group.setAttribute('id', groupId);
+    group.setAttribute('inkscape:label', groupLabel);
     group.setAttribute('class', 'annotations');
 
     // Collect label positions for collision detection
@@ -668,7 +671,7 @@ export class CircularPlotRenderer {
     });
     
     // Adjust angles to avoid overlaps (move along arc)
-    const labelDistance = outerRadius + 30;
+    const labelDistance = labelInward ? Math.max(20, innerRadius - 30) : outerRadius + 30;
     
     // Sort by angle for easier collision detection
     labelPositions.sort((a, b) => a.midAngle - b.midAngle);
@@ -991,7 +994,7 @@ export class CircularPlotRenderer {
     return geometryGetColorIntensity(baseColor, percentIdentity, lower, upper);
   }
 
-  private renderGCLegend(svg: SVGSVGElement, hasGCContent: boolean, hasGCSkew: boolean) {
+  private renderGCLegend(svg: SVGElement, hasGCContent: boolean, hasGCSkew: boolean) {
     const legendX = this.gcLegendPos?.x ?? 20;
     const legendY = this.gcLegendPos?.y ?? 20;
     const fs = this.config.legendFontSize;
@@ -1146,7 +1149,7 @@ export class CircularPlotRenderer {
   }
 
   private renderScaleMarkers(
-    svg: SVGSVGElement,
+    svg: SVGElement,
     cx: number,
     cy: number,
     refLength: number
@@ -1203,7 +1206,7 @@ export class CircularPlotRenderer {
     svg.appendChild(group);
   }
 
-  private renderRingLegend(svg: SVGSVGElement, rings: RingData[]) {
+  private renderRingLegend(svg: SVGElement, rings: RingData[]) {
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     group.setAttribute('id', 'ring-legend');
     group.setAttribute('inkscape:label', 'Ring Legend');
@@ -1362,7 +1365,11 @@ export class CircularPlotRenderer {
 
     // Create SVG with Inkscape namespace for layer/group compatibility
     this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    this.svg.setAttribute('xmlns:inkscape', 'http://www.inkscape.org/namespaces/inkscape');
+    this.svg.setAttributeNS(
+      'http://www.w3.org/2000/xmlns/',
+      'xmlns:inkscape',
+      'http://www.inkscape.org/namespaces/inkscape',
+    );
     this.svg.setAttribute('viewBox', `0 0 ${this.config.width} ${this.config.height}`);
     this.svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     this.svg.setAttribute('width', '100%');
@@ -1404,16 +1411,38 @@ export class CircularPlotRenderer {
 
     this.svg.appendChild(mainGroup);
     
-    // Now render everything into mainGroup instead of svg
-    const tempSvg = this.svg;
-    this.svg = mainGroup as any; // Temporarily use mainGroup as target
-    
     const cx = this.config.width / 2;
     const cy = this.config.height / 2;
     const refLength = data.reference.length;
     
     // Render reference ring first
-    this.renderReferenceRing(mainGroup as any, cx, cy, refLength);
+    this.renderReferenceRing(mainGroup, cx, cy, refLength);
+
+    // GenBank reference features sit inside the reference ring, matching the canvas preview.
+    if (data.reference.features && data.reference.features.length > 0) {
+      const featureInner = Math.max(10, this.config.innerRadius - 30);
+      const featureAnnotations: Annotation[] = data.reference.features.map((feature, index) => ({
+        id: `ref-feat-${index}`,
+        start: feature.start,
+        end: feature.end,
+        label: feature.name || feature.product || feature.type,
+        shape: (feature.strand === '+' ? 'arrow-forward' : 'arrow-reverse') as AnnotationShape,
+        color: feature.color || '#4a90e2',
+      }));
+      this.renderAnnotations(
+        mainGroup,
+        cx,
+        cy,
+        refLength,
+        featureAnnotations,
+        featureInner,
+        this.config.innerRadius,
+        true,
+        true,
+        'reference-annotations',
+        'Reference Annotations',
+      );
+    }
 
     // Calculate ring positions - GC Content and GC Skew come first
     let currentRadius = this.config.innerRadius;
@@ -1421,13 +1450,13 @@ export class CircularPlotRenderer {
     // Render GC Content ring
     if (data.reference.gcContent) {
       currentRadius += this.config.ringSpacing; // Small spacing from reference
-      this.renderGCRing(mainGroup as any, cx, cy, refLength, data.reference.gcContent, currentRadius);
+      this.renderGCRing(mainGroup, cx, cy, refLength, data.reference.gcContent, currentRadius);
       currentRadius += this.config.gcRingWidth + this.config.ringSpacing;
     }
 
     // Render GC Skew ring (second ring outside reference)
     if (data.reference.gcSkew) {
-      this.renderGCSkewRing(mainGroup as any, cx, cy, refLength, data.reference.gcSkew, currentRadius);
+      this.renderGCSkewRing(mainGroup, cx, cy, refLength, data.reference.gcSkew, currentRadius);
       currentRadius += this.config.gcRingWidth + this.config.ringSpacing;
     }
 
@@ -1439,19 +1468,22 @@ export class CircularPlotRenderer {
 
       // Render as graph ring if it has graph data, otherwise as alignment ring
       if (ring.graphPoints && ring.graphPoints.length > 0) {
-        this.renderGraphRing(mainGroup as any, cx, cy, refLength, ring, radius, ringWidth);
+        this.renderGraphRing(mainGroup, cx, cy, refLength, ring, radius, ringWidth);
       } else {
-        this.renderQueryRing(mainGroup as any, cx, cy, refLength, ring, radius, ringWidth);
+        this.renderQueryRing(mainGroup, cx, cy, refLength, ring, radius, ringWidth);
       }
 
       if (ring.annotations && ring.annotations.length > 0) {
         this.renderAnnotations(
-          mainGroup as any,
+          mainGroup,
           cx, cy, refLength,
           ring.annotations,
           radius,
           radius + ringWidth,
-          ring.showLabels !== false
+          ring.showLabels !== false,
+          false,
+          `annotations-${ring.queryId}`,
+          `Annotations: ${ring.queryName}`,
         );
       }
 
@@ -1461,27 +1493,24 @@ export class CircularPlotRenderer {
     // Render contig boundaries on the outermost ring (after all query rings)
     if (data.reference.contigs && data.reference.contigs.length > 1) {
       const contigRingWidth = 6;
-      this.renderContigBoundaries(mainGroup as any, cx, cy, refLength, data.reference.contigs, currentRadius, contigRingWidth);
+      this.renderContigBoundaries(mainGroup, cx, cy, refLength, data.reference.contigs, currentRadius, contigRingWidth);
       currentRadius += contigRingWidth + this.config.ringSpacing;
     }
 
-    this.renderScaleMarkers(mainGroup as any, cx, cy, refLength);
+    this.renderScaleMarkers(mainGroup, cx, cy, refLength);
     
     // Add legends if enabled
     if (this.config.showLegend !== false) {
       if (data.reference.gcContent || data.reference.gcSkew) {
-        this.renderGCLegend(mainGroup as any, !!data.reference.gcContent, !!data.reference.gcSkew);
+        this.renderGCLegend(mainGroup, !!data.reference.gcContent, !!data.reference.gcSkew);
       }
       if (visibleRings.length > 0) {
-        this.renderRingLegend(mainGroup as any, visibleRings);
+        this.renderRingLegend(mainGroup, visibleRings);
       }
     }
     
     // Render title and reference size in center
-    this.renderTitle(mainGroup as any, cx, cy, refLength);
-    
-    // Restore svg reference
-    this.svg = tempSvg;
+    this.renderTitle(mainGroup, cx, cy, refLength);
     
     // Clear and append to container
     container.innerHTML = '';
@@ -1490,7 +1519,11 @@ export class CircularPlotRenderer {
     return this.svg;
   }
 
-  private renderTitle(svg: SVGSVGElement, cx: number, cy: number, refLength: number) {
+  private renderTitle(svg: SVGElement, cx: number, cy: number, refLength: number) {
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('id', 'title-group');
+    group.setAttribute('inkscape:label', 'Title');
+
     // Render title if provided
     if (this.config.title) {
       const titleText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -1502,7 +1535,7 @@ export class CircularPlotRenderer {
       titleText.setAttribute('font-weight', 'bold');
       titleText.setAttribute('fill', '#333');
       titleText.textContent = this.config.title;
-      svg.appendChild(titleText);
+      group.appendChild(titleText);
     }
     
     // Always render reference size below title
@@ -1514,10 +1547,11 @@ export class CircularPlotRenderer {
     sizeText.setAttribute('font-size', String(this.config.titleFontSize * 0.6));
     sizeText.setAttribute('fill', '#666');
     sizeText.textContent = `${refLength.toLocaleString()} bp`;
-    svg.appendChild(sizeText);
+    group.appendChild(sizeText);
+    svg.appendChild(group);
   }
 
-  setTooltipCallback(callback: (info: any) => void) {
+  setTooltipCallback(callback: (info: Record<string, unknown> | null) => void) {
     this.tooltipCallback = callback;
   }
 

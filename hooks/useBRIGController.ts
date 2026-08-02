@@ -6,6 +6,7 @@ import type { CircularPlotData, PipelineParams, ProgressUpdate, RingConfig, Anno
 import { APP_VERSION } from '@/lib/version';
 import type { BRIGController as BRIGControllerType } from '@/lib/controller';
 import { exportSession, importSession } from '@/lib/session';
+import { readFileText } from '@/lib/fileAccess';
 import type { ImagePropertiesConfig } from '@/components/ImageProperties';
 
 export function useBRIGController() {
@@ -53,7 +54,7 @@ export function useBRIGController() {
     const originalWarn = console.warn;
 
     // Summarize objects for display - avoid dumping raw arrays
-    const summarizeArg = (arg: any): string => {
+    const summarizeArg = (arg: unknown): string => {
       if (arg == null) return String(arg);
       if (typeof arg !== 'object') return String(arg);
       if (Array.isArray(arg)) {
@@ -61,10 +62,10 @@ export function useBRIGController() {
         return JSON.stringify(arg);
       }
       // Summarize known large fields
-      const clone: any = {};
-      for (const [k, v] of Object.entries(arg)) {
-        if (Array.isArray(v) && (v as any[]).length > 5) {
-          clone[k] = `[${(v as any[]).length} items]`;
+      const clone: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(arg as Record<string, unknown>)) {
+        if (Array.isArray(v) && v.length > 5) {
+          clone[k] = `[${v.length} items]`;
         } else if (k === 'partialData' || k === 'sequence') {
           clone[k] = '[omitted]';
         } else if (typeof v === 'object' && v !== null) {
@@ -76,19 +77,19 @@ export function useBRIGController() {
       return JSON.stringify(clone);
     };
 
-    console.log = (...args: any[]) => {
+    console.log = (...args: unknown[]) => {
       const message = args.map(summarizeArg).join(' ');
       setConsoleLogs(prev => [...prev, `[LOG] ${message}`]);
       originalLog.apply(console, args);
     };
 
-    console.error = (...args: any[]) => {
+    console.error = (...args: unknown[]) => {
       const message = args.map(summarizeArg).join(' ');
       setConsoleLogs(prev => [...prev, `[ERROR] ${message}`]);
       originalError.apply(console, args);
     };
 
-    console.warn = (...args: any[]) => {
+    console.warn = (...args: unknown[]) => {
       const message = args.map(summarizeArg).join(' ');
       setConsoleLogs(prev => [...prev, `[WARN] ${message}`]);
       originalWarn.apply(console, args);
@@ -472,7 +473,7 @@ export function useBRIGController() {
     if (!file) return;
 
     try {
-      const json = await file.text();
+      const json = await readFileText(file);
       const session = importSession(json);
 
       // Restore rings (without files - they can't be serialized)

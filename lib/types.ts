@@ -21,7 +21,7 @@ export interface AlignmentResult {
   metadata: {
     timestamp: number;
     alignerVersion: string;
-    parameters: Record<string, any>;
+    parameters: Partial<PipelineParams>;
   };
 }
 

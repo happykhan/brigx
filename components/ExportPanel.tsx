@@ -13,6 +13,10 @@ interface ExportPanelProps {
   viewState?: PlotViewState | null;
 }
 
+// The interactive canvas uses a fixed 1000x1000 logical coordinate system.
+// SVG exports must use the same system so pan and dragged legend coordinates match exactly.
+const PLOT_LOGICAL_SIZE = 1000;
+
 export default function ExportPanel({ plotData, imageProperties, viewState }: ExportPanelProps) {
   const [isExporting, setIsExporting] = useState(false);
   const exportSVG = () => {
@@ -23,8 +27,8 @@ export default function ExportPanel({ plotData, imageProperties, viewState }: Ex
     document.body.appendChild(container);
 
     const renderer = new CircularPlotRenderer({
-      width: 1200,
-      height: 1200,
+      width: PLOT_LOGICAL_SIZE,
+      height: PLOT_LOGICAL_SIZE,
       innerRadius: imageProperties.innerRadius,
       ringWidth: imageProperties.ringWidth,
       gcRingWidth: imageProperties.gcRingWidth,
@@ -75,8 +79,8 @@ export default function ExportPanel({ plotData, imageProperties, viewState }: Ex
       document.body.appendChild(container);
 
       const renderer = new CircularPlotRenderer({
-        width: 1200,
-        height: 1200,
+        width: PLOT_LOGICAL_SIZE,
+        height: PLOT_LOGICAL_SIZE,
         innerRadius: imageProperties.innerRadius,
         ringWidth: imageProperties.ringWidth,
         gcRingWidth: imageProperties.gcRingWidth,

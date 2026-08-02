@@ -8,6 +8,7 @@ import { registerAllModules } from 'handsontable/registry';
 import 'handsontable/dist/handsontable.full.min.css';
 import type { Annotation, AnnotationShape } from '@/lib/types';
 import { parseAnnotationFile, exportAnnotationsToTSV } from '@/lib/annotationParser';
+import { readFileText } from '@/lib/fileAccess';
 import toast from 'react-hot-toast';
 
 // Register all Handsontable modules (including cell types)
@@ -73,6 +74,7 @@ export default function AnnotationEditor({
   // The source-of-truth data array is held in a ref so Handsontable can
   // mutate it directly without React re-renders overwriting cell edits.
   const tableDataRef = useRef<TableRow[]>(toTableData(annotations));
+  const selectedRowsRef = useRef<number[]>([]);
 
   // Counter displayed in the toolbar (updated on sync)
   const [count, setCount] = useState(annotations.length);
@@ -90,6 +92,7 @@ export default function AnnotationEditor({
     const rows = toTableData(anns);
     tableDataRef.current = rows;
     idsRef.current = anns.map(a => a.id);
+    selectedRowsRef.current = [];
     setCount(anns.length);
     const hot = hotRef.current;
     if (hot && !hot.isDestroyed) {
@@ -109,7 +112,7 @@ export default function AnnotationEditor({
     if (!file) return;
 
     try {
-      const content = await file.text();
+      const content = await readFileText(file);
       const result = parseAnnotationFile(content, referenceLength);
 
       if (result.errors.length > 0) {
@@ -158,18 +161,20 @@ export default function AnnotationEditor({
     if (!hot) return;
 
     const selected = hot.getSelected();
-    if (!selected || selected.length === 0) {
+    const rowsToDelete = new Set<number>(selectedRowsRef.current);
+
+    if (selected) {
+      selected.forEach(([startRow, , endRow]) => {
+        const first = Math.min(startRow, endRow);
+        const last = Math.max(startRow, endRow);
+        for (let row = first; row <= last; row++) rowsToDelete.add(row);
+      });
+    }
+
+    if (rowsToDelete.size === 0) {
       toast.error('No rows selected');
       return;
     }
-
-    // Get all selected row indices
-    const rowsToDelete = new Set<number>();
-    selected.forEach(([startRow, , endRow]) => {
-      for (let i = startRow; i <= endRow; i++) {
-        rowsToDelete.add(i);
-      }
-    });
 
     const current = readAnnotations();
     const remaining = current.filter((_, idx) => !rowsToDelete.has(idx));
@@ -207,7 +212,7 @@ export default function AnnotationEditor({
     if (!file) return;
 
     try {
-      const text = await file.text();
+      const text = await readFileText(file);
       const { extractGenBankFeatures } = await import('@/workers/parser.worker');
       const features = extractGenBankFeatures(text, gbFeatureType, gbTextFilter || undefined);
 
@@ -238,7 +243,7 @@ export default function AnnotationEditor({
     if (!file) return;
 
     try {
-      const text = await file.text();
+      const text = await readFileText(file);
       const { extractGFF3Features } = await import('@/workers/parser.worker');
       const features = extractGFF3Features(text, gff3FeatureType, gff3TextFilter || undefined);
 
@@ -296,6 +301,12 @@ export default function AnnotationEditor({
   const afterPaste = useCallback(() => {
     syncCount();
   }, [syncCount]);
+
+  const afterSelectionEnd = useCallback((row: number, _column: number, row2: number) => {
+    const first = Math.min(row, row2);
+    const last = Math.max(row, row2);
+    selectedRowsRef.current = Array.from({ length: last - first + 1 }, (_, index) => first + index);
+  }, []);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(0, 0, 0, 0.6)' }}>
@@ -473,6 +484,7 @@ export default function AnnotationEditor({
             afterRemoveRow={afterRemoveRow}
             afterCreateRow={afterCreateRow}
             afterPaste={afterPaste}
+            afterSelectionEnd={afterSelectionEnd}
             contextMenu={['row_above', 'row_below', 'remove_row', '---------', 'copy', 'cut']}
             manualRowResize={true}
             manualColumnResize={true}

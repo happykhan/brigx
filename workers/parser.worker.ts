@@ -1,5 +1,6 @@
 // Parser Worker - Handles FASTA and GenBank parsing with format auto-detection
 import type { ParsedGenome } from '../lib/types';
+import { readFileArrayBuffer } from '../lib/fileAccess';
 import pako from 'pako';
 
 // Detect if file is gzipped by checking magic numbers
@@ -105,7 +106,7 @@ export async function parseFile(file: File): Promise<ParsedGenome[]> {
   console.log(`[Parser Worker] Parsing file: ${file.name}, size: ${file.size} bytes`);
   
   // Read file as array buffer first
-  const arrayBuffer = await file.arrayBuffer();
+  const arrayBuffer = await readFileArrayBuffer(file);
   const bytes = new Uint8Array(arrayBuffer);
   
   // Check if gzipped and decompress if needed
@@ -356,9 +357,18 @@ export function extractGFF3Features(
   return annotations;
 }
 
-// Worker message handler - only attach when running as a Web Worker
-if (typeof self !== 'undefined' && typeof self.postMessage === 'function') {
-(self as any).onmessage = async (e: MessageEvent) => {
+interface ParserWorkerScope {
+  onmessage: ((event: MessageEvent) => void) | null;
+  postMessage(message: unknown): void;
+}
+
+// Worker message handler - only attach when running as a Web Worker, not when
+// this module is imported by the browser UI or the unit tests.
+const parserWorkerScope = typeof self === 'undefined'
+  ? null
+  : self as unknown as ParserWorkerScope;
+if (parserWorkerScope && typeof document === 'undefined') {
+parserWorkerScope.onmessage = async (e: MessageEvent) => {
   console.log('[Parser Worker] Received message:', e.data.type);
   const { type, file, sequence, windowSize, genomes } = e.data;
   
@@ -367,26 +377,26 @@ if (typeof self !== 'undefined' && typeof self.postMessage === 'function') {
       console.log('[Parser Worker] Starting parse...');
       const parsedGenomes = await parseFile(file);
       console.log(`[Parser Worker] Parse complete, ${parsedGenomes.length} genomes`);
-      self.postMessage({ type: 'parsed', genomes: parsedGenomes });
+      parserWorkerScope.postMessage({ type: 'parsed', genomes: parsedGenomes });
     } else if (type === 'gc') {
       console.log('[Parser Worker] Starting GC calculation...');
       const gcContent = calculateGCWindows(sequence, windowSize);
       console.log(`[Parser Worker] GC calculation complete, ${gcContent.length} windows`);
-      self.postMessage({ type: 'gc', gcContent });
+      parserWorkerScope.postMessage({ type: 'gc', gcContent });
     } else if (type === 'gcSkew') {
       console.log('[Parser Worker] Starting GC Skew calculation...');
       const gcSkew = calculateGCSkewWindows(sequence, windowSize);
       console.log(`[Parser Worker] GC Skew calculation complete, ${gcSkew.length} windows`);
-      self.postMessage({ type: 'gcSkew', gcSkew });
+      parserWorkerScope.postMessage({ type: 'gcSkew', gcSkew });
     } else if (type === 'merge') {
       console.log('[Parser Worker] Starting genome merge...');
       const merged = mergeGenomes(genomes);
       console.log(`[Parser Worker] Merge complete: ${merged.name}`);
-      self.postMessage({ type: 'merged', genome: merged });
+      parserWorkerScope.postMessage({ type: 'merged', genome: merged });
     }
   } catch (error) {
     console.error('[Parser Worker] Error:', error);
-    self.postMessage({ type: 'error', error: error instanceof Error ? error.message : String(error) });
+    parserWorkerScope.postMessage({ type: 'error', error: error instanceof Error ? error.message : String(error) });
   }
 };
 }

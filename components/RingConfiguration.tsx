@@ -290,7 +290,7 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations, 
                     <input
                       type="file"
                       multiple
-                      accept=".fasta,.fa,.fna,.gbk,.gb,.genbank,.fasta.gz,.fa.gz,.fna.gz,.gbk.gz,.gb.gz,.genbank.gz,.gz,.graph,.bedgraph,.wig,.bed,.sam"
+                      accept=".fasta,.fa,.fna,.gbk,.gb,.gbff,.genbank,.fasta.gz,.fa.gz,.fna.gz,.gbk.gz,.gb.gz,.gbff.gz,.genbank.gz,.gz,.graph,.bedgraph,.wig,.bed,.sam"
                       onChange={(e) => addFilesToRing(ring.id, e.target.files)}
                       className="hidden"
                     />

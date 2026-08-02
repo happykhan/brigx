@@ -13,7 +13,8 @@ import {
   calculateGCWindows,
   calculateGCSkewWindows,
   mergeGenomes,
-  extractGenBankFeatures
+  extractGenBankFeatures,
+  extractGFF3Features,
 } from '@/workers/parser.worker';
 import { parseAnnotationFile, exportAnnotationsToTSV, resolveColour, resolveDecoration } from '@/lib/annotationParser';
 import type { ParsedGenome, Annotation } from '@/lib/types';
@@ -555,5 +556,35 @@ ORIGIN
 
     // Should have CDS features for the plasmid
     expect(features.length).toBeGreaterThan(10);
+  });
+});
+
+describe('GFF3 Feature Extraction', () => {
+  const gff3 = `##gff-version 3
+chr1\tBakta\tCDS\t100\t500\t.\t+\t0\tID=cds1;Name=adhesin%20A;product=surface%20adhesin
+chr1\tBakta\tCDS\t600\t900\t.\t-\t0\tID=cds2;locus_tag=ABC_0002;product=toxin
+chr1\tBakta\ttRNA\t950\t1020\t.\t+\t.\tID=trna1;Name=tRNA-Lys
+`;
+
+  it('parses Bakta CDS records, decoded labels, and strand direction', () => {
+    const features = extractGFF3Features(gff3, 'CDS');
+
+    expect(features).toHaveLength(2);
+    expect(features[0]).toMatchObject({
+      start: 100,
+      end: 500,
+      label: 'adhesin A',
+      shape: 'arrow-forward',
+    });
+    expect(features[1]).toMatchObject({
+      label: 'ABC_0002',
+      shape: 'arrow-reverse',
+    });
+  });
+
+  it('filters GFF3 features using decoded attribute text', () => {
+    const features = extractGFF3Features(gff3, 'CDS', 'surface adhesin');
+    expect(features).toHaveLength(1);
+    expect(features[0].label).toBe('adhesin A');
   });
 });

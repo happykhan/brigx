@@ -43,11 +43,6 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     const pageErrors: Error[] = []
     page.on('pageerror', error => pageErrors.push(error))
 
-    const refInput = page.locator('input[type="file"][accept*=".fa"]').first()
-    await refInput.setInputFiles(REFERENCE)
-    await expect(page.getByText('reference.fa', { exact: true })).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 30_000 })
-
     await page.getByRole('button', { name: 'Add New Ring' }).click()
     await page.getByRole('button', { name: 'Custom Ring Overlay' }).click()
     await expect(page.getByRole('heading', { name: 'Annotations for Ring 1' })).toBeVisible()

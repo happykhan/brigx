@@ -12,9 +12,9 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
-  electron-test:
-    name: Electron integration tests
-    runs-on: ubuntu-latest
+  tauri-test:
+    name: Tauri integration and Rust tests
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
     steps:
@@ -25,42 +25,77 @@ jobs:
           node-version-file: '.nvmrc'
           cache: npm
 
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.93.1 --profile minimal --component clippy,rustfmt
+
+      - name: Install Tauri and test runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            xdg-utils \
+            xvfb
+
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Install Electron runtime libraries
-        run: npx playwright install --with-deps chromium
+      - name: Check Rust formatting and lints
+        run: |
+          cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+          cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets --all-features -- -D warnings
+
+      - name: Confirm release graph excludes WebDriver plugins
+        shell: bash
+        run: |
+          if cargo tree --manifest-path src-tauri/Cargo.toml --locked --edges normal --no-default-features | grep -q 'tauri-plugin-wdio'; then
+            echo 'Release dependency graph unexpectedly contains a WebDriver plugin.' >&2
+            exit 1
+          fi
 
       - name: Test the desktop shell and scientific workflow
         run: xvfb-run --auto-servernum npm run desktop:test
 
   package:
     name: Package ${{ matrix.label }}
-    needs: electron-test
+    needs: tauri-test
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
-            label: macOS
-            artifact: macos
+          - os: macos-15
+            label: macOS Apple silicon
+            artifact: macos-arm64
+            target: aarch64-apple-darwin
+            bundle_path: src-tauri/target/aarch64-apple-darwin/release/bundle/**/*
+          - os: macos-15-intel
+            label: macOS Intel
+            artifact: macos-x64
+            target: x86_64-apple-darwin
+            bundle_path: src-tauri/target/x86_64-apple-darwin/release/bundle/**/*
           - os: windows-latest
-            label: Windows
-            artifact: windows
-          - os: ubuntu-latest
-            label: Linux
-            artifact: linux
+            label: Windows x64
+            artifact: windows-x64
+            target: ''
+            bundle_path: src-tauri/target/release/bundle/**/*
+          - os: ubuntu-22.04
+            label: Linux x64
+            artifact: linux-x64
+            target: ''
+            bundle_path: src-tauri/target/release/bundle/**/*
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
       id-token: write
       attestations: write
-    env:
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
-      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -69,40 +104,190 @@ jobs:
           node-version-file: '.nvmrc'
           cache: npm
 
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install 1.93.1 --profile minimal
+          if [[ -n '${{ matrix.target }}' ]]; then
+            rustup target add '${{ matrix.target }}' --toolchain 1.93.1
+          fi
+
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install --yes fakeroot rpm
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            xdg-utils \
+            fakeroot \
+            rpm
 
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Prepare Windows signing certificate
-        if: runner.os == 'Windows' && env.WINDOWS_CERTIFICATE_BASE64 != ''
+      - name: Require signing credentials for tagged releases
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD || secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if [[ '${{ runner.os }}' == 'macOS' ]]; then
+            for variable in APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD KEYCHAIN_PASSWORD; do
+              if [[ -z "${!variable}" ]]; then
+                echo "Missing required macOS release secret: $variable" >&2
+                exit 1
+              fi
+            done
+          elif [[ '${{ runner.os }}' == 'Windows' ]]; then
+            for variable in WINDOWS_CERTIFICATE_BASE64 WINDOWS_CERTIFICATE_PASSWORD; do
+              if [[ -z "${!variable}" ]]; then
+                echo "Missing required Windows release secret: $variable" >&2
+                exit 1
+              fi
+            done
+          fi
+
+      - name: Import Apple Developer ID certificate
+        if: startsWith(github.ref, 'refs/tags/') && runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_ID_SECRET: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD_SECRET: ${{ secrets.APPLE_PASSWORD || secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID_SECRET: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          certificate_path="$RUNNER_TEMP/brigx-signing.p12"
+          keychain_path="$RUNNER_TEMP/brigx-signing.keychain-db"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$certificate_path"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security default-keychain -s "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security import "$certificate_path" \
+            -k "$keychain_path" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$keychain_path"
+          signing_identity=$(security find-identity -v -p codesigning "$keychain_path" \
+            | sed -n '1s/.*"\(.*\)"/\1/p')
+          if [[ -z "$signing_identity" ]]; then
+            echo 'No valid Apple code-signing identity was imported.' >&2
+            exit 1
+          fi
+          if [[ "$signing_identity" != "Developer ID Application:"* ]]; then
+            echo "Expected a Developer ID Application identity, found: $signing_identity" >&2
+            exit 1
+          fi
+          {
+            echo "APPLE_ID=$APPLE_ID_SECRET"
+            echo "APPLE_PASSWORD=$APPLE_PASSWORD_SECRET"
+            echo "APPLE_TEAM_ID=$APPLE_TEAM_ID_SECRET"
+            echo "APPLE_SIGNING_IDENTITY=$signing_identity"
+            echo "BRIGX_APPLE_CERTIFICATE_FILE=$certificate_path"
+            echo "BRIGX_APPLE_KEYCHAIN=$keychain_path"
+          } >> "$GITHUB_ENV"
+
+      - name: Import Windows Authenticode certificate
+        if: startsWith(github.ref, 'refs/tags/') && runner.os == 'Windows'
         shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
           $certificatePath = Join-Path $env:RUNNER_TEMP 'brigx-signing.pfx'
           [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
+          $password = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
+          $certificate = Import-PfxCertificate -FilePath $certificatePath -CertStoreLocation Cert:\CurrentUser\My -Password $password
+          if (-not $certificate.Thumbprint) { throw 'Imported certificate has no thumbprint' }
+          if (-not $certificate.HasPrivateKey) { throw 'Imported certificate has no private key' }
+          if ($certificate.NotBefore.ToUniversalTime() -gt [DateTime]::UtcNow) { throw 'Imported certificate is not valid yet' }
+          if ($certificate.NotAfter.ToUniversalTime() -le [DateTime]::UtcNow) { throw 'Imported certificate has expired' }
+          $config = @{
+            bundle = @{
+              windows = @{
+                certificateThumbprint = $certificate.Thumbprint
+                digestAlgorithm = 'sha256'
+                timestampUrl = 'https://timestamp.digicert.com'
+              }
+            }
+          } | ConvertTo-Json -Depth 4
+          $configPath = Join-Path $env:RUNNER_TEMP 'tauri-signing.json'
+          Set-Content -LiteralPath $configPath -Value $config -Encoding utf8
+          "BRIGX_TAURI_SIGNING_CONFIG=$configPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "WINDOWS_CERTIFICATE_FILE=$certificatePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "WINDOWS_CERTIFICATE_THUMBPRINT=$($certificate.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "WINDOWS_SIGNING_CONFIG_FILE=$configPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build installers
-        run: npm run desktop:make
+        shell: bash
+        run: |
+          arguments=()
+          if [[ -n '${{ matrix.target }}' ]]; then
+            arguments+=(--target '${{ matrix.target }}')
+          fi
+          if [[ -n "${BRIGX_TAURI_SIGNING_CONFIG:-}" ]]; then
+            arguments+=(--config "$BRIGX_TAURI_SIGNING_CONFIG")
+          fi
+          npm run tauri -- build "${arguments[@]}"
 
-      - name: Remove temporary Windows signing certificate
-        if: always() && runner.os == 'Windows' && env.WINDOWS_CERTIFICATE_FILE != ''
+      - name: Remove temporary Apple signing material
+        if: always() && runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [[ -n "${BRIGX_APPLE_KEYCHAIN:-}" ]]; then
+            security delete-keychain "$BRIGX_APPLE_KEYCHAIN" || true
+          fi
+          if [[ -n "${BRIGX_APPLE_CERTIFICATE_FILE:-}" && -f "$BRIGX_APPLE_CERTIFICATE_FILE" ]]; then
+            rm -f -- "$BRIGX_APPLE_CERTIFICATE_FILE"
+          fi
+
+      - name: Remove temporary Windows signing material
+        if: always() && runner.os == 'Windows'
         shell: pwsh
-        run: Remove-Item -LiteralPath $env:WINDOWS_CERTIFICATE_FILE -Force
+        run: |
+          if ($env:WINDOWS_CERTIFICATE_THUMBPRINT) {
+            Remove-Item "Cert:\CurrentUser\My\$($env:WINDOWS_CERTIFICATE_THUMBPRINT)" -ErrorAction SilentlyContinue
+          }
+          if ($env:WINDOWS_CERTIFICATE_FILE -and (Test-Path -LiteralPath $env:WINDOWS_CERTIFICATE_FILE)) {
+            Remove-Item -LiteralPath $env:WINDOWS_CERTIFICATE_FILE -Force -ErrorAction SilentlyContinue
+          }
+          if ($env:WINDOWS_SIGNING_CONFIG_FILE -and (Test-Path -LiteralPath $env:WINDOWS_SIGNING_CONFIG_FILE)) {
+            Remove-Item -LiteralPath $env:WINDOWS_SIGNING_CONFIG_FILE -Force -ErrorAction SilentlyContinue
+          }
 
       - name: Attest tagged build provenance
         if: startsWith(github.ref, 'refs/tags/')
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
-          subject-path: '.desktop-artifacts/make/**/*'
+          subject-path: ${{ matrix.bundle_path }}
 
       - name: Upload installers
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: BRIGX-${{ matrix.artifact }}-${{ runner.arch }}
-          path: .desktop-artifacts/make/**/*
+          name: BRIGX-${{ matrix.artifact }}
+          path: ${{ matrix.bundle_path }}
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 14
@@ -122,14 +307,36 @@ jobs:
 
       - name: Create checksums
         working-directory: release-assets
-        run: find . -type f -print0 | sort -z | xargs -0 shasum -a 256 > SHA256SUMS.txt
+        run: |
+          mapfile -d '' installers < <(find . -type f \( \
+            -name '*.dmg' -o \
+            -name '*.exe' -o \
+            -name '*.AppImage' -o \
+            -name '*.deb' -o \
+            -name '*.rpm' \
+          \) -print0 | sort -z)
+          if (( ${#installers[@]} == 0 )); then
+            echo 'No installers were downloaded.' >&2
+            exit 1
+          fi
+          for installer in "${installers[@]}"; do
+            checksum=$(shasum -a 256 "$installer" | cut -d ' ' -f 1)
+            printf '%s  %s\n' "$checksum" "$(basename "$installer")"
+          done | sort -k 2 > SHA256SUMS.txt
 
       - name: Create a draft GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          mapfile -d '' files < <(find release-assets -type f -print0)
+          mapfile -d '' files < <(find release-assets -type f \( \
+            -name '*.dmg' -o \
+            -name '*.exe' -o \
+            -name '*.AppImage' -o \
+            -name '*.deb' -o \
+            -name '*.rpm' \
+          \) -print0 | sort -z)
+          files+=(release-assets/SHA256SUMS.txt)
           gh release create "$RELEASE_TAG" "${files[@]}" \
             --draft \
             --verify-tag \

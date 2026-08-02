@@ -88,12 +88,12 @@ export default function AboutPage() {
                     {desktop && (
                       <tr>
                         <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>
-                          <ExternalLink href="https://www.electronjs.org/">Electron {desktop.versions.electron}</ExternalLink>
-                          {' '}(Chromium {desktop.versions.chrome}, Node.js {desktop.versions.node})
+                          <ExternalLink href="https://tauri.app/">Tauri {desktop.versions.tauri}</ExternalLink>
+                          {' '}with {desktop.versions.webview}
                         </td>
                         <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>Desktop application runtime</td>
                         <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>
-                          <ExternalLink href="https://github.com/electron/electron/blob/main/LICENSE">MIT and bundled third-party notices</ExternalLink>
+                          <ExternalLink href="https://github.com/tauri-apps/tauri#license">MIT or Apache-2.0; system-webview terms</ExternalLink>
                         </td>
                       </tr>
                     )}
@@ -127,8 +127,10 @@ export default function AboutPage() {
               </div>
 
               <p className="mb-4">
-                Handsontable and LAST are not included in this release. BRIGX&apos;s editable annotation table is a
-                first-party React component, and alignment uses the bundled BLAST modules listed above.
+                CGView.js, Handsontable, and LAST are not included in this release, and no CGView.js source is copied.
+                BRIGX&apos;s circular renderer and editable annotation table are first-party implementations; alignment
+                uses the bundled BLAST WebAssembly modules listed above. Desktop packages also include the full
+                licence texts for their locked Rust dependencies.
               </p>
 
               <h2 className="text-2xl font-semibold mt-8 mb-4">Example data</h2>

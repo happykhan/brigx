@@ -7,10 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
-- Free offline Electron desktop edition for macOS, Windows, and Linux.
+- Free, small offline Tauri desktop edition for macOS, Windows, and Linux using each operating system's webview.
 - Versioned `.brigx` projects with source-path hashing, recent projects, native save dialogs, autosave recovery, and an unsaved-changes close guard.
-- Sandboxed custom-protocol desktop shell, narrow context-isolated preload, denied permissions, hardened Electron fuses, platform icons, packaging matrix, checksums, and tagged-build provenance.
-- Desktop end-to-end coverage for the real BLAST workflow, project round-trip, recovery, native export, and renderer isolation.
+- Least-privilege Tauri command/capability boundary, opaque file tokens, binary IPC, denied navigation, platform icons, packaging matrix, checksums, and tagged-build provenance.
+- Desktop end-to-end coverage for the real BLAST workflow, project round-trip, recovery, native export, renderer isolation, and direct-plugin denial.
+- Locked Rust dependency policy and bundled full licence texts generated with cargo-about.
 - Bakta `.gbff` and GFF3 feature import support.
 - Reference GenBank CDS annotations in both the canvas preview and SVG export.
 - A plot centre control and correctly scaled legend dragging.
@@ -21,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Regression coverage for GFF3, file access, editable SVG output, and annotation editing/paste/deletion.
 
 ### Changed
+- Replaced the Electron prototype with Tauri while retaining the browser WebAssembly BLAST engine and `.brigx` schema.
 - JavaScript `unsafe-eval` is no longer required; integrity-checked BLAST loaders use verified in-memory modules while CSP grants only WebAssembly compilation.
 - All exports use native save dialogs in the desktop edition and ordinary downloads on the web.
 - CI installs the committed npm lockfile with `npm ci` and audits runtime plus build dependencies.

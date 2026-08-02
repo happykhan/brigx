@@ -31,7 +31,7 @@ export default defineConfig({
     testTimeout: 15_000,
     hookTimeout: 30_000,
     include: ['**/__tests__/**/*.{ts,tsx}', '**/*.{spec,test}.{ts,tsx}'],
-    exclude: ['**/node_modules/**', '**/tests/e2e/**', '**/tests/electron/**'],
+    exclude: ['**/node_modules/**', '**/tests/e2e/**', '**/tests/tauri/**'],
     alias: {
       '@': resolve(__dirname, '.'),
     },

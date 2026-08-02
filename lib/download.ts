@@ -1,4 +1,4 @@
-/** Save an export through Electron's native dialog or a browser download. */
+/** Save an export through the desktop shell's native dialog or a browser download. */
 export async function saveBlob(blob: Blob, filename: string): Promise<boolean> {
   const desktop = window.brigxDesktop;
   if (desktop) {

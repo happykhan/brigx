@@ -2,22 +2,7 @@ export const DESKTOP_API_VERSION = 1;
 export const BRIGX_PROJECT_TYPE = 'brigx-project';
 export const BRIGX_PROJECT_SCHEMA_VERSION = 1;
 
-export const DESKTOP_CHANNELS = {
-  startNewProject: 'brigx:project:new',
-  saveProject: 'brigx:project:save',
-  openProject: 'brigx:project:open',
-  openRecentProject: 'brigx:project:open-recent',
-  listRecentProjects: 'brigx:project:list-recent',
-  saveRecovery: 'brigx:recovery:save',
-  hasRecovery: 'brigx:recovery:has',
-  openRecovery: 'brigx:recovery:open',
-  clearRecovery: 'brigx:recovery:clear',
-  saveFile: 'brigx:file:save',
-  setDirtyState: 'brigx:window:set-dirty',
-  closeAfterSave: 'brigx:window:close-after-save',
-  menuAction: 'brigx:menu:action',
-} as const;
-
+export type DesktopPlatform = 'darwin' | 'linux' | 'win32';
 export type DesktopFileRole = 'reference' | 'ring';
 
 export interface DesktopRendererFileBinding {
@@ -27,28 +12,10 @@ export interface DesktopRendererFileBinding {
   file: File;
 }
 
-export interface DesktopMainFileBinding {
-  role: DesktopFileRole;
-  ringId?: string;
-  token?: string;
-  filePath?: string;
-  name: string;
-  type: string;
-  size: number;
-  lastModified: number;
-}
-
 export interface DesktopSaveProjectRequest {
   sessionJson: string;
   plotJson?: string;
   files: DesktopRendererFileBinding[];
-  saveAs?: boolean;
-}
-
-export interface DesktopMainSaveProjectRequest {
-  sessionJson: string;
-  plotJson?: string;
-  files: DesktopMainFileBinding[];
   saveAs?: boolean;
 }
 
@@ -98,14 +65,20 @@ export interface DesktopSaveFileRequest {
   bytes: Uint8Array;
 }
 
+export interface DesktopPickInputFilesRequest {
+  role: DesktopFileRole;
+  ringId?: string;
+  multiple?: boolean;
+}
+
 export interface DesktopAPI {
   readonly apiVersion: number;
-  readonly platform: NodeJS.Platform;
+  readonly platform: DesktopPlatform;
   readonly versions: {
-    electron: string;
-    chrome: string;
-    node: string;
+    tauri: string;
+    webview: string;
   };
+  pickInputFiles(request: DesktopPickInputFilesRequest): Promise<DesktopOpenedFile[]>;
   startNewProject(): Promise<void>;
   saveProject(request: DesktopSaveProjectRequest): Promise<DesktopSaveResult>;
   openProject(): Promise<DesktopOpenProjectResult>;
@@ -118,6 +91,7 @@ export interface DesktopAPI {
   saveFile(request: DesktopSaveFileRequest): Promise<DesktopSaveResult>;
   setDirtyState(dirty: boolean): Promise<void>;
   closeAfterSave(): Promise<void>;
+  openExternal(url: string): Promise<void>;
   onMenuAction(listener: (action: DesktopMenuAction) => void): () => void;
 }
 
@@ -146,6 +120,7 @@ export interface BRIGXProjectManifest {
 declare global {
   interface Window {
     brigxDesktop?: DesktopAPI;
+    __TAURI_INTERNALS__?: unknown;
   }
 }
 

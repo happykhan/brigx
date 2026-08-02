@@ -1,5 +1,7 @@
 import type {
+  DesktopFileRole,
   DesktopOpenedFile,
+  DesktopPickInputFilesRequest,
   DesktopRendererFileBinding,
   DesktopSaveProjectRequest,
 } from '@/desktop/contracts';
@@ -26,6 +28,16 @@ export function fileFromDesktop(opened: DesktopOpenedFile): File {
   });
   fileTokens.set(file, opened.token);
   return file;
+}
+
+export async function pickDesktopInputFiles(
+  role: DesktopFileRole,
+  options: Omit<DesktopPickInputFilesRequest, 'role'> = {},
+): Promise<File[]> {
+  const desktop = typeof window === 'undefined' ? undefined : window.brigxDesktop;
+  if (!desktop) return [];
+  const opened = await desktop.pickInputFiles({ role, ...options });
+  return opened.map(fileFromDesktop);
 }
 
 export function restoreDesktopFiles(

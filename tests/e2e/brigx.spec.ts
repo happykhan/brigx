@@ -89,7 +89,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByRole('heading', { name: 'Third-party software' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'GNU General Public License v3.0' })).toHaveAttribute('href', /LICENSE$/)
     await expect(page.getByRole('link', { name: 'complete third-party notice' })).toHaveAttribute('href', /THIRD_PARTY_NOTICES\.md$/)
-    await expect(page.getByText('Handsontable and LAST are not included in this release.')).toBeVisible()
+    await expect(page.getByText(/CGView\.js, Handsontable, and LAST are not included in this release/)).toBeVisible()
   })
 
   test('runs an alignment with the bundled integrity-checked BLAST assets', async ({ page }) => {

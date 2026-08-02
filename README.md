@@ -31,13 +31,13 @@ npm run verify   # Full release verification, including Chromium workflows
 
 ## Desktop edition
 
-The Electron desktop shell runs the same integrity-checked BLAST WebAssembly pipeline as the web application. It does not add accounts, payments, telemetry, cloud storage, or a separate native analysis engine.
+The small Tauri desktop shell runs the same integrity-checked BLAST WebAssembly pipeline as the web application. It uses the operating system's webview instead of bundling a browser engine, and does not add accounts, payments, telemetry, cloud storage, or a separate native analysis engine.
 
 ```bash
 npm run desktop:dev       # Desktop shell with Vite hot reload
-npm run desktop:test      # Real Electron workflow and security-boundary tests
-npm run desktop:package   # Unpacked app for the current platform
-npm run desktop:make      # Platform installer/archive
+npm run desktop:test      # Real Tauri workflow and security-boundary tests
+npm run desktop:package   # Optimised current-platform executable
+npm run desktop:make      # Current-platform installer/package
 ```
 
 Desktop `.brigx` projects save settings, annotations, completed plot data, source-file paths, and source-file hashes. They do not duplicate genome contents, so referenced input files must remain available. See [the desktop build and release guide](DESKTOP.md).
@@ -49,7 +49,7 @@ BRIGX runs locally in the browser or desktop shell. Versioned BLAST binaries are
 ## Tech stack
 
 - Vite + React + TypeScript
-- Electron with a sandboxed, context-isolated renderer
+- Tauri 2 + Rust with the operating system webview
 - BLAST 2.2.26 compiled to WebAssembly (Emscripten)
 - Web Workers for parallel alignment
 - [@genomicx/ui](https://github.com/happykhan/genomicx-ui) shared components (NavBar, AppFooter, LogConsole, ThemeToggle)

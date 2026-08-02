@@ -4,8 +4,8 @@ Thank you for your interest in contributing to BRIGx — a browser-based tool fo
 
 ## Prerequisites
 
-- **Node.js 18+** (LTS recommended)
-- **npm 9+** (bundled with Node.js)
+- **Node.js 24 LTS** (see `.nvmrc` and `.node-version`)
+- **npm** (use the version bundled with Node.js 24)
 - A modern browser for manual testing (Chrome or Firefox recommended)
 
 ## Getting Started

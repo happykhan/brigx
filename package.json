@@ -4,6 +4,9 @@
     "description": "Browser-based circular genome comparison tool — BLAST Ring Image Generator in the browser",
     "private": true,
     "type": "module",
+    "engines": {
+        "node": ">=24 <25"
+    },
     "license": "GPL-3.0",
     "author": "Nabil-Fareed Alikhan",
     "homepage": "https://brigx.genomicx.org",

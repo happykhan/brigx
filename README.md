@@ -18,6 +18,8 @@ Live at [brigx.genomicx.org](https://brigx.genomicx.org) · Part of the [Genomic
 
 ## Quick start
 
+BRIGX requires Node.js 24 LTS for development and release builds.
+
 ```bash
 npm install
 npm run dev      # http://localhost:3000

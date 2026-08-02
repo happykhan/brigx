@@ -4,10 +4,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { parseGraphFile } from '@/lib/graphParser';
+import { isGraphFileName } from '@/lib/controller';
 import {
   parseFasta,
   mergeGenomes
-} from '@/workers/parser.worker';
+} from '@/lib/genomeParser';
 import type { ContigBoundary } from '@/lib/types';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -19,6 +20,10 @@ function readExample(filename: string): string {
 }
 
 describe('Graph File Parser', () => {
+  it('recognises every graph extension advertised by the file picker', () => {
+    expect(['track.graph', 'track.bedgraph', 'track.wig', 'track.bed'].every(isGraphFileName)).toBe(true);
+    expect(isGraphFileName('query.fna')).toBe(false);
+  });
   it('should parse real BRIGExample.graph', () => {
     const content = readExample('BRIGExample.graph');
     const result = parseGraphFile(content);

@@ -7,16 +7,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
-- `CONTRIBUTING.md` with setup instructions, test/lint/build guidance, PR process, and code style notes.
-- GitHub issue templates for bug reports and feature requests (`.github/ISSUE_TEMPLATE/`).
-- `benchmarks/README.md` documenting the development benchmark scripts.
-- `components/ErrorBoundary.tsx` — React error boundary wrapping the `CircularPlot` component.
-- `CHANGELOG.md` (this file).
+- Bakta `.gbff` and GFF3 feature import support.
+- Reference GenBank CDS annotations in both the canvas preview and SVG export.
+- A plot centre control and correctly scaled legend dragging.
+- Direct HEX colour entry for comparison rings.
+- Explanatory average-identity tooltip in the statistics panel.
+- Named Inkscape-compatible SVG groups and top-level gradient definitions.
+- Actionable recovery guidance when a browser loses access to a selected file.
+- Regression coverage for GFF3, file access, editable SVG output, and annotation editing/paste/deletion.
 
 ### Changed
-- `lib/version.ts` — replaced CommonJS `require()` with a proper ESM approach using `NEXT_PUBLIC_APP_VERSION` env var; falls back to `'dev'` if unset.
-- `next.config.js` — injects `NEXT_PUBLIC_APP_VERSION` from `npm_package_version` at build time.
-- `eslint.config.mjs` — re-enabled `@typescript-eslint/no-explicit-any` and `@typescript-eslint/no-require-imports` as warnings (previously disabled) to surface technical debt without breaking the build.
+- Settings and output panels now remain usable together on laptop screens.
+- Annotation editing now preserves manual edits and spreadsheet paste, with reliable row deletion and reset.
+- SVG and PNG exports preserve the preview zoom, pan, and dragged legend positions.
+- BED inputs are routed through the graph parser as advertised.
+- Browser workers and the alignment interface now use strict TypeScript types.
+- Production DOMPurify is pinned to the patched release.
 
 ### Removed
 - `@biowasm/aioli` dependency — unused since BRIGx ships its own custom WASM build.

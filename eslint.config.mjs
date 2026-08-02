@@ -16,8 +16,11 @@ export default tseslint.config(
     ignores: [
       "__tests__/**",
       "node_modules/**",
+      "dist/**",
       ".next/**",
       "out/**",
+      ".pixi/**",
+      "public/wasm/**",
       "jest.config.js",
       "jest.setup.js",
       "tailwind.config.ts",
@@ -25,3 +28,4 @@ export default tseslint.config(
     ],
   }
 );
+

@@ -21,7 +21,7 @@ export interface AlignmentResult {
   metadata: {
     timestamp: number;
     alignerVersion: string;
-    parameters: Record<string, any>;
+    parameters: Partial<PipelineParams>;
   };
 }
 
@@ -110,6 +110,8 @@ export interface CircularPlotData {
     gcContent?: number[];
     gcSkew?: number[];
     features?: Feature[];
+    /** Optional companion annotations, such as Bakta GFF3 features for a FASTA reference. */
+    annotations?: Annotation[];
     contigs?: ContigBoundary[]; // Contig boundaries for multi-FASTA reference
   };
   rings: RingData[];
@@ -117,6 +119,15 @@ export interface CircularPlotData {
     minIdentity: number;
     minAlignmentLength: number;
   };
+}
+
+/** Interactive plot state shared by the canvas preview and exported renderers. */
+export interface PlotViewState {
+  zoom: number;
+  panX: number;
+  panY: number;
+  gcLegendPos: { x: number; y: number } | null;
+  ringLegendPos: { x: number; y: number } | null;
 }
 
 export interface ParsedGenome {

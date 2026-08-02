@@ -1,19 +1,26 @@
 
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useReducer } from 'react';
 import toast from 'react-hot-toast';
-import type { CircularPlotData, PipelineParams, ProgressUpdate, RingConfig, Annotation, RingData } from '@/lib/types';
+import type { PipelineParams, ProgressUpdate, RingConfig, Annotation } from '@/lib/types';
 import { APP_VERSION } from '@/lib/version';
 import type { BRIGController as BRIGControllerType } from '@/lib/controller';
 import { exportSession, importSession } from '@/lib/session';
+import { readFileText } from '@/lib/fileAccess';
+import { extractReferenceAnnotationFile } from '@/lib/featureParser';
+import { INITIAL_PLOT_STATE, plotStateReducer } from '@/lib/plotState';
 import type { ImagePropertiesConfig } from '@/components/ImageProperties';
+import { useConsoleCapture } from './useConsoleCapture';
 
 export function useBRIGController() {
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
   const [rings, setRings] = useState<RingConfig[]>([]);
+  const ringsRef = useRef(rings);
+  ringsRef.current = rings;
 
   // Store controller instance in ref to persist alignment cache across runs
   const controllerRef = useRef<BRIGControllerType | null>(null);
+  const referenceGenerationRef = useRef(0);
   const [params, setParams] = useState<PipelineParams>({
     minIdentity: 70,
     minAlignmentLength: 1000,
@@ -22,10 +29,10 @@ export function useBRIGController() {
     alignerOptions: ''
   });
   const [progress, setProgress] = useState<ProgressUpdate>({ step: 'idle', percent: 0 });
-  const [plotData, setPlotData] = useState<CircularPlotData | null>(null);
+  const [plotState, dispatchPlot] = useReducer(plotStateReducer, INITIAL_PLOT_STATE);
+  const plotData = plotState.displayed;
   const [isProcessing, setIsProcessing] = useState(false);
-  const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
-  const [cachedPlotData, setCachedPlotData] = useState<CircularPlotData | null>(null);
+  const { logs: consoleLogs, clearLogs: clearConsoleLogs } = useConsoleCapture();
   const [imageProperties, setImageProperties] = useState<ImagePropertiesConfig>({
     innerRadius: 200,
     ringWidth: 20,
@@ -44,61 +51,18 @@ export function useBRIGController() {
   const [annotationEditorOpen, setAnnotationEditorOpen] = useState(false);
   const [editingRingId, setEditingRingId] = useState<string | null>(null);
   const [ringAnnotations, setRingAnnotations] = useState<Record<string, Annotation[]>>({});
-  const [referenceLength, setReferenceLength] = useState<number>(0);
+  const ringAnnotationsRef = useRef(ringAnnotations);
+  ringAnnotationsRef.current = ringAnnotations;
+  const [referenceAnnotations, setReferenceAnnotations] = useState<Annotation[]>([]);
+  const referenceAnnotationsRef = useRef(referenceAnnotations);
+  referenceAnnotationsRef.current = referenceAnnotations;
+  const [referenceAnnotationFileName, setReferenceAnnotationFileName] = useState<string | null>(null);
+  const referenceLength = plotData?.reference.length ?? 0;
 
-  // Intercept console.log messages
-  useEffect(() => {
-    const originalLog = console.log;
-    const originalError = console.error;
-    const originalWarn = console.warn;
-
-    // Summarize objects for display - avoid dumping raw arrays
-    const summarizeArg = (arg: any): string => {
-      if (arg == null) return String(arg);
-      if (typeof arg !== 'object') return String(arg);
-      if (Array.isArray(arg)) {
-        if (arg.length > 5) return `[Array(${arg.length})]`;
-        return JSON.stringify(arg);
-      }
-      // Summarize known large fields
-      const clone: any = {};
-      for (const [k, v] of Object.entries(arg)) {
-        if (Array.isArray(v) && (v as any[]).length > 5) {
-          clone[k] = `[${(v as any[]).length} items]`;
-        } else if (k === 'partialData' || k === 'sequence') {
-          clone[k] = '[omitted]';
-        } else if (typeof v === 'object' && v !== null) {
-          clone[k] = summarizeArg(v);
-        } else {
-          clone[k] = v;
-        }
-      }
-      return JSON.stringify(clone);
-    };
-
-    console.log = (...args: any[]) => {
-      const message = args.map(summarizeArg).join(' ');
-      setConsoleLogs(prev => [...prev, `[LOG] ${message}`]);
-      originalLog.apply(console, args);
-    };
-
-    console.error = (...args: any[]) => {
-      const message = args.map(summarizeArg).join(' ');
-      setConsoleLogs(prev => [...prev, `[ERROR] ${message}`]);
-      originalError.apply(console, args);
-    };
-
-    console.warn = (...args: any[]) => {
-      const message = args.map(summarizeArg).join(' ');
-      setConsoleLogs(prev => [...prev, `[WARN] ${message}`]);
-      originalWarn.apply(console, args);
-    };
-
-    return () => {
-      console.log = originalLog;
-      console.error = originalError;
-      console.warn = originalWarn;
-    };
+  useEffect(() => () => {
+    referenceGenerationRef.current += 1;
+    controllerRef.current?.cleanup();
+    controllerRef.current = null;
   }, []);
 
   // Handle annotation changes
@@ -108,25 +72,7 @@ export function useBRIGController() {
       [ringId]: annotations
     }));
 
-    // Update plot data using functional updates to avoid stale closures
-    setCachedPlotData(prev => {
-      if (!prev || !prev.rings) return prev;
-      const updatedRings = prev.rings.map(ringData => {
-        if (ringData.queryId === ringId) {
-          return {
-            ...ringData,
-            annotations,
-            hits: ringData.hits || [],
-            statistics: ringData.statistics || { meanIdentity: 0, genomeCoverage: 0, totalAlignedBases: 0 },
-            alignmentOutput: ringData.alignmentOutput || ''
-          };
-        }
-        return ringData;
-      });
-      const updated = { ...prev, rings: updatedRings };
-      setPlotData(updated);
-      return updated;
-    });
+    dispatchPlot({ type: 'annotations', ringId, annotations });
   };
 
   const handleOpenAnnotationEditor = (ringId: string) => {
@@ -134,24 +80,63 @@ export function useBRIGController() {
     setAnnotationEditorOpen(true);
   };
 
+  const handleReferenceAnnotationsFileChange = async (file: File) => {
+    if (referenceLength <= 0) {
+      toast.error('Load the reference genome before its annotation file');
+      return;
+    }
+
+    try {
+      const text = await readFileText(file);
+      const parsed = extractReferenceAnnotationFile(text, file.name, 'CDS');
+      const annotations = parsed
+        .filter(annotation => annotation.end >= 1 && annotation.start <= referenceLength)
+        .map(annotation => ({
+          ...annotation,
+          start: Math.max(1, Math.min(annotation.start, referenceLength)),
+          end: Math.max(1, Math.min(annotation.end, referenceLength)),
+          color: annotation.color === '#000000' ? '#4a90e2' : annotation.color,
+        }));
+
+      if (annotations.length === 0) {
+        toast.error('No CDS features matched the reference coordinates');
+        return;
+      }
+
+      setReferenceAnnotations(annotations);
+      setReferenceAnnotationFileName(file.name);
+      dispatchPlot({ type: 'reference-annotations', annotations });
+      toast.success(`Loaded ${annotations.length} reference CDS feature(s)`);
+    } catch (error) {
+      toast.error(`Reference annotation error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const handleClearReferenceAnnotations = () => {
+    setReferenceAnnotations([]);
+    setReferenceAnnotationFileName(null);
+    dispatchPlot({ type: 'reference-annotations', annotations: [] });
+  };
+
   // Auto-generate plot skeleton when reference file is loaded
   useEffect(() => {
     if (referenceFile && !plotData) {
       console.log('[Page] Reference file loaded, generating plot skeleton...');
-      generatePlotSkeleton();
+      void generatePlotSkeleton(referenceFile, referenceGenerationRef.current);
     }
   }, [referenceFile]);
 
   // Generate initial plot structure without running alignments
-  const generatePlotSkeleton = async () => {
+  const generatePlotSkeleton = async (file: File, generation: number) => {
+    let controller: BRIGControllerType | null = null;
     try {
       const { BRIGController } = await import('@/lib/controller');
-      const controller = new BRIGController();
+      controller = new BRIGController();
       await controller.initialize();
 
       // Run pipeline without any ring files to just get reference data (GC content/skew)
       const skeletonResult = await controller.runFullPipeline(
-        referenceFile!,
+        file,
         [], // No rings for alignment
         [],
         params,
@@ -159,14 +144,14 @@ export function useBRIGController() {
       );
 
       // Create ring placeholders for configured rings
-      const ringPlaceholders = rings.map((ringConfig) => ({
+      const ringPlaceholders = ringsRef.current.map((ringConfig) => ({
         queryId: ringConfig.id,
         queryName: ringConfig.legendText,
         color: ringConfig.color,
         visible: true,
         customWidth: ringConfig.customWidth,
         hits: [],
-        annotations: ringAnnotations[ringConfig.id] || [],
+        annotations: ringAnnotationsRef.current[ringConfig.id] || [],
         statistics: {
           meanIdentity: 0,
           genomeCoverage: 0,
@@ -176,77 +161,39 @@ export function useBRIGController() {
 
       const plotDataWithRings = {
         ...skeletonResult,
+        reference: {
+          ...skeletonResult.reference,
+          annotations: referenceAnnotationsRef.current,
+        },
         rings: ringPlaceholders
       };
 
-      setPlotData(plotDataWithRings);
-      setCachedPlotData(plotDataWithRings);
-      setReferenceLength(skeletonResult.reference.length);
-    } catch (error: any) {
+      if (generation === referenceGenerationRef.current) {
+        dispatchPlot({ type: 'replace', data: plotDataWithRings });
+        setProgress({ step: 'Reference ready', percent: 100 });
+      }
+    } catch (error) {
+      if (generation !== referenceGenerationRef.current) return;
+      const msg = error instanceof Error ? error.message : String(error);
       console.error('[Page] Error generating skeleton:', error);
-      toast.error(`Error: ${error.message}`);
+      toast.error(`Error: ${msg}`);
+    } finally {
+      controller?.cleanup();
     }
   };
 
   // Auto-update plot when ring settings change (colors, thresholds, visibility, annotations)
   // NOTE: This should NOT depend on cachedPlotData to avoid overwriting alignment results
   useEffect(() => {
-    if (!cachedPlotData) return;
-
     console.log('[Page] Ring settings changed, updating plot');
-
-    // Create a map of existing ring data by queryId
-    const ringDataMap = new Map((cachedPlotData.rings || []).map(r => [r.queryId, r]));
-
-    // Update all configured rings, whether they have alignment data or not
-    const updatedRings = rings.map((ringConfig) => {
-      const existingRingData = ringDataMap.get(ringConfig.id);
-
-      if (existingRingData) {
-        return {
-          ...existingRingData,
-          queryName: ringConfig.legendText,
-          color: ringConfig.color,
-          visible: true,
-          customWidth: ringConfig.customWidth,
-          upperThreshold: ringConfig.upperThreshold,
-          lowerThreshold: ringConfig.lowerThreshold,
-          graphMaxCap: ringConfig.graphMaxCap,
-          showLabels: ringConfig.showLabels,
-          annotations: ringAnnotations[ringConfig.id] || existingRingData.annotations || []
-        };
-      } else {
-        return {
-          queryId: ringConfig.id,
-          queryName: ringConfig.legendText,
-          color: ringConfig.color,
-          visible: true,
-          customWidth: ringConfig.customWidth,
-          upperThreshold: ringConfig.upperThreshold,
-          lowerThreshold: ringConfig.lowerThreshold,
-          graphMaxCap: ringConfig.graphMaxCap,
-          showLabels: ringConfig.showLabels,
-          hits: [],
-          annotations: ringAnnotations[ringConfig.id] || [],
-          statistics: {
-            meanIdentity: 0,
-            genomeCoverage: 0,
-            totalAlignedBases: 0
-          }
-        };
-      }
-    });
-
-    const updated = { ...cachedPlotData, rings: updatedRings };
-    setPlotData(updated);
-    setCachedPlotData(updated);
+    dispatchPlot({ type: 'configure', rings, annotationsByRing: ringAnnotations });
   }, [rings, ringAnnotations]); // Removed cachedPlotData from dependencies!
 
   const handleRun = async () => {
     console.log(`[BRIGX v${APP_VERSION}] Starting alignment pipeline`);
 
     // Clear console logs on each run
-    setConsoleLogs([]);
+    clearConsoleLogs();
 
     if (!referenceFile) {
       toast.error('Please select a reference genome');
@@ -264,13 +211,20 @@ export function useBRIGController() {
 
     setIsProcessing(true);
     setProgress({ step: 'Starting alignments...', percent: 0 });
+    const runGeneration = referenceGenerationRef.current;
 
     try {
       // Reuse existing controller instance to preserve alignment cache
       if (!controllerRef.current) {
         const { BRIGController } = await import('@/lib/controller');
-        controllerRef.current = new BRIGController();
-        await controllerRef.current.initialize();
+        const controller = new BRIGController();
+        try {
+          await controller.initialize();
+          controllerRef.current = controller;
+        } catch (error) {
+          controller.cleanup();
+          throw error;
+        }
         console.log('[Page] Created new BRIGController instance');
       } else {
         console.log('[Page] Reusing existing BRIGController instance (cache preserved)');
@@ -284,6 +238,7 @@ export function useBRIGController() {
         [],
         params,
         (update) => {
+          if (runGeneration !== referenceGenerationRef.current) return;
           console.log(`[Page] ${update.step} (${update.percent}%)${update.message ? ' - ' + update.message : ''}`);
           setProgress(update);
 
@@ -291,155 +246,54 @@ export function useBRIGController() {
           if (update.partialData?.rings && update.partialData.rings.length > 0) {
             console.log('[Page] Received partial data with', update.partialData.rings.length, 'rings');
 
-            // Merge new ring data with existing cached data (preserve all rings and annotations)
-            const hasExistingRings = cachedPlotData?.rings && cachedPlotData.rings.length > 0;
-
-            let mergedRings;
-            if (hasExistingRings) {
-              // Start with all existing rings
-              mergedRings = cachedPlotData.rings.map(existingRing => {
-                const newRingData = update.partialData!.rings!.find(r => r.queryName === existingRing.queryName);
-                if (newRingData) {
-                  console.log(`[Page] Updating ring: ${existingRing.queryName}, hits: ${newRingData.hits?.length || 0}, preserving annotations: ${existingRing.annotations?.length || 0}`);
-                  return {
-                    ...existingRing,
-                    hits: newRingData.hits,
-                    statistics: newRingData.statistics,
-                    alignmentOutput: newRingData.alignmentOutput,
-                    graphPoints: newRingData.graphPoints || existingRing.graphPoints,
-                    graphMaxValue: newRingData.graphMaxValue || existingRing.graphMaxValue,
-                    graphStats: newRingData.graphStats || existingRing.graphStats,
-                    annotations: existingRing.annotations || []
-                  };
-                }
-                return existingRing;
-              });
-
-              // Add any new rings that weren't in the cache
-              const newRingsToAdd = update.partialData!.rings!.filter(
-                newRing => !cachedPlotData.rings.some(existing => existing.queryName === newRing.queryName)
-              );
-              if (newRingsToAdd.length > 0) {
-                console.log(`[Page] Adding ${newRingsToAdd.length} new rings:`, newRingsToAdd.map(r => r.queryName));
-                // Add annotations from ringAnnotations state if they exist
-                const newRingsWithAnnotations = newRingsToAdd.map(ring => {
-                  const annotations = ringAnnotations[ring.queryId] || ring.annotations || [];
-                  if (annotations.length > 0) {
-                    console.log(`[Page] Adding annotations to new ring ${ring.queryName}:`, annotations.length);
-                  }
-                  return {
-                    ...ring,
-                    annotations
-                  };
-                });
-                mergedRings = [...mergedRings, ...newRingsWithAnnotations];
-              }
-            } else {
-              // No existing rings - add annotations from ringAnnotations state
-              console.log('[Page] No existing rings, adding annotations from state');
-              mergedRings = update.partialData!.rings!.map(ring => {
-                const annotations = ringAnnotations[ring.queryId] || ring.annotations || [];
-                if (annotations.length > 0) {
-                  console.log(`[Page] Adding annotations to ring ${ring.queryName}:`, annotations.length);
-                }
-                return {
-                  ...ring,
-                  annotations
-                };
-              });
-            }
-
-            const updatedPlotData = {
-              reference: update.partialData.reference || cachedPlotData?.reference || { name: '', length: 0 },
-              rings: mergedRings,
-              config: update.partialData.config || cachedPlotData?.config || { minIdentity: 70, minAlignmentLength: 100 }
-            };
-
-            setPlotData(updatedPlotData);
+            dispatchPlot({
+              type: 'partial',
+              data: {
+                ...update.partialData,
+                reference: update.partialData.reference
+                  ? { ...update.partialData.reference, annotations: referenceAnnotationsRef.current }
+                  : undefined,
+                rings: update.partialData.rings,
+              },
+              annotationsByRing: ringAnnotationsRef.current,
+            });
           }
         }
       );
 
       console.log(`[Page] Alignments complete. ${result.rings?.length || 0} rings: ${result.rings?.map(r => r.queryName).join(', ')}`);
 
-      // Merge final alignment results into existing plot data
-      // CRITICAL: Check if existing rings array has any items, not just if it exists
-      const hasExistingRings = cachedPlotData?.rings && cachedPlotData.rings.length > 0;
-
-      let finalRings: RingData[];
-      if (hasExistingRings) {
-        // Update existing cached rings with new alignment data
-        finalRings = cachedPlotData.rings.map(existingRing => {
-          const newRingData = result.rings?.find(r => r.queryName === existingRing.queryName);
-          if (newRingData) {
-            console.log(`[Page] Final merge - updating ring: ${existingRing.queryName}`);
-            return {
-              ...existingRing,
-              hits: newRingData.hits,
-              statistics: newRingData.statistics,
-              alignmentOutput: newRingData.alignmentOutput,
-              graphPoints: newRingData.graphPoints || existingRing.graphPoints,
-              graphMaxValue: newRingData.graphMaxValue || existingRing.graphMaxValue,
-              annotations: existingRing.annotations || ringAnnotations[existingRing.queryId] || []
-            };
-          }
-          return existingRing;
-        });
-
-        // Append any NEW rings from result that weren't in the cache
-        const newRingsToAdd = (result.rings || []).filter(
-          newRing => !cachedPlotData.rings.some(existing => existing.queryName === newRing.queryName)
-        );
-        if (newRingsToAdd.length > 0) {
-          console.log(`[Page] Final merge - adding ${newRingsToAdd.length} new rings: ${newRingsToAdd.map(r => r.queryName).join(', ')}`);
-          const newRingsWithAnnotations = newRingsToAdd.map(ring => ({
-            ...ring,
-            annotations: ring.annotations || ringAnnotations[ring.queryId] || []
-          }));
-          finalRings = [...finalRings, ...newRingsWithAnnotations];
-        }
-      } else {
-        finalRings = (result.rings || []).map(ring => ({
-          ...ring,
-          annotations: ring.annotations || ringAnnotations[ring.queryId] || []
-        }));
-      }
-
-      console.log(`[Page] Final merge: ${finalRings?.length || 0} rings`);
-
-      // Keep existing skeleton (reference, GC data), only update rings with alignment data
-      if (cachedPlotData) {
-        const finalPlotData = {
-          ...cachedPlotData,
-          rings: finalRings
-        };
-
-        console.log('[Page] Setting final plot data with rings:', finalPlotData.rings?.length);
-        setPlotData(finalPlotData);
-        setCachedPlotData(finalPlotData);
-      } else {
-        // Fallback if no cached data (shouldn't happen)
-        console.warn('[Page] No cached data, using result directly');
-        setPlotData(result);
-        setCachedPlotData(result);
-      }
+      if (runGeneration !== referenceGenerationRef.current) return;
+      dispatchPlot({
+        type: 'commit',
+        data: {
+          ...result,
+          reference: { ...result.reference, annotations: referenceAnnotationsRef.current },
+        },
+        annotationsByRing: ringAnnotationsRef.current,
+      });
       setProgress({ step: 'Complete!', percent: 100 });
       toast.success('Alignments completed successfully!');
-    } catch (error: any) {
+    } catch (error) {
+      if (runGeneration !== referenceGenerationRef.current) return;
+      const msg = error instanceof Error ? error.message : String(error);
       console.error('[Page] Alignment error:', error);
-      toast.error(`Error: ${error.message}`, { duration: 6000 });
-      setProgress({ step: 'Error', percent: 0, message: error.message });
+      toast.error(`Error: ${msg}`, { duration: 6000 });
+      setProgress({ step: 'Error', percent: 0, message: msg });
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleReferenceFileChange = (file: File) => {
+    referenceGenerationRef.current += 1;
+    if (referenceFile) {
+      setReferenceAnnotations([]);
+      setReferenceAnnotationFileName(null);
+    }
     setReferenceFile(file);
     // Reset plot when reference changes
-    setPlotData(null);
-    setCachedPlotData(null);
-    setReferenceLength(0);
+    dispatchPlot({ type: 'clear' });
     if (controllerRef.current) {
       controllerRef.current.cleanup();
       controllerRef.current = null;
@@ -453,7 +307,8 @@ export function useBRIGController() {
       rings,
       ringAnnotations,
       params,
-      imageProperties
+      imageProperties,
+      referenceAnnotations,
     );
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -470,7 +325,7 @@ export function useBRIGController() {
     if (!file) return;
 
     try {
-      const json = await file.text();
+      const json = await readFileText(file);
       const session = importSession(json);
 
       // Restore rings (without files - they can't be serialized)
@@ -481,6 +336,9 @@ export function useBRIGController() {
         upperThreshold: r.upperThreshold,
         lowerThreshold: r.lowerThreshold,
         customWidth: r.customWidth,
+        blastType: r.blastType,
+        showLabels: r.showLabels,
+        graphMaxCap: r.graphMaxCap,
         files: []
       }));
       setRings(restoredRings);
@@ -494,13 +352,18 @@ export function useBRIGController() {
       });
       setRingAnnotations(restoredAnnotations);
 
+      const restoredReferenceAnnotations = session.referenceAnnotations ?? [];
+      setReferenceAnnotations(restoredReferenceAnnotations);
+      setReferenceAnnotationFileName(restoredReferenceAnnotations.length > 0 ? 'Loaded from session' : null);
+      dispatchPlot({ type: 'reference-annotations', annotations: restoredReferenceAnnotations });
+
       // Restore params and image config
       setParams(session.params);
       setImageProperties(session.imageConfig);
 
       toast.success('Session loaded. Re-add reference and ring files to run alignments.');
-    } catch (error: any) {
-      toast.error(`Failed to load session: ${error.message}`);
+    } catch (error) {
+      toast.error(`Failed to load session: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     e.target.value = '';
@@ -526,11 +389,15 @@ export function useBRIGController() {
     editingRingId,
     setEditingRingId,
     ringAnnotations,
+    referenceAnnotations,
+    referenceAnnotationFileName,
     referenceLength,
     // Handlers
     handleReferenceFileChange,
     handleAnnotationsChange,
     handleOpenAnnotationEditor,
+    handleReferenceAnnotationsFileChange,
+    handleClearReferenceAnnotations,
     handleRun,
     handleSaveSession,
     handleLoadSession,

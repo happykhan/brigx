@@ -24,7 +24,7 @@ import {
   calculateGCWindows,
   calculateGCSkewWindows,
   mergeGenomes
-} from '@/workers/parser.worker';
+} from '@/lib/genomeParser';
 import { parseAnnotationFile } from '@/lib/annotationParser';
 import type {
   ParsedGenome,
@@ -465,6 +465,8 @@ describe('Chapter 7: GenBank parsing for S. aureus plasmids', () => {
 
     const psk57 = await parseGenBank(readCh7('S.aureus.pSK57-plasmid-GQ900493.gbk'));
     const sap014a = await parseGenBank(readCh7('S.aureus.SAP014A-plasmid-GQ900379.gbk'));
+    expect(psk57.length).toBeGreaterThan(0);
+    expect(sap014a.length).toBeGreaterThan(0);
 
     const gcContent = calculateGCWindows(reference.sequence, 100); // small genome = small window
     const gcSkew = calculateGCSkewWindows(reference.sequence, 100);

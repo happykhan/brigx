@@ -1,17 +1,40 @@
 // Alignment Worker - Runs BLAST (formatdb + blastall) alignments
-import type { AlignmentResult, AlignmentHit } from '../lib/types';
+import type { AlignmentResult, AlignmentHit, PipelineParams } from '../lib/types';
+
+interface EmscriptenFileSystem {
+  writeFile(path: string, data: string | Uint8Array): void;
+  readFile(path: string): Uint8Array;
+  readdir(path: string): string[];
+}
+
+interface BlastModule {
+  FS: EmscriptenFileSystem;
+  callMain(args: string[]): number | void;
+  _stdout: string[];
+  _stderr: string[];
+}
+
+interface BlastModuleOptions {
+  wasmBinary: ArrayBuffer;
+  print(text: string): void;
+  printErr(text: string): void;
+  noInitialRun: boolean;
+}
+
+type BlastModuleFactory = (options: BlastModuleOptions) => Promise<BlastModule> | BlastModule;
 
 // Cache module factories and WASM binaries
-let formatdbFactory: any = null;
+let formatdbFactory: BlastModuleFactory | null = null;
 let formatdbWasmBinary: ArrayBuffer | null = null;
-let blastallFactory: any = null;
+let blastallFactory: BlastModuleFactory | null = null;
 let blastallWasmBinary: ArrayBuffer | null = null;
 
 // Cache the formatdb index for the current reference
 let cachedRefName: string | null = null;
+let cachedRefSequence: string | null = null;
 let cachedDbFiles: Map<string, Uint8Array> | null = null;
 
-async function loadModuleFactory(name: string): Promise<{ factory: any; wasmBinary: ArrayBuffer }> {
+async function loadModuleFactory(name: string): Promise<{ factory: BlastModuleFactory; wasmBinary: ArrayBuffer }> {
   const [jsResponse, wasmResponse] = await Promise.all([
     fetch(`https://static.genomicx.org/wasm/${name}.js`),
     fetch(`https://static.genomicx.org/wasm/${name}.wasm`)
@@ -26,7 +49,7 @@ async function loadModuleFactory(name: string): Promise<{ factory: any; wasmBina
   ]);
 
   const moduleWrapper = new Function('Module', moduleText + '; return Module;');
-  const factory = moduleWrapper({});
+  const factory = moduleWrapper({}) as BlastModuleFactory;
   return { factory, wasmBinary };
 }
 
@@ -49,7 +72,7 @@ async function initializeBlast() {
   console.log('[Alignment Worker] BLAST modules ready');
 }
 
-async function createModuleInstance(factory: any, wasmBinary: ArrayBuffer): Promise<any> {
+async function createModuleInstance(factory: BlastModuleFactory, wasmBinary: ArrayBuffer): Promise<BlastModule> {
   const stdout: string[] = [];
   const stderr: string[] = [];
   const mod = await factory({
@@ -65,7 +88,7 @@ async function createModuleInstance(factory: any, wasmBinary: ArrayBuffer): Prom
 
 async function buildDatabase(referenceName: string, referenceSeq: string): Promise<Map<string, Uint8Array>> {
   // Return cached index if reference hasn't changed
-  if (cachedRefName === referenceName && cachedDbFiles) {
+  if (cachedRefName === referenceName && cachedRefSequence === referenceSeq && cachedDbFiles) {
     console.log('[Alignment Worker] Using cached formatdb index');
     return cachedDbFiles;
   }
@@ -105,6 +128,7 @@ async function buildDatabase(referenceName: string, referenceSeq: string): Promi
 
   // Cache for reuse with other queries against same reference
   cachedRefName = referenceName;
+  cachedRefSequence = referenceSeq;
   cachedDbFiles = dbFiles;
 
   return dbFiles;
@@ -171,7 +195,7 @@ async function alignGenomes(
   referenceSeq: string,
   queryName: string,
   querySeq: string,
-  params: any
+  params: Partial<Pick<PipelineParams, 'blastProgram' | 'alignerOptions'>> = {}
 ): Promise<{ alignmentResult: AlignmentResult; rawOutput: string }> {
   console.log(`[Alignment Worker] alignGenomes: ${queryName} (${querySeq.length}bp query, ${referenceSeq.length}bp ref)`);
   await initializeBlast();
@@ -226,32 +250,41 @@ async function alignGenomes(
   return { alignmentResult, rawOutput: output };
 }
 
+type AlignmentWorkerRequest =
+  | { type: 'init' }
+  | {
+      type: 'align';
+      referenceName: string;
+      referenceSeq: string;
+      queryName: string;
+      querySeq: string;
+      params: PipelineParams;
+    };
+
 // Worker message handler
-self.onmessage = async (e: MessageEvent) => {
-  console.log('[Alignment Worker] Received message:', e.data.type);
-  const { type, referenceName, referenceSeq, queryName, querySeq, params, blastProgram } = e.data;
-  // Merge blastProgram into params for the aligner
-  if (blastProgram && params) {
-    params.blastProgram = blastProgram;
-  }
+self.onmessage = async (event: MessageEvent<AlignmentWorkerRequest>) => {
+  const request = event.data;
+  console.log('[Alignment Worker] Received message:', request.type);
 
   try {
-    if (type === 'init') {
+    if (request.type === 'init') {
       await initializeBlast();
       self.postMessage({ type: 'initialized' });
-    } else if (type === 'align') {
-      console.log(`[Alignment Worker] Starting alignment: ${queryName}`);
+    } else {
+      console.log(`[Alignment Worker] Starting alignment: ${request.queryName}`);
       const { alignmentResult, rawOutput } = await alignGenomes(
-        referenceName,
-        referenceSeq,
-        queryName,
-        querySeq,
-        params
+        request.referenceName,
+        request.referenceSeq,
+        request.queryName,
+        request.querySeq,
+        request.params,
       );
       self.postMessage({ type: 'aligned', result: alignmentResult, rawOutput });
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Alignment Worker] Error caught:', error);
-    self.postMessage({ type: 'error', error: error.message, stack: error.stack });
+    const msg = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    self.postMessage({ type: 'error', error: msg, stack });
   }
 };

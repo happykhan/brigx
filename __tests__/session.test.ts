@@ -53,7 +53,18 @@ describe('Session Export/Import', () => {
       ]
     };
 
-    const json = exportSession('0.2.0', 'reference.fna', rings, annotations, mockParams, mockImageConfig);
+    const referenceAnnotations: Annotation[] = [
+      { id: 'ref-1', start: 10, end: 50, label: 'Reference gene', shape: 'arrow-forward' },
+    ];
+    const json = exportSession(
+      '0.2.0',
+      'reference.fna',
+      rings,
+      annotations,
+      mockParams,
+      mockImageConfig,
+      referenceAnnotations,
+    );
     const session = importSession(json);
 
     expect(session.version).toBe('0.2.0');
@@ -64,6 +75,7 @@ describe('Session Export/Import', () => {
     expect(session.rings[1].fileNames).toEqual(['CFT073.fna', 'UTI89.fna']);
     expect(session.rings[0].annotations).toHaveLength(1);
     expect(session.rings[0].annotations[0].label).toBe('Gene1');
+    expect(session.referenceAnnotations).toEqual(referenceAnnotations);
     expect(session.params.minIdentity).toBe(70);
     expect(session.params.alignerOptions).toBe('-W 28');
     expect(session.imageConfig.title).toBe('Test Image');
@@ -72,6 +84,14 @@ describe('Session Export/Import', () => {
   it('should reject invalid session JSON', () => {
     expect(() => importSession('{}')).toThrow('Invalid BRIGX session file');
     expect(() => importSession('not json')).toThrow();
+    expect(() => importSession(JSON.stringify({
+      version: '0.2.0',
+      timestamp: Date.now(),
+      referenceFileName: 'ref.fna',
+      rings: [{ id: 'ring-1' }],
+      params: mockParams,
+      imageConfig: mockImageConfig,
+    }))).toThrow('Invalid BRIGX session file');
   });
 
   it('should include timestamp', () => {
@@ -95,5 +115,6 @@ describe('Profile Export/Import', () => {
 
   it('should reject invalid profile JSON', () => {
     expect(() => importProfile('{}')).toThrow('Invalid BRIGX profile file');
+    expect(() => importProfile('{"imageConfig":{"title":"Incomplete"}}')).toThrow('Invalid BRIGX profile file');
   });
 });

@@ -1,6 +1,6 @@
 {
     "name": "brig-web",
-    "version": "0.6.27",
+    "version": "0.6.28",
     "description": "Browser-based circular genome comparison tool — BLAST Ring Image Generator in the browser",
     "private": true,
     "license": "GPL-3.0",
@@ -15,6 +15,7 @@
         "build": "tsc -b && vite build",
         "start": "vite preview",
         "lint": "eslint .",
+        "quality:architecture": "bash scripts/check-architecture.sh",
         "test": "vitest run",
         "test:watch": "vitest",
         "version:patch": "npm version patch --no-git-tag-version",
@@ -33,7 +34,7 @@
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "react-hot-toast": "^2.6.0",
-        "react-router-dom": "^7.14.0"
+        "react-router-dom": "7.18.2"
     },
     "devDependencies": {
         "@eslint/eslintrc": "^3.3.5",
@@ -55,5 +56,8 @@
         "typescript-eslint": "^8.57.2",
         "vite": "^6.3.0",
         "vitest": "^3.1.1"
+    },
+    "overrides": {
+        "dompurify": "3.4.12"
     }
 }

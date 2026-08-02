@@ -1,7 +1,36 @@
 
 
+import { useState } from 'react';
 import toast from 'react-hot-toast';
 import type { CircularPlotData } from '@/lib/types';
+
+/** Inline info icon that shows a tooltip on hover/click. */
+function InfoTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-block ml-1 align-middle">
+      <button
+        type="button"
+        className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold leading-none cursor-help"
+        style={{ background: 'var(--gx-border)', color: 'var(--gx-text-muted)' }}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onClick={() => setOpen(v => !v)}
+        aria-label="More information"
+      >
+        ?
+      </button>
+      {open && (
+        <span
+          className="absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 rounded text-xs leading-relaxed shadow-lg"
+          style={{ background: 'var(--gx-surface)', color: 'var(--gx-text)', border: '1px solid var(--gx-border)' }}
+        >
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
 
 interface StatisticsPanelProps {
   plotData: CircularPlotData;
@@ -38,6 +67,7 @@ export default function StatisticsPanel({ plotData }: StatisticsPanelProps) {
                   <div className="text-sm" style={{ color: 'var(--gx-text-muted)' }}>
                     Coverage: {ring.statistics.genomeCoverage.toFixed(1)}% |
                     Avg Identity: {ring.statistics.meanIdentity.toFixed(1)}%
+                    <InfoTip text="Alignment-length-weighted mean of BLAST percent identity across all hits that pass the minimum identity and length filters. Each hit's identity is weighted by the number of reference bases it covers." />
                   </div>
                 </div>
                 <div className="flex items-center gap-3">

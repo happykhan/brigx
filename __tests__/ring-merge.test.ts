@@ -7,7 +7,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { RingData, CircularPlotData } from '@/lib/types';
+import { mergeAlignmentRings } from '@/lib/ringState';
+import type { Annotation, RingData } from '@/lib/types';
 
 function createRing(name: string, hitCount: number): RingData {
   return {
@@ -29,52 +30,6 @@ function createRing(name: string, hitCount: number): RingData {
   };
 }
 
-// Simulates the final merge logic from page.tsx
-function finalMerge(
-  cachedRings: RingData[] | undefined,
-  resultRings: RingData[],
-  ringAnnotations: Record<string, any[]>
-): RingData[] {
-  const hasExistingRings = cachedRings && cachedRings.length > 0;
-
-  let finalRings: RingData[];
-  if (hasExistingRings) {
-    // Update existing cached rings with new alignment data
-    finalRings = cachedRings.map(existingRing => {
-      const newRingData = resultRings.find(r => r.queryName === existingRing.queryName);
-      if (newRingData) {
-        return {
-          ...existingRing,
-          hits: newRingData.hits,
-          statistics: newRingData.statistics,
-          alignmentOutput: newRingData.alignmentOutput,
-          annotations: existingRing.annotations || ringAnnotations[existingRing.queryId] || []
-        };
-      }
-      return existingRing;
-    });
-
-    // Append new rings from result that weren't in the cache
-    const newRingsToAdd = resultRings.filter(
-      newRing => !cachedRings.some(existing => existing.queryName === newRing.queryName)
-    );
-    if (newRingsToAdd.length > 0) {
-      const newRingsWithAnnotations = newRingsToAdd.map(ring => ({
-        ...ring,
-        annotations: ring.annotations || ringAnnotations[ring.queryId] || []
-      }));
-      finalRings = [...finalRings, ...newRingsWithAnnotations];
-    }
-  } else {
-    finalRings = resultRings.map(ring => ({
-      ...ring,
-      annotations: ring.annotations || ringAnnotations[ring.queryId] || []
-    }));
-  }
-
-  return finalRings;
-}
-
 describe('Ring merge: add ring after initial alignment', () => {
   it('should include new ring when cache has existing rings', () => {
     // First run: only Ring 1
@@ -83,7 +38,7 @@ describe('Ring merge: add ring after initial alignment', () => {
     // Second run: Ring 1 (cached) + Ring 3 (new)
     const resultRings = [createRing('Ring 1', 100), createRing('Ring 3', 80)];
 
-    const merged = finalMerge(cachedRings, resultRings, {});
+    const merged = mergeAlignmentRings(cachedRings, resultRings, {});
 
     expect(merged).toHaveLength(2);
     expect(merged[0].queryName).toBe('Ring 1');
@@ -98,7 +53,7 @@ describe('Ring merge: add ring after initial alignment', () => {
     const resultRing1 = createRing('Ring 1', 100);
     const resultRing2 = createRing('Ring 2', 75);
 
-    const merged = finalMerge(cachedRings, [resultRing1, resultRing2], {});
+    const merged = mergeAlignmentRings(cachedRings, [resultRing1, resultRing2], {});
 
     expect(merged).toHaveLength(2);
     expect(merged[0].queryName).toBe('Ring 1');
@@ -115,7 +70,7 @@ describe('Ring merge: add ring after initial alignment', () => {
 
     const resultRings = [createRing('Ring 1', 100), createRing('Ring 2', 60)];
 
-    const merged = finalMerge([cachedRing], resultRings, {});
+    const merged = mergeAlignmentRings([cachedRing], resultRings, {});
 
     expect(merged[0].annotations).toHaveLength(1);
     expect(merged[0].annotations![0].label).toBe('Gene1');
@@ -125,7 +80,7 @@ describe('Ring merge: add ring after initial alignment', () => {
   it('should work when cache is empty (first run)', () => {
     const resultRings = [createRing('Ring 1', 100), createRing('Ring 2', 80)];
 
-    const merged = finalMerge(undefined, resultRings, {});
+    const merged = mergeAlignmentRings(undefined, resultRings, {});
 
     expect(merged).toHaveLength(2);
   });
@@ -139,7 +94,7 @@ describe('Ring merge: add ring after initial alignment', () => {
       createRing('Ring 4', 80)
     ];
 
-    const merged = finalMerge(cachedRings, resultRings, {});
+    const merged = mergeAlignmentRings(cachedRings, resultRings, {});
 
     expect(merged).toHaveLength(4);
     expect(merged.map(r => r.queryName)).toEqual(['Ring 1', 'Ring 2', 'Ring 3', 'Ring 4']);
@@ -152,11 +107,33 @@ describe('Ring merge: add ring after initial alignment', () => {
     // Only Ring 1 was re-run (Ring 2 had no files)
     const resultRings = [createRing('Ring 1', 100)];
 
-    const merged = finalMerge(cachedRings, resultRings, {});
+    const merged = mergeAlignmentRings(cachedRings, resultRings, {});
 
     expect(merged).toHaveLength(2);
     expect(merged[0].hits).toHaveLength(100); // Updated
     expect(merged[1].hits).toHaveLength(40);  // Preserved from cache
+  });
+
+  it('matches rings by stable ID when two legends are identical', () => {
+    const first = { ...createRing('Same legend', 1), queryId: 'ring-a' };
+    const second = { ...createRing('Same legend', 2), queryId: 'ring-b' };
+    const incomingFirst = { ...createRing('Same legend', 10), queryId: 'ring-a' };
+    const incomingSecond = { ...createRing('Same legend', 20), queryId: 'ring-b' };
+
+    const merged = mergeAlignmentRings([first, second], [incomingFirst, incomingSecond], {});
+
+    expect(merged[0].hits).toHaveLength(10);
+    expect(merged[1].hits).toHaveLength(20);
+  });
+
+  it('honours an explicitly cleared annotation list', () => {
+    const cached = createRing('Ring 1', 1);
+    cached.annotations = [{ id: 'old', start: 1, end: 2, label: 'Old', shape: 'block' }];
+    const cleared: Record<string, Annotation[]> = { [cached.queryId]: [] };
+
+    const [merged] = mergeAlignmentRings([cached], [createRing('Ring 1', 2)], cleared);
+
+    expect(merged.annotations).toEqual([]);
   });
 });
 
@@ -172,7 +149,7 @@ describe('Ring merge: graph ring data isolation', () => {
     const ring3 = createRing('Ring 3', 80);
 
     const resultRings = [ring1, ring2, ring3];
-    const merged = finalMerge(undefined, resultRings, {});
+    const merged = mergeAlignmentRings(undefined, resultRings, {});
 
     expect(merged).toHaveLength(3);
 
@@ -208,10 +185,19 @@ describe('Ring merge: graph ring data isolation', () => {
       },
     ];
 
-    const merged = finalMerge(cachedRings, resultRings, {});
+    const merged = mergeAlignmentRings(cachedRings, resultRings, {});
 
     expect(merged).toHaveLength(2);
     expect(merged[0].graphPoints).toBeUndefined();
     expect(merged[1].graphPoints).toHaveLength(1);
+  });
+
+  it('keeps a valid zero graph maximum from a fresh result', () => {
+    const cached = { ...createRing('Graph', 0), graphMaxValue: 50 };
+    const incoming = { ...createRing('Graph', 0), graphMaxValue: 0 };
+
+    const [merged] = mergeAlignmentRings([cached], [incoming], {});
+
+    expect(merged.graphMaxValue).toBe(0);
   });
 });

@@ -1,36 +1,23 @@
 
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { CircularPlotData } from '@/lib/types';
+import type { CircularPlotData, PlotViewState } from '@/lib/types';
 import type { ImagePropertiesConfig } from './ImageProperties';
 import { CanvasPlotRenderer } from '@/lib/canvas-renderer';
+import type { PlotTooltip } from '@/lib/rendering/types';
 
 interface CircularPlotProps {
   data: CircularPlotData;
   imageProperties: ImagePropertiesConfig;
+  onViewStateChange?: (state: PlotViewState) => void;
 }
 
-interface TooltipInfo {
-  type?: string;
-  queryName?: string;
-  start?: number;
-  end?: number;
-  identity?: number;
-  coverage?: number;
-  position?: number;
-  windowSize?: number;
-  gc?: string;
-  skew?: string;
-  name?: string;
-  length?: number;
-  value?: string;
-  label?: string;
-  strand?: string;
+interface TooltipInfo extends PlotTooltip {
   x: number;
   y: number;
 }
 
-export default function CircularPlot({ data, imageProperties }: CircularPlotProps) {
+export default function CircularPlot({ data, imageProperties, onViewStateChange }: CircularPlotProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<CanvasPlotRenderer | null>(null);
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
@@ -50,6 +37,24 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
   propsRef.current = imageProperties;
   zoomRef.current = zoom;
   panRef.current = pan;
+
+  const onViewStateChangeRef = useRef(onViewStateChange);
+  onViewStateChangeRef.current = onViewStateChange;
+
+  /** Emit current view state to parent (for SVG export). */
+  const emitViewState = useCallback(() => {
+    const cb = onViewStateChangeRef.current;
+    if (!cb) return;
+    const renderer = rendererRef.current;
+    const legendPos = renderer ? renderer.getLegendPositions() : { gcLegendPos: null, ringLegendPos: null };
+    cb({
+      zoom: zoomRef.current,
+      panX: panRef.current.x,
+      panY: panRef.current.y,
+      gcLegendPos: legendPos.gcLegendPos,
+      ringLegendPos: legendPos.ringLegendPos,
+    });
+  }, []);
 
   // Render at the container's actual pixel size, preserving zoom/pan
   const renderAtSize = useCallback(() => {
@@ -95,7 +100,8 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
     canvas.style.width = cssSize + 'px';
     canvas.style.height = cssSize + 'px';
     rendererRef.current = renderer;
-  }, []);
+    emitViewState();
+  }, [emitViewState]);
 
   // Re-render on data/config change
   useEffect(() => {
@@ -120,7 +126,8 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
     if (rendererRef.current) {
       rendererRef.current.redraw(zoom, pan.x, pan.y);
     }
-  }, [zoom, pan]);
+    emitViewState();
+  }, [zoom, pan, emitViewState]);
 
   const getCanvasCoords = (e: React.MouseEvent) => {
     const canvas = canvasRef.current;
@@ -153,12 +160,15 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
 
   const handleMouseMove = (e: React.MouseEvent) => {
     // Legend dragging
-    if (draggingLegend && rendererRef.current) {
+    if (draggingLegend && rendererRef.current && canvasRef.current) {
       const dx = e.clientX - legendDragStart.x;
       const dy = e.clientY - legendDragStart.y;
-      rendererRef.current.moveLegend(draggingLegend, dx, dy, zoom);
+      // Scale CSS px delta to logical space (canvas is 1000×1000 logical but rendered at CSS size)
+      const scale = 1000 / (canvasRef.current.offsetWidth || 1000);
+      rendererRef.current.moveLegend(draggingLegend, dx * scale, dy * scale, zoom);
       setLegendDragStart({ x: e.clientX, y: e.clientY });
       rendererRef.current.redraw(zoom, pan.x, pan.y);
+      emitViewState();
       return;
     }
 
@@ -186,7 +196,7 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
     const hit = rendererRef.current.hitTest(canvasX, canvasY, zoom, pan.x, pan.y);
     if (hit) {
       setTooltip({
-        ...(hit as unknown as Omit<TooltipInfo, 'x' | 'y'>),
+        ...hit,
         x: e.clientX,
         y: e.clientY,
       });
@@ -200,6 +210,7 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
   const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.2, 5));
   const handleZoomOut = () => setZoom(prev => Math.max(prev / 1.2, 0.3));
   const handleResetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+  const handleCenterView = () => setPan({ x: 0, y: 0 });
 
   // Scroll to zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -225,6 +236,13 @@ export default function CircularPlot({ data, imageProperties }: CircularPlotProp
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
+          </button>
+          <button type="button" onClick={handleCenterView} className="p-1.5 rounded hover:opacity-80 flex items-center gap-1" style={{ color: 'var(--gx-text)' }} title="Centre the plot (keep current zoom)">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="3" strokeWidth={2} />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v4m0 12v4M2 12h4m12 0h4" />
+            </svg>
+            <span className="text-xs">Centre</span>
           </button>
         </div>
         <button type="button" onClick={handleResetView} className="text-xs px-2 py-1 rounded hover:opacity-80" style={{ color: 'var(--gx-text-muted)' }} title="Reset zoom to 100% and centre the plot">

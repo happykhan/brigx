@@ -103,6 +103,11 @@ export default function AboutPage() {
                 uses the bundled BLAST WebAssembly modules listed above.
               </p>
 
+              <p className="mb-4">
+                A desktop version is possible, but applications need to be signed before we can distribute them properly.
+                Apple charges US$99 a year, and Windows signing costs about US$10 a month.
+              </p>
+
               <h2 className="text-2xl font-semibold mt-8 mb-4">Citation</h2>
               <p className="mb-4">If you use BRIGX in research, please cite the original BRIG paper:</p>
               <blockquote className="pl-4 italic mb-4" style={{ borderLeft: '4px solid var(--gx-accent)', color: 'var(--gx-text-muted)' }}>

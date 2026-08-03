@@ -37,7 +37,7 @@ The BLAST JavaScript/WebAssembly output includes Emscripten runtime code. Emscri
 | `react-hot-toast` | Status notifications | MIT | https://github.com/timolins/react-hot-toast |
 | `react-router-dom` | Client-side navigation | MIT | https://github.com/remix-run/react-router |
 
-BRIGX does not include CGView.js, Handsontable, or LAST and does not copy CGView.js source. The circular renderer and editable annotation table are first-party BRIGX code.
+The circular renderer and editable annotation table are original BRIGX code.
 
 ## Desktop runtime
 

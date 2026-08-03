@@ -123,10 +123,9 @@ export default function AboutPage() {
               </div>
 
               <p className="mb-4">
-                CGView.js, Handsontable, and LAST are not included in this release, and no CGView.js source is copied.
-                BRIGX&apos;s circular renderer and editable annotation table are first-party implementations; alignment
-                uses the bundled BLAST WebAssembly modules listed above. Desktop packages also include the full
-                licence texts for their locked Rust dependencies.
+                BRIGX&apos;s circular renderer and editable annotation table are original BRIGX implementations. Alignment
+                uses the bundled BLAST WebAssembly modules listed above. Desktop packages also include the full licence
+                texts for their locked Rust dependencies.
               </p>
 
               <h2 className="text-2xl font-semibold mt-8 mb-4">Example data</h2>

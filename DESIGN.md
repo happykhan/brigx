@@ -53,15 +53,15 @@ The window title identifies the project, dirty state, BRIGX, and the Beta channe
 
 ## Release truthfulness
 
-The hosted web application is the recommended edition. Desktop packages are labelled **Beta — unsigned community build** until macOS notarisation and Windows Authenticode signing are configured and clean-machine release checks pass.
+The hosted web application is the recommended edition. Windows packages are labelled **Beta — unsigned community build** until publisher signing is configured and clean-machine release checks pass. macOS packages are not publicly distributed until Developer ID signing and Apple notarisation are configured.
 
-The download page must state the expected Gatekeeper and SmartScreen warnings before a person downloads anything. Every published desktop beta must have:
+The download page must state the expected SmartScreen warning before a person downloads the Windows beta. Every published desktop beta must have:
 
 - source and package version agreement;
-- macOS Apple silicon, macOS Intel, Windows x64, and Linux x64 packages;
+- Windows x64 and Linux x64 packages;
 - SHA-256 checksums;
 - GitHub build-provenance attestations;
-- an installation and limitation notice;
+- an installation and limitation notice, including the macOS distribution hold;
 - the GPL source corresponding to the tag.
 
 Stable `v*` releases remain signing-gated. Unsigned beta tags use `desktop-beta-v*` and create GitHub prereleases.

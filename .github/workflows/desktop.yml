@@ -324,13 +324,22 @@ jobs:
       - name: Create checksums
         working-directory: release-assets
         run: |
-          mapfile -d '' installers < <(find . -type f \( \
-            -name '*.dmg' -o \
-            -name '*.exe' -o \
-            -name '*.AppImage' -o \
-            -name '*.deb' -o \
-            -name '*.rpm' \
-          \) -print0 | sort -z)
+          if [[ "$GITHUB_REF_NAME" == desktop-beta-v* ]]; then
+            mapfile -d '' installers < <(find . -type f \( \
+              -name '*.exe' -o \
+              -name '*.AppImage' -o \
+              -name '*.deb' -o \
+              -name '*.rpm' \
+            \) -print0 | sort -z)
+          else
+            mapfile -d '' installers < <(find . -type f \( \
+              -name '*.dmg' -o \
+              -name '*.exe' -o \
+              -name '*.AppImage' -o \
+              -name '*.deb' -o \
+              -name '*.rpm' \
+            \) -print0 | sort -z)
+          fi
           if (( ${#installers[@]} == 0 )); then
             echo 'No installers were downloaded.' >&2
             exit 1
@@ -345,13 +354,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          mapfile -d '' files < <(find release-assets -type f \( \
-            -name '*.dmg' -o \
-            -name '*.exe' -o \
-            -name '*.AppImage' -o \
-            -name '*.deb' -o \
-            -name '*.rpm' \
-          \) -print0 | sort -z)
+          if [[ "$RELEASE_TAG" == desktop-beta-v* ]]; then
+            mapfile -d '' files < <(find release-assets -type f \( \
+              -name '*.exe' -o \
+              -name '*.AppImage' -o \
+              -name '*.deb' -o \
+              -name '*.rpm' \
+            \) -print0 | sort -z)
+          else
+            mapfile -d '' files < <(find release-assets -type f \( \
+              -name '*.dmg' -o \
+              -name '*.exe' -o \
+              -name '*.AppImage' -o \
+              -name '*.deb' -o \
+              -name '*.rpm' \
+            \) -print0 | sort -z)
+          fi
           files+=(release-assets/SHA256SUMS.txt)
           if [[ "$RELEASE_TAG" == desktop-beta-v* ]]; then
             version=${RELEASE_TAG#desktop-beta-v}

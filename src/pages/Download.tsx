@@ -9,18 +9,6 @@ const releasePage = `https://github.com/happykhan/brigx/releases/tag/${releaseTa
 
 const downloads = [
   {
-    platform: 'macOS',
-    detail: 'Apple silicon',
-    requirement: 'macOS 11 or later',
-    file: `BRIGX_${APP_VERSION}_aarch64.dmg`,
-  },
-  {
-    platform: 'macOS',
-    detail: 'Intel',
-    requirement: 'macOS 11 or later',
-    file: `BRIGX_${APP_VERSION}_x64.dmg`,
-  },
-  {
     platform: 'Windows',
     detail: 'x64 installer',
     requirement: 'Windows 10 or later',
@@ -46,7 +34,7 @@ export default function DownloadPage() {
             A small, offline Tauri application using the operating system webview and the same BRIGX WebAssembly pipeline as the web edition.
           </p>
           <div className="beta-notice" role="note">
-            <strong>Unsigned community build.</strong> This beta is free and fully functional, but it is not yet notarised by Apple or signed with a Windows publisher certificate. Read the installation notes below before downloading.
+            <strong>Unsigned community build.</strong> Windows may show a publisher warning. macOS downloads are paused until Developer ID signing and Apple notarisation are configured.
           </div>
         </header>
 
@@ -66,6 +54,17 @@ export default function DownloadPage() {
               </article>
             ))}
           </div>
+          <div className="macos-release-hold" role="note">
+            <div>
+              <h3>macOS</h3>
+              <p>Not currently distributed</p>
+            </div>
+            <p>
+              Unsigned applications downloaded through a browser are rejected by Gatekeeper as damaged. We will publish
+              Apple silicon and Intel builds after they are signed and notarised. Until then, use the web edition.
+            </p>
+            <Link to="/app" className="product-text-link">Open the web app <span aria-hidden="true">→</span></Link>
+          </div>
           <p className="download-alternatives">
             Linux users can also get <a href={`${releaseBase}/BRIGX_${APP_VERSION}_amd64.deb`}>DEB</a> or{' '}
             <a href={`${releaseBase}/BRIGX-${APP_VERSION}-1.x86_64.rpm`}>RPM</a> packages.{' '}
@@ -74,17 +73,8 @@ export default function DownloadPage() {
         </section>
 
         <section className="install-notes" aria-labelledby="install-title">
-          <h2 id="install-title">Installing an unsigned beta</h2>
+          <h2 id="install-title">Installation notes</h2>
           <div>
-            <article>
-              <h3>macOS</h3>
-              <ol>
-                <li>Open the DMG and drag BRIGX into Applications.</li>
-                <li>Try to open BRIGX once. macOS will block the unnotarised application.</li>
-                <li>Open System Settings → Privacy &amp; Security, then choose <strong>Open Anyway</strong> for BRIGX.</li>
-                <li>Confirm <strong>Open</strong>. This exception applies only to this copy of BRIGX.</li>
-              </ol>
-            </article>
             <article>
               <h3>Windows</h3>
               <ol>
@@ -114,7 +104,7 @@ export default function DownloadPage() {
             <li>Updates are installed manually from this page during beta.</li>
             <li>Packages and source are released under GPL-3.0 with third-party notices.</li>
           </ul>
-          <p>If you prefer not to install an unsigned application, <Link to="/app">use the web edition</Link>.</p>
+          <p>If you prefer not to install an unsigned Windows application, or you use macOS, <Link to="/app">use the web edition</Link>.</p>
         </section>
       </main>
       <ProductFooter />

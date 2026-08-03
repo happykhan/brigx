@@ -16,7 +16,18 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByRole('link', { name: 'Open the web app' })).toHaveAttribute('href', '/app')
     await expect(page.getByRole('link', { name: 'Get the desktop beta' })).toHaveAttribute('href', '/download')
     await expect(page.getByRole('heading', { name: 'One scientific engine. Two ways to work.' })).toBeVisible()
-    await expect(page.getByText(/CGView\.js is neither embedded nor copied/)).toBeVisible()
+    await expect(page.getByText(/editable annotation table are original BRIGX implementations/)).toBeVisible()
+  })
+
+  test('landing page uses the dedicated mobile composition without horizontal overflow', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+
+    await expect(page.getByRole('heading', { name: 'Web edition' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Desktop beta' })).toBeVisible()
+    await expect(page.locator('.product-table-wrap')).toBeHidden()
+    await expect(page.locator('.gx-nav-logo-sub')).toBeHidden()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   })
 
   test('loads the app with Reference Genome section visible', async ({ page }) => {
@@ -100,7 +111,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByRole('heading', { name: 'Third-party software' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'GNU General Public License v3.0' })).toHaveAttribute('href', /LICENSE$/)
     await expect(page.getByRole('link', { name: 'complete third-party notice' })).toHaveAttribute('href', /THIRD_PARTY_NOTICES\.md$/)
-    await expect(page.getByText(/CGView\.js, Handsontable, and LAST are not included in this release/)).toBeVisible()
+    await expect(page.getByText(/editable annotation table are original BRIGX implementations/)).toBeVisible()
   })
 
   test('download page identifies the unsigned beta before offering packages', async ({ page }) => {
@@ -108,9 +119,9 @@ test.describe('BRIGX e2e — circular genome plot', () => {
 
     await expect(page.getByRole('heading', { name: 'BRIGX Desktop Beta' })).toBeVisible()
     await expect(page.getByText('Unsigned community build.')).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Installing an unsigned beta' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Download' })).toHaveCount(4)
-    await expect(page.getByText(/Privacy & Security/)).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Installation notes' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Download' })).toHaveCount(2)
+    await expect(page.getByText(/macOS downloads are paused/)).toBeVisible()
     await expect(page.getByText(/Microsoft Defender SmartScreen/)).toBeVisible()
   })
 

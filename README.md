@@ -2,7 +2,7 @@
 
 A free, local-first circular genome comparison tool for the web and desktop — the successor to [BRIG](https://pmc.ncbi.nlm.nih.gov/articles/PMC3163573/) (BLAST Ring Image Generator).
 
-Live at [brigx.genomicx.org](https://brigx.genomicx.org) · Part of the [GenomicX](https://genomicx.org) ecosystem.
+Product site at [brigx.genomicx.org](https://brigx.genomicx.org) · [Open the web application](https://brigx.genomicx.org/app) · Part of the [GenomicX](https://genomicx.org) ecosystem.
 
 ## Features
 
@@ -41,6 +41,8 @@ npm run desktop:make      # Current-platform installer/package
 ```
 
 Desktop `.brigx` projects save settings, annotations, completed plot data, source-file paths, and source-file hashes. They do not duplicate genome contents, so referenced input files must remain available. See [the desktop build and release guide](DESKTOP.md).
+
+Public desktop builds use an explicitly labelled, unsigned `desktop-beta-v*` GitHub prerelease channel until paid Apple notarisation and Windows publisher signing are configured. The website and release notes explain the expected Gatekeeper and SmartScreen warnings before download.
 
 ## How it works
 

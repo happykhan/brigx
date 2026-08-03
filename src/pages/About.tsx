@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
-import { NavBar, AppFooter } from '@genomicx/ui';
-import { APP_VERSION } from '@/lib/version';
+import ProductFooter from '@/components/ProductFooter';
+import ProductNav from '@/components/ProductNav';
 
 const linkStyle = { color: 'var(--gx-accent)', textDecoration: 'underline' };
 
@@ -9,15 +9,17 @@ function ExternalLink({ href, children }: { href: string; children: React.ReactN
 }
 
 export default function AboutPage() {
-  const desktop = typeof window === 'undefined' ? undefined : window.brigxDesktop;
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--gx-bg)' }}>
-      <NavBar appName="BRIGX" appSubtitle={desktop ? 'Offline Desktop Ring Image Generator' : 'Browser-based Ring Image Generator'} version={APP_VERSION} />
+    <div className="product-page">
+      <ProductNav />
 
-      <main className="flex-grow py-12">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="card">
-            <h1 className="text-4xl font-bold mb-8" style={{ letterSpacing: '-0.025em' }}>About BRIGX</h1>
+      <main className="product-width product-document">
+        <article className="legal-record">
+            <header className="product-document-header">
+              <p className="product-kicker">Product record</p>
+              <h1>About BRIGX</h1>
+              <p>Privacy, open-source licensing, software provenance, citation, and support information.</p>
+            </header>
 
             <div className="max-w-none">
               <h2 className="text-2xl font-semibold mt-6 mb-4">Overview</h2>
@@ -30,23 +32,20 @@ export default function AboutPage() {
 
               <h2 className="text-2xl font-semibold mt-8 mb-4">Data handling and privacy</h2>
               <p className="mb-4">
-                Genome and annotation files are processed locally {desktop ? 'on this computer' : 'in your browser'}.
+                Genome and annotation files are processed locally in your browser or on your computer.
                 BRIGX does not upload file contents to an analysis server. This release contains no accounts,
                 cloud storage, advertising, telemetry, or analytics.
               </p>
-              {desktop ? (
-                <p className="mb-4">
-                  Desktop project files store settings, completed plot data, SHA-256 checksums, and local paths to
-                  source files; they do not copy genome contents into the project. Treat a <code>.brigx</code> file as
-                  potentially sensitive because its paths and filenames may reveal information about your computer
-                  or work. Recovery snapshots stay in BRIGX&apos;s local application-data directory.
-                </p>
-              ) : (
-                <p className="mb-4">
-                  As with any website, the hosting provider may receive ordinary request metadata such as IP address,
-                  browser information, requested asset, and time of access.
-                </p>
-              )}
+              <p className="mb-4">
+                Desktop project files store settings, completed plot data, SHA-256 checksums, and local paths to
+                source files; they do not copy genome contents into the project. Treat a <code>.brigx</code> file as
+                potentially sensitive because its paths and filenames may reveal information about your computer
+                or work. Recovery snapshots stay in BRIGX&apos;s local application-data directory.
+              </p>
+              <p className="mb-4">
+                As with any website, the hosting provider may receive ordinary request metadata such as IP address,
+                browser information, requested asset, and time of access.
+              </p>
 
               <h2 className="text-2xl font-semibold mt-8 mb-4">Open-source licence and commercial use</h2>
               <p className="mb-4">
@@ -85,18 +84,15 @@ export default function AboutPage() {
                       <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>BLAST WebAssembly runtime</td>
                       <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}><ExternalLink href="https://emscripten.org/docs/introducing_emscripten/emscripten_license.html">MIT/NCSA</ExternalLink></td>
                     </tr>
-                    {desktop && (
-                      <tr>
-                        <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>
-                          <ExternalLink href="https://tauri.app/">Tauri {desktop.versions.tauri}</ExternalLink>
-                          {' '}with {desktop.versions.webview}
-                        </td>
-                        <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>Desktop application runtime</td>
-                        <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>
-                          <ExternalLink href="https://github.com/tauri-apps/tauri#license">MIT or Apache-2.0; system-webview terms</ExternalLink>
-                        </td>
-                      </tr>
-                    )}
+                    <tr>
+                      <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>
+                        <ExternalLink href="https://tauri.app/">Tauri 2</ExternalLink> with the operating-system webview
+                      </td>
+                      <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>Desktop application runtime</td>
+                      <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>
+                        <ExternalLink href="https://github.com/tauri-apps/tauri#license">MIT or Apache-2.0; system-webview terms</ExternalLink>
+                      </td>
+                    </tr>
                     <tr>
                       <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}><ExternalLink href="https://react.dev/">React and React DOM</ExternalLink></td>
                       <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>User interface</td>
@@ -165,19 +161,21 @@ export default function AboutPage() {
               </p>
 
               <div className="mt-8 pt-8" style={{ borderTop: '1px solid var(--gx-border)' }}>
-                <Link to="/" className="inline-flex items-center font-medium transition-colors" style={{ color: 'var(--gx-accent)' }}>
+                <Link to="/app" className="inline-flex items-center font-medium transition-colors" style={{ color: 'var(--gx-accent)' }}>
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                   </svg>
-                  Back to Application
+                  Open the web application
+                </Link>
+                <Link to="/download" className="inline-flex items-center font-medium ml-6" style={{ color: 'var(--gx-accent)' }}>
+                  Desktop downloads
                 </Link>
               </div>
             </div>
-          </div>
-        </div>
+        </article>
       </main>
 
-      <AppFooter appName="BRIGX" bugReportEmail="nabil@happykhan.com" bugReportUrl="https://github.com/happykhan/brigx/issues" />
+      <ProductFooter />
     </div>
   );
 }

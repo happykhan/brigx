@@ -713,7 +713,7 @@ export function useBRIGController() {
 
   useEffect(() => {
     if (!desktop) return;
-    document.title = `${desktopProjectDirty ? '• ' : ''}${desktopProjectName ? `${desktopProjectName} — ` : ''}BRIGX`;
+    document.title = `${desktopProjectDirty ? '• ' : ''}${desktopProjectName ? `${desktopProjectName} — ` : ''}BRIGX Desktop Beta`;
   }, [desktop, desktopProjectDirty, desktopProjectName]);
 
   return {

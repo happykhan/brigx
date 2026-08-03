@@ -1,6 +1,6 @@
 [package]
 name = "brigx"
-version = "0.6.31"
+version = "0.7.0"
 description = "Free, offline circular comparative genome visualisation"
 authors = ["Nabil-Fareed Alikhan"]
 edition = "2024"

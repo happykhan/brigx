@@ -8,15 +8,26 @@ const QUERY = path.join(FIXTURES, 'query.fa')
 const BAKTA_GFF3 = path.join(FIXTURES, 'bakta.gff3')
 
 test.describe('BRIGX e2e — circular genome plot', () => {
-  test('loads the app with Reference Genome section visible', async ({ page }) => {
+  test('landing page explains the product and offers web and desktop editions', async ({ page }) => {
     await page.goto('/')
+
+    await expect(page.getByRole('heading', { name: 'Circular genome comparison without uploading your data.' })).toBeVisible()
+    await expect(page.getByRole('img', { name: /representative circular comparison/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Open the web app' })).toHaveAttribute('href', '/app')
+    await expect(page.getByRole('link', { name: 'Get the desktop beta' })).toHaveAttribute('href', '/download')
+    await expect(page.getByRole('heading', { name: 'One scientific engine. Two ways to work.' })).toBeVisible()
+    await expect(page.getByText(/CGView\.js is neither embedded nor copied/)).toBeVisible()
+  })
+
+  test('loads the app with Reference Genome section visible', async ({ page }) => {
+    await page.goto('/app')
 
     await expect(page.getByRole('heading', { name: 'Reference Genome' })).toBeVisible()
     await expect(page.getByText('Load a reference genome to begin')).toBeVisible()
   })
 
   test('uploading a reference FASTA shows the filename', async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/app')
 
     const refInput = page.locator('input[type="file"][accept*=".fa"]').first()
     await refInput.setInputFiles(REFERENCE)
@@ -25,7 +36,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
   })
 
   test('uploading reference shows the Run button', async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/app')
 
     const refInput = page.locator('input[type="file"][accept*=".fa"]').first()
     await refInput.setInputFiles(REFERENCE)
@@ -38,7 +49,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
 
   test('annotation table keeps edits, accepts spreadsheet paste, and deletes rows', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])
-    await page.goto('/')
+    await page.goto('/app')
 
     const pageErrors: Error[] = []
     page.on('pageerror', error => pageErrors.push(error))
@@ -71,7 +82,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
   })
 
   test('loads Bakta GFF3 on the reference track', async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/app')
 
     await page.getByLabel('Reference genome file').setInputFiles(REFERENCE)
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 30_000 })
@@ -92,10 +103,21 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByText(/CGView\.js, Handsontable, and LAST are not included in this release/)).toBeVisible()
   })
 
+  test('download page identifies the unsigned beta before offering packages', async ({ page }) => {
+    await page.goto('/download')
+
+    await expect(page.getByRole('heading', { name: 'BRIGX Desktop Beta' })).toBeVisible()
+    await expect(page.getByText('Unsigned community build.')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Installing an unsigned beta' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Download' })).toHaveCount(4)
+    await expect(page.getByText(/Privacy & Security/)).toBeVisible()
+    await expect(page.getByText(/Microsoft Defender SmartScreen/)).toBeVisible()
+  })
+
   test('runs an alignment with the bundled integrity-checked BLAST assets', async ({ page }) => {
     const pageErrors: Error[] = []
     page.on('pageerror', error => pageErrors.push(error))
-    await page.goto('/')
+    await page.goto('/app')
 
     await page.getByLabel('Reference genome file').setInputFiles(REFERENCE)
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 30_000 })
@@ -114,7 +136,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
   })
 
   test('expanded plot controls remain clickable and SVG downloads', async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/app')
 
     await page.getByLabel('Reference genome file').setInputFiles(REFERENCE)
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 30_000 })

@@ -14,8 +14,7 @@ interface DesktopProjectBarProps {
   onRecover: () => void;
 }
 
-const buttonClass = 'text-sm px-3 py-2.5 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed';
-const mutedStyle = { color: 'var(--gx-text-muted)' };
+const buttonClass = 'desktop-toolbar-button disabled:opacity-50 disabled:cursor-not-allowed';
 
 export default function DesktopProjectBar({
   projectName,
@@ -31,15 +30,17 @@ export default function DesktopProjectBar({
   onRecover,
 }: DesktopProjectBarProps) {
   return (
-    <nav
-      aria-label="Desktop project controls"
-      style={{ background: 'var(--gx-bg-alt)', borderBottom: '1px solid var(--gx-border)' }}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-1 overflow-x-auto">
-        <button type="button" onClick={onNew} className={buttonClass} style={mutedStyle}>
+    <header className="desktop-toolbar">
+      <div className="desktop-toolbar-brand">
+        <span className="desktop-toolbar-mark" aria-hidden="true"><i /><i /><i /></span>
+        <h1>BRIGX</h1>
+        <span className="desktop-beta-label">Beta</span>
+      </div>
+      <nav aria-label="Desktop project controls" className="desktop-toolbar-actions">
+        <button type="button" onClick={onNew} className={buttonClass}>
           New Project
         </button>
-        <button type="button" onClick={onOpen} className={buttonClass} style={mutedStyle}>
+        <button type="button" onClick={onOpen} className={buttonClass}>
           Open Project
         </button>
         <select
@@ -49,40 +50,35 @@ export default function DesktopProjectBar({
             if (event.target.value) onOpenRecent(event.target.value);
           }}
           disabled={recentProjects.length === 0}
-          className="text-sm px-2 py-1.5 rounded shrink-0 disabled:opacity-50"
-          style={{
-            color: 'var(--gx-text-muted)',
-            background: 'var(--gx-surface)',
-            border: '1px solid var(--gx-border)',
-          }}
+          className="desktop-recent-select disabled:opacity-50"
         >
           <option value="">Recent projects</option>
           {recentProjects.map(project => (
             <option key={project.id} value={project.id}>{project.displayName}</option>
           ))}
         </select>
-        <button type="button" onClick={onSave} disabled={isSaving} className={buttonClass} style={mutedStyle}>
+        <span className="desktop-toolbar-separator" aria-hidden="true" />
+        <button type="button" onClick={onSave} disabled={isSaving} className={buttonClass}>
           {isSaving ? 'Saving…' : 'Save'}
         </button>
-        <button type="button" onClick={onSaveAs} disabled={isSaving} className={buttonClass} style={mutedStyle}>
+        <button type="button" onClick={onSaveAs} disabled={isSaving} className={buttonClass}>
           Save As…
         </button>
         {hasRecovery && (
           <button
             type="button"
             onClick={onRecover}
-            className={buttonClass}
-            style={{ color: 'var(--gx-accent)' }}
+            className={`${buttonClass} desktop-recovery-button`}
             title="Restore the locally autosaved recovery snapshot"
           >
             Recover autosave
           </button>
         )}
-        <div className="ml-auto text-xs px-3 py-2.5 whitespace-nowrap" style={mutedStyle} aria-live="polite">
+      </nav>
+      <div className="desktop-project-title" aria-live="polite">
           <span data-testid="desktop-project-name">{projectName ?? 'Unsaved project'}</span>
-          {isDirty && <span aria-label="unsaved changes"> • Unsaved changes</span>}
-        </div>
+          {isDirty && <span aria-label="unsaved changes"> — Modified</span>}
       </div>
-    </nav>
+    </header>
   );
 }

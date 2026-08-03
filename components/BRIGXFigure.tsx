@@ -19,9 +19,9 @@ function hit(start: number, end: number, identity: number, strand: '+' | '-' = '
 
 function ring(queryId: string, queryName: string, color: string, offset: number): RingData {
   const segments: AlignmentHit[] = [];
-  for (let index = 0; index < 15; index += 1) {
-    const start = 70_000 + index * 355_000 + offset;
-    const length = 180_000 + ((index * 41_000 + offset) % 120_000);
+  for (let index = 0; index < 12; index += 1) {
+    const start = 85_000 + index * 445_000 + offset;
+    const length = 235_000 + ((index * 47_000 + offset) % 135_000);
     if (start < REFERENCE_LENGTH) {
       segments.push(hit(start, Math.min(start + length, REFERENCE_LENGTH - 10_000), 73 + ((index * 7 + offset) % 27), index % 4 === 0 ? '-' : '+'));
     }
@@ -49,16 +49,12 @@ const representativeData: CircularPlotData = {
     length: REFERENCE_LENGTH,
     gcContent,
     gcSkew,
-    annotations: [
-      { id: 'stx', start: 1_315_000, end: 1_352_000, label: 'stx region', shape: 'arrow-forward', color: '#b91c1c' },
-      { id: 'lee', start: 4_610_000, end: 4_646_000, label: 'LEE', shape: 'arrow-reverse', color: '#7c3aed' },
-    ],
   },
   rings: [
-    ring('cft073', 'E. coli CFT073', '#2563eb', 0),
-    ring('uti89', 'E. coli UTI89', '#0d9488', 55_000),
-    ring('k12', 'E. coli K-12 MG1655', '#d97706', 105_000),
-    ring('hs', 'E. coli HS', '#7c3aed', 150_000),
+    ring('cft073', 'E. coli CFT073', '#315c83', 0),
+    ring('uti89', 'E. coli UTI89', '#2e8585', 55_000),
+    ring('k12', 'E. coli K-12 MG1655', '#b86b29', 105_000),
+    ring('hs', 'E. coli HS', '#76579b', 150_000),
   ],
   config: { minIdentity: 70, minAlignmentLength: 100 },
 };
@@ -70,33 +66,54 @@ export default function BRIGXFigure() {
     const container = figureRef.current;
     if (!container) return;
     const renderer = new CircularPlotRenderer({
-      width: 1000,
-      height: 1000,
-      innerRadius: 185,
-      ringWidth: 34,
-      gcRingWidth: 32,
-      ringSpacing: 5,
+      width: 720,
+      height: 720,
+      innerRadius: 155,
+      ringWidth: 23,
+      gcRingWidth: 18,
+      ringSpacing: 3,
       minIdentity: 70,
       maxIdentity: 100,
-      legendFontSize: 15,
-      scaleFontSize: 11,
-      titleFontSize: 23,
-      labelFontSize: 12,
-      title: 'Representative BRIGX comparison',
-      showLegend: true,
+      legendFontSize: 12,
+      scaleFontSize: 9,
+      titleFontSize: 18,
+      labelFontSize: 10,
+      title: '',
+      showLegend: false,
     });
     renderer.render(container, representativeData);
   }, []);
 
   return (
     <figure className="product-figure">
-      <div
-        ref={figureRef}
-        className="product-figure-canvas"
-        role="img"
-        aria-label="Representative circular comparison rendered by the first-party BRIGX renderer"
-      />
-      <figcaption>Representative output rendered in-page by BRIGX’s first-party circular renderer.</figcaption>
+      <header className="product-figure-header">
+        <div>
+          <span>Comparative map</span>
+          <strong>E. coli O157:H7 Sakai</strong>
+        </div>
+        <span className="product-figure-reference">5.50 Mb reference</span>
+      </header>
+      <div className="product-figure-body">
+        <div
+          ref={figureRef}
+          className="product-figure-canvas"
+          role="img"
+          aria-label="Representative circular comparison of E. coli genomes rendered by BRIGX"
+        />
+        <div className="product-figure-key" aria-label="Comparison rings">
+          {representativeData.rings.map((comparisonRing, index) => (
+            <div key={comparisonRing.queryId}>
+              <span className="product-figure-key-index">{String(index + 1).padStart(2, '0')}</span>
+              <span className="product-figure-key-swatch" style={{ backgroundColor: comparisonRing.color }} aria-hidden="true" />
+              <span>{comparisonRing.queryName}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <figcaption>
+        <span>Representative comparison</span>
+        <span>Rendered live by BRIGX</span>
+      </figcaption>
     </figure>
   );
 }

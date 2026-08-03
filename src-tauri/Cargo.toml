@@ -1,0 +1,48 @@
+[package]
+name = "brigx"
+version = "0.6.30"
+description = "Free, offline circular comparative genome visualisation"
+authors = ["Nabil-Fareed Alikhan"]
+edition = "2024"
+license = "GPL-3.0-only"
+homepage = "https://brigx.genomicx.org"
+repository = "https://github.com/happykhan/brigx"
+publish = false
+
+[lib]
+name = "brigx_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+atomic-write-file = "0.3.0"
+mime_guess = "2.0.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.11.0"
+tauri = { version = "2.11.5", features = [] }
+tauri-plugin-dialog = "2.7.2"
+tauri-plugin-opener = "2.5.4"
+tauri-plugin-single-instance = "2.4.3"
+time = { version = "0.3.55", features = ["formatting"] }
+url = "2.5"
+uuid = { version = "1.24.0", features = ["v4"] }
+
+tauri-plugin-wdio = { version = "1.2.0", optional = true }
+tauri-plugin-wdio-webdriver = { version = "1.2.0", optional = true }
+
+[dev-dependencies]
+tempfile = "3.23"
+
+[features]
+default = []
+e2e = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"]
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

@@ -29,7 +29,7 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Install npm dependencies
-        run: npm install
+        run: npm ci
 
       - name: Type-check
         run: pixi run npx tsc --noEmit
@@ -43,7 +43,7 @@ jobs:
       - name: Licence policy
         run: pixi run npm run quality:licenses
 
-      - name: Production dependency audit
+      - name: Runtime and build dependency audit
         run: pixi run npm run quality:security
 
       - name: Unit tests
@@ -64,7 +64,7 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Install npm dependencies
-        run: npm install
+        run: npm ci
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium

@@ -8,6 +8,7 @@ const notices = await readFile(path.join(root, 'THIRD_PARTY_NOTICES.md'), 'utf8'
 
 const expectedLicences = new Map([
   ['@genomicx/ui', new Set(['GPL-3.0', 'GPL-3.0-only'])],
+  ['@tauri-apps/api', new Set(['Apache-2.0 OR MIT', 'MIT OR Apache-2.0'])],
   ['pako', new Set(['(MIT AND Zlib)', 'MIT', 'Zlib'])],
   ['react', new Set(['MIT'])],
   ['react-dom', new Set(['MIT'])],
@@ -15,7 +16,12 @@ const expectedLicences = new Map([
   ['react-router-dom', new Set(['MIT'])],
 ]);
 
-const prohibitedPackages = ['@handsontable/react', 'handsontable'];
+const prohibitedPackages = [
+  '@handsontable/react',
+  'handsontable',
+  '@sciguy/cgview-js',
+  'cgview-js',
+];
 const runtimeDependencies = Object.keys(packageJson.dependencies || {});
 const failures = [];
 
@@ -55,7 +61,10 @@ for (const sourcePath of sourcePaths) {
 
 for (const filename of sourceFiles) {
   const source = await readFile(filename, 'utf8');
-  if (/non-commercial-and-evaluation|from\s+['"](?:@handsontable\/react|handsontable)/i.test(source)) {
+  if (
+    /non-commercial-and-evaluation|from\s+['"](?:@handsontable\/react|handsontable)/i.test(source)
+    || /(?:from\s+|import\()['"][^'"]*cgview/i.test(source)
+  ) {
     failures.push(`${path.relative(root, filename)} contains a prohibited non-commercial dependency reference`);
   }
 }
@@ -65,7 +74,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Licence policy passed for ${runtimeDependencies.length} runtime packages.`);
+console.log(`Licence policy passed for ${runtimeDependencies.length} JavaScript runtime packages.`);
 
 async function collectSourceFiles(directory, output) {
   const { readdir } = await import('node:fs/promises');

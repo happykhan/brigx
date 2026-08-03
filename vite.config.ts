@@ -26,8 +26,12 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
+    // Several integration tests intentionally parse 5-6 Mbp real genome
+    // fixtures. Leave enough headroom when CI runs those files in parallel.
+    testTimeout: 15_000,
+    hookTimeout: 30_000,
     include: ['**/__tests__/**/*.{ts,tsx}', '**/*.{spec,test}.{ts,tsx}'],
-    exclude: ['**/node_modules/**', '**/tests/e2e/**'],
+    exclude: ['**/node_modules/**', '**/tests/e2e/**', '**/tests/tauri/**'],
     alias: {
       '@': resolve(__dirname, '.'),
     },

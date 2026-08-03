@@ -12,6 +12,7 @@ import {
 import { parseAnnotationFile, exportAnnotationsToTSV } from '@/lib/annotationParser';
 import { readFileText } from '@/lib/fileAccess';
 import { extractGenBankFeatures, extractGFF3Features } from '@/lib/featureParser';
+import { saveBlob } from '@/lib/download';
 
 interface AnnotationEditorProps {
   ringId: string;
@@ -175,16 +176,16 @@ export default function AnnotationEditor({
     onClose();
   };
 
-  const handleExport = () => {
-    const tsv = exportAnnotationsToTSV(currentAnnotations());
-    const blob = new Blob([tsv], { type: 'text/tab-separated-values' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${ringName.replace(/\s+/g, '_')}_annotations.tsv`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    toast.success('Exported annotations');
+  const handleExport = async () => {
+    try {
+      const tsv = exportAnnotationsToTSV(currentAnnotations());
+      const blob = new Blob([tsv], { type: 'text/tab-separated-values' });
+      if (await saveBlob(blob, `${ringName.replace(/\s+/g, '_')}_annotations.tsv`)) {
+        toast.success('Exported annotations');
+      }
+    } catch (error) {
+      toast.error(`Could not export annotations: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
 
   const handleFeatureImport = async (event: React.ChangeEvent<HTMLInputElement>) => {

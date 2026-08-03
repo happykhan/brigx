@@ -17,8 +17,11 @@ export default tseslint.config(
       "__tests__/**",
       "node_modules/**",
       "dist/**",
+      "desktop-dist/**",
+      "src-tauri/target/**",
       ".next/**",
       "out/**",
+      ".desktop-artifacts/**",
       ".pixi/**",
       "public/wasm/**",
       "jest.config.js",
@@ -28,4 +31,3 @@ export default tseslint.config(
     ],
   }
 );
-

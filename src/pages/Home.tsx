@@ -1,5 +1,5 @@
 
-import { lazy, Suspense, useState as useReactState, useCallback, useMemo } from 'react';
+import { lazy, Suspense, useState as useReactState, useCallback, useEffect, useMemo } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { NavBar, AppFooter, LogConsole } from '@genomicx/ui';
 import CircularPlot from '@/components/CircularPlot';
@@ -10,6 +10,7 @@ import RingsPanel from '@/components/RingsPanel';
 import ControlPanel from '@/components/ControlPanel';
 import StatisticsPanel from '@/components/StatisticsPanel';
 import ImagePropertiesPanel from '@/components/ImagePropertiesPanel';
+import DesktopProjectBar from '@/components/DesktopProjectBar';
 import { useBRIGController } from '@/hooks/useBRIGController';
 import { APP_VERSION } from '@/lib/version';
 import type { PlotViewState } from '@/lib/types';
@@ -43,12 +44,17 @@ export default function Home() {
     handleReferenceFileChange, handleAnnotationsChange, handleOpenAnnotationEditor,
     handleReferenceAnnotationsFileChange, handleClearReferenceAnnotations,
     handleRun, handleSaveSession, handleLoadSession,
+    isDesktop, desktopProjectName, desktopRecentProjects, desktopHasRecovery,
+    desktopSaving, desktopProjectDirty, desktopProjectRevision,
+    handleDesktopNew, handleDesktopOpen, handleDesktopOpenRecent, handleDesktopRecover,
+    handleDesktopSave, handleDesktopSaveAs,
   } = useBRIGController();
 
   const [plotViewState, setPlotViewState] = useReactState<PlotViewState | null>(null);
   const handleViewStateChange = useCallback((state: PlotViewState) => {
     setPlotViewState(previous => samePlotViewState(previous, state) ? previous : state);
   }, []);
+  useEffect(() => setPlotViewState(null), [desktopProjectRevision]);
   const displayedPlotData = useMemo(() => {
     if (!plotData) return null;
     return {
@@ -67,12 +73,26 @@ export default function Home() {
       <div className="min-h-screen flex flex-col" style={{ background: 'var(--gx-bg)' }}>
         <NavBar
           appName="BRIGX"
-          appSubtitle="Browser-based Ring Image Generator"
+          appSubtitle={isDesktop ? 'Offline Desktop Ring Image Generator' : 'Browser-based Ring Image Generator'}
           version={APP_VERSION}
         />
 
-        {/* Session sub-nav — styled like RonaQC's secondary tab strip */}
-        <nav style={{ background: 'var(--gx-bg-alt)', borderBottom: '1px solid var(--gx-border)' }}>
+        {isDesktop ? (
+          <DesktopProjectBar
+            projectName={desktopProjectName}
+            recentProjects={desktopRecentProjects}
+            hasRecovery={desktopHasRecovery}
+            isSaving={desktopSaving}
+            isDirty={desktopProjectDirty}
+            onNew={() => { void handleDesktopNew(); }}
+            onOpen={() => { void handleDesktopOpen(); }}
+            onOpenRecent={id => { void handleDesktopOpenRecent(id); }}
+            onSave={() => { void handleDesktopSave(); }}
+            onSaveAs={() => { void handleDesktopSaveAs(); }}
+            onRecover={() => { void handleDesktopRecover(); }}
+          />
+        ) : (
+          <nav style={{ background: 'var(--gx-bg-alt)', borderBottom: '1px solid var(--gx-border)' }}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex overflow-x-auto">
             <button
               type="button"
@@ -96,7 +116,8 @@ export default function Home() {
               <input type="file" accept=".json" onChange={handleLoadSession} className="hidden" />
             </label>
           </div>
-        </nav>
+          </nav>
+        )}
 
         <main className="flex-1 py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -168,7 +189,7 @@ export default function Home() {
           </div>
         </main>
 
-        <AppFooter appName="BRIGX" bugReportEmail="nabil@happykhan.com" bugReportUrl="https://github.com/happykhan/brigx/issues" bugReportItems={['A description of what happened and what you expected', 'Your input files (reference + query genomes)', 'Saved session file (use "Save Session" button)', 'Debug console output (copy from the Debug Console panel)', 'Browser name and version']} />
+        <AppFooter appName="BRIGX" bugReportEmail="nabil@happykhan.com" bugReportUrl="https://github.com/happykhan/brigx/issues" bugReportItems={['A description of what happened and what you expected', 'A minimised or synthetic reproducer, if needed — never send confidential or patient-identifiable genome data', isDesktop ? 'A saved .brigx project with only safe test data, if relevant' : 'A saved session file with only safe test data, if relevant', 'Debug console output (copy from the Debug Console panel)', isDesktop ? 'Operating system and BRIGX version' : 'Browser name and version']} />
       </div>
 
       {annotationEditorOpen && editingRingId && (

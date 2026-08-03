@@ -9,6 +9,7 @@
     "jsx": "react-jsx",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "types": ["vite/client"],
     "resolveJsonModule": true,
     "allowJs": true,
     "strict": true,

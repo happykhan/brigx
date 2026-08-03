@@ -1,4 +1,5 @@
-
+import toast from 'react-hot-toast';
+import { isDesktopApp, pickDesktopInputFiles } from '@/lib/desktopBridge';
 
 interface ReferenceInputProps {
   referenceFile: File | null;
@@ -19,23 +20,44 @@ export default function ReferenceInput({
   onReferenceAnnotationFileChange,
   onClearReferenceAnnotations,
 }: ReferenceInputProps) {
+  const desktop = isDesktopApp();
+
+  const pickDesktopReference = () => {
+    void pickDesktopInputFiles('reference').then(files => {
+      if (files[0]) onFileChange(files[0]);
+    }).catch(error => {
+      toast.error(`Failed to open reference file: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  };
+
   return (
     <div className="card">
       <h2 className="section-title">Reference Genome</h2>
       <div>
         <label className="label">Reference Genome (FASTA / GenBank / GBFF)</label>
-        <input
-          type="file"
-          aria-label="Reference genome file"
-          accept=".fasta,.fa,.fna,.gbk,.gb,.gbff,.genbank,.fasta.gz,.fa.gz,.fna.gz,.gbk.gz,.gb.gz,.gbff.gz,.genbank.gz,.gz"
-          onChange={(e) => {
-            if (e.target.files && e.target.files[0]) {
-              onFileChange(e.target.files[0]);
-            }
-          }}
-          className="input-field w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:cursor-pointer"
-          style={{ fontSize: '0.8rem' }}
-        />
+        {desktop ? (
+          <button
+            type="button"
+            aria-label="Reference genome file"
+            onClick={pickDesktopReference}
+            className="btn-secondary w-full text-sm"
+          >
+            Choose reference file…
+          </button>
+        ) : (
+          <input
+            type="file"
+            aria-label="Reference genome file"
+            accept=".fasta,.fa,.fna,.gbk,.gb,.gbff,.genbank,.fasta.gz,.fa.gz,.fna.gz,.gbk.gz,.gb.gz,.gbff.gz,.genbank.gz,.gz"
+            onChange={(e) => {
+              if (e.target.files && e.target.files[0]) {
+                onFileChange(e.target.files[0]);
+              }
+            }}
+            className="input-field w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:cursor-pointer"
+            style={{ fontSize: '0.8rem' }}
+          />
+        )}
         {referenceFile && (
           <div className="mt-2 flex items-center text-sm" style={{ color: 'var(--gx-accent)' }}>
             <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">

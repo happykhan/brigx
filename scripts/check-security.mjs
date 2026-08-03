@@ -7,7 +7,7 @@ const acceptedAdvisories = new Map([
 
 let report;
 try {
-  const output = execFileSync('npm', ['audit', '--omit=dev', '--json'], { encoding: 'utf8' });
+  const output = execFileSync('npm', ['audit', '--json'], { encoding: 'utf8' });
   report = JSON.parse(output);
 } catch (error) {
   if (!error.stdout) throw error;
@@ -35,4 +35,4 @@ if (accepted.length > 0) {
   console.warn(`Accepted non-applicable advisories:\n${[...new Set(accepted)].map(item => `- ${item}`).join('\n')}`);
 }
 
-console.log('Production dependency audit passed.');
+console.log('Runtime and build dependency audit passed.');

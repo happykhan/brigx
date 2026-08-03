@@ -4,6 +4,7 @@ import { APP_VERSION } from '@/lib/version';
 
 const actions = (
   <>
+    <Link to="/" className="gx-nav-link">Home</Link>
     <Link to="/app" className="gx-nav-link">Web app</Link>
     <Link to="/download" className="gx-nav-link">Desktop</Link>
   </>
@@ -11,8 +12,9 @@ const actions = (
 
 const mobileActions = (
   <>
+    <Link to="/" className="gx-nav-dropdown-link">Home</Link>
     <Link to="/app" className="gx-nav-dropdown-link">Open web app</Link>
-    <Link to="/download" className="gx-nav-dropdown-link">Desktop downloads</Link>
+    <Link to="/download" className="gx-nav-dropdown-link">Desktop</Link>
   </>
 );
 

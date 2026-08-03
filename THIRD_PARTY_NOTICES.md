@@ -1,18 +1,18 @@
 # BRIGX third-party notices
 
-This notice covers software and data distributed with BRIGX or loaded by the production application. BRIGX itself is licensed under GPL-3.0; see `LICENSE`. JavaScript and Rust versions are locked in `package-lock.json` and `src-tauri/Cargo.lock` and checked by `npm run quality:licenses`.
+This notice covers software and data distributed with BRIGX or loaded by the production application. BRIGX itself is licensed under GPL-3.0; see `LICENSE`. Package versions are resolved from `package.json` at build time and checked by `npm run quality:licenses`.
 
 ## Bundled alignment assets
 
 ### NCBI BLAST Legacy 2.2.26
 
 - Files: `public/wasm/blast/blastall.js`, `blastall.wasm`, `formatdb.js`, and `formatdb.wasm`
-- Purpose: nucleotide database preparation and sequence alignment in the browser or desktop webview
+- Purpose: nucleotide database preparation and sequence alignment in the browser
 - Status: NCBI states that BLAST source code is in the US public domain
 - Source and terms: https://blast.ncbi.nlm.nih.gov/doc/blast-help/developerinfo.html
 - Project: https://blast.ncbi.nlm.nih.gov/Blast.cgi
 
-The JavaScript and WebAssembly files are served from the BRIGX application origin and verified at runtime using these SHA-256 values:
+The JavaScript and WebAssembly files are served from the BRIGX origin and verified at runtime using the following SHA-256 values:
 
 | File | SHA-256 |
 |---|---|
@@ -29,32 +29,18 @@ The BLAST JavaScript/WebAssembly output includes Emscripten runtime code. Emscri
 
 | Package | Purpose | Licence | Source |
 |---|---|---|---|
-| `@genomicx/ui` | Shared GenomicX interface components | GPL-3.0 | https://github.com/happykhan/genomicx-ui |
-| `@tauri-apps/api` | Typed desktop IPC and event client | MIT or Apache-2.0 | https://github.com/tauri-apps/tauri |
+| `@genomicx/ui` | Shared GenomicX user-interface components | GPL-3.0 | https://github.com/happykhan/genomicx-ui |
 | `pako` | DEFLATE/GZIP decompression | MIT and Zlib | https://github.com/nodeca/pako |
 | `react` | User-interface runtime | MIT | https://github.com/facebook/react |
-| `react-dom` | Browser/webview rendering | MIT | https://github.com/facebook/react |
+| `react-dom` | Browser rendering for React | MIT | https://github.com/facebook/react |
 | `react-hot-toast` | Status notifications | MIT | https://github.com/timolins/react-hot-toast |
 | `react-router-dom` | Client-side navigation | MIT | https://github.com/remix-run/react-router |
 
-The circular renderer and editable annotation table are original BRIGX code.
-
-## Desktop runtime
-
-The desktop edition uses Tauri 2 and a Rust backend. Tauri is dual-licensed under MIT or Apache-2.0. The application links additional permissively licensed Rust crates. Each desktop package includes `THIRD_PARTY_LICENSES.html`, generated from the locked production graph with cargo-about, containing crate names, versions, source links, and full applicable licence texts.
-
-| Component | Purpose | Licence or terms | Source |
-|---|---|---|---|
-| Tauri | Native application and IPC runtime | MIT or Apache-2.0 | https://github.com/tauri-apps/tauri#license |
-| WKWebView | macOS system webview; not bundled by BRIGX | Apple operating-system component | https://developer.apple.com/documentation/webkit/wkwebview |
-| Microsoft Edge WebView2 | Windows system webview; evergreen runtime/bootstrapper | Microsoft terms and component notices | https://developer.microsoft.com/en-us/microsoft-edge/webview2/ |
-| WebKitGTK | Linux system webview; supplied by the distribution | LGPL-2.1-or-later and component-specific terms | https://webkitgtk.org/ |
-
-Unlike the earlier prototype, BRIGX does not ship Electron, Chromium, or Node.js inside the application. The exact system-webview version varies with the operating system and its updates.
+The production application does not include Handsontable or LAST. BRIGX's annotation editor and circular renderer are first-party code.
 
 ## Build and test tooling
 
-BRIGX is built and tested with open-source tools including Rust, cargo-about, Tauri CLI, TypeScript, Vite, Tailwind CSS, ESLint, Vitest, Testing Library, jsdom, Playwright, WebdriverIO, and the debug-only Tauri WebDriver plugins. These tools are development dependencies; WebDriver plugins and permissions are compiled only into the dedicated E2E build and are not present in release packages.
+BRIGX is built and tested with open-source tools including TypeScript, Vite, Tailwind CSS, ESLint, Vitest, Testing Library, jsdom, and Playwright. Their package manifests and licence files are installed by npm for development and CI; they are not production runtime dependencies.
 
 ## Example and test data
 
@@ -62,4 +48,4 @@ The repository contains public accessioned NCBI records and files from the origi
 
 ## Marks and attribution
 
-BLAST is a registered trademark of the US National Library of Medicine. BRIGX is not affiliated with or endorsed by NCBI, NLM, NIH, Tauri, Microsoft, Apple, WebKitGTK, or any other third-party project listed here. All names and marks remain the property of their respective owners.
+BLAST is a registered trademark of the US National Library of Medicine. BRIGX is not affiliated with or endorsed by NCBI, NLM, NIH, or any other third-party project listed here. All names and marks remain the property of their respective owners.

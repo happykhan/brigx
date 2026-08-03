@@ -1,22 +1,5 @@
 # Changelog
 
-## Unreleased corrections
-
-- Withheld unsigned macOS beta downloads after confirming that Gatekeeper rejects the browser-downloaded app bundle as damaged; signed and notarised packages are required before macOS distribution resumes.
-- Reworked the landing page for mobile readability and removed implementation provenance commentary from product-facing copy.
-
-## 0.7.0 — Product website and desktop beta
-
-- Replaced the application-at-root experience with a dedicated BRIGX product website and clear web/desktop paths.
-- Moved the browser workbench to `/app` and added a versioned desktop download and installation page at `/download`.
-- Added a real representative comparison rendered by BRIGX's first-party circular renderer to the landing page.
-- Reworked the About page as the authoritative privacy, licence, citation, provenance, and third-party record.
-- Separated browser and desktop shells while preserving one renderer and integrity-checked BLAST WebAssembly pipeline.
-- Removed website navigation and the website footer from Tauri; added a compact project toolbar, full-height scientific workspace, desktop status bar, and Beta-aware project window title.
-- Added an unsigned `desktop-beta-v*` GitHub prerelease channel with six platform packages, checksums, provenance attestations, and installation warnings.
-- Retained signing requirements for stable `v*` releases and removed untested automatic post-merge version bumps.
-- Added a committed visual contract, route/browser coverage, responsive/mobile comparison rendering, and desktop shell assertions.
-
 All notable changes to BRIGx will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -24,11 +7,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### Added
-- Free, small offline Tauri desktop edition for macOS, Windows, and Linux using each operating system's webview.
-- Versioned `.brigx` projects with source-path hashing, recent projects, native save dialogs, autosave recovery, and an unsaved-changes close guard.
-- Least-privilege Tauri command/capability boundary, opaque file tokens, binary IPC, denied navigation, platform icons, packaging matrix, checksums, and tagged-build provenance.
-- Desktop end-to-end coverage for the real BLAST workflow, project round-trip, recovery, native export, renderer isolation, and direct-plugin denial.
-- Locked Rust dependency policy and bundled full licence texts generated with cargo-about.
 - Bakta `.gbff` and GFF3 feature import support.
 - Reference GenBank CDS annotations in both the canvas preview and SVG export.
 - A plot centre control and correctly scaled legend dragging.
@@ -39,11 +17,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Regression coverage for GFF3, file access, editable SVG output, and annotation editing/paste/deletion.
 
 ### Changed
-- Replaced the Electron prototype with Tauri while retaining the browser WebAssembly BLAST engine and `.brigx` schema.
-- JavaScript `unsafe-eval` is no longer required; integrity-checked BLAST loaders use verified in-memory modules while CSP grants only WebAssembly compilation.
-- All exports use native save dialogs in the desktop edition and ordinary downloads on the web.
-- CI installs the committed npm lockfile with `npm ci` and audits runtime plus build dependencies.
-- Bug-report guidance now requests only minimised, synthetic, or public test data and warns against sharing sensitive genome data.
 - Settings and output panels now remain usable together on laptop screens.
 - Annotation editing now preserves manual edits and spreadsheet paste, with reliable row deletion and reset.
 - SVG and PNG exports preserve the preview zoom, pan, and dragged legend positions.
@@ -52,7 +25,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Production DOMPurify is pinned to the patched release.
 
 ### Removed
-- Cloud storage, payments, licence keys, analytics, and telemetry from the product plan; BRIGX remains entirely free and local-first.
 - `@biowasm/aioli` dependency — unused since BRIGx ships its own custom WASM build.
 
 ### Moved

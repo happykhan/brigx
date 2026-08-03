@@ -4,7 +4,6 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import type { CircularPlotData, PlotViewState } from '@/lib/types';
 import { CircularPlotRenderer } from '@/lib/renderer';
-import { saveBlob } from '@/lib/download';
 import type { ImagePropertiesConfig } from './ImageProperties';
 
 interface ExportPanelProps {
@@ -51,6 +50,18 @@ function renderPlotSVG(
   }
 }
 
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Revoking synchronously can cancel downloads in Safari and embedded browsers.
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(blob => {
@@ -62,17 +73,11 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
 
 export default function ExportPanel({ plotData, imageProperties, viewState }: ExportPanelProps) {
   const [isExporting, setIsExporting] = useState(false);
-  const exportSVG = async () => {
-    try {
-      const svgString = renderPlotSVG(plotData, imageProperties, viewState);
-      const blob = new Blob([svgString], { type: 'image/svg+xml' });
-      if (await saveBlob(blob, `brig-plot-${Date.now()}.svg`)) {
-        toast.success('SVG exported successfully!');
-      }
-    } catch (error) {
-      console.error('SVG export error:', error);
-      toast.error('Failed to export SVG');
-    }
+  const exportSVG = () => {
+    const svgString = renderPlotSVG(plotData, imageProperties, viewState);
+    const blob = new Blob([svgString], { type: 'image/svg+xml' });
+    downloadBlob(blob, `brig-plot-${Date.now()}.svg`);
+    toast.success('SVG exported successfully!');
   };
 
   const exportPNG = async () => {
@@ -113,9 +118,8 @@ export default function ExportPanel({ plotData, imageProperties, viewState }: Ex
       });
 
       const pngBlob = await canvasToBlob(canvas, 'image/png');
-      if (await saveBlob(pngBlob, `brig-plot-${Date.now()}.png`)) {
-        toast.success('PNG exported successfully!');
-      }
+      downloadBlob(pngBlob, `brig-plot-${Date.now()}.png`);
+      toast.success('PNG exported successfully!');
     } catch (error) {
       console.error('PNG export error:', error);
       toast.error('Failed to export PNG');
@@ -124,17 +128,11 @@ export default function ExportPanel({ plotData, imageProperties, viewState }: Ex
     }
   };
 
-  const exportJSON = async () => {
-    try {
-      const json = JSON.stringify(plotData, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      if (await saveBlob(blob, `brig-data-${Date.now()}.json`)) {
-        toast.success('Data exported successfully!');
-      }
-    } catch (error) {
-      console.error('Data export error:', error);
-      toast.error('Failed to export data');
-    }
+  const exportJSON = () => {
+    const json = JSON.stringify(plotData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    downloadBlob(blob, `brig-data-${Date.now()}.json`);
+    toast.success('Data exported successfully!');
   };
 
   return (

@@ -1,10 +1,10 @@
 
-import { lazy, Suspense, useState as useReactState, useCallback, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useState as useReactState, useCallback, useMemo } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { LogConsole } from '@genomicx/ui';
 import BrowserSessionBar from '@/components/BrowserSessionBar';
+import BugReportModal from '@/components/BugReportModal';
 import CircularPlot from '@/components/CircularPlot';
-import DesktopStatusBar from '@/components/DesktopStatusBar';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ExportPanel from '@/components/ExportPanel';
 import ReferenceInput from '@/components/ReferenceInput';
@@ -12,7 +12,6 @@ import RingsPanel from '@/components/RingsPanel';
 import ControlPanel from '@/components/ControlPanel';
 import StatisticsPanel from '@/components/StatisticsPanel';
 import ImagePropertiesPanel from '@/components/ImagePropertiesPanel';
-import DesktopProjectBar from '@/components/DesktopProjectBar';
 import ProductFooter from '@/components/ProductFooter';
 import ProductNav from '@/components/ProductNav';
 import { useBRIGController } from '@/hooks/useBRIGController';
@@ -47,17 +46,13 @@ export default function Home() {
     handleReferenceFileChange, handleAnnotationsChange, handleOpenAnnotationEditor,
     handleReferenceAnnotationsFileChange, handleClearReferenceAnnotations,
     handleRun, handleSaveSession, handleLoadSession,
-    isDesktop, desktopProjectName, desktopRecentProjects, desktopHasRecovery,
-    desktopSaving, desktopProjectDirty, desktopProjectRevision,
-    handleDesktopNew, handleDesktopOpen, handleDesktopOpenRecent, handleDesktopRecover,
-    handleDesktopSave, handleDesktopSaveAs,
   } = useBRIGController();
 
   const [plotViewState, setPlotViewState] = useReactState<PlotViewState | null>(null);
+  const [bugReportOpen, setBugReportOpen] = useReactState(false);
   const handleViewStateChange = useCallback((state: PlotViewState) => {
     setPlotViewState(previous => samePlotViewState(previous, state) ? previous : state);
   }, []);
-  useEffect(() => setPlotViewState(null), [desktopProjectRevision]);
   const displayedPlotData = useMemo(() => {
     if (!plotData) return null;
     return {
@@ -73,30 +68,17 @@ export default function Home() {
   return (
     <>
       <Toaster position="bottom-right" toastOptions={{ style: { background: 'var(--gx-bg-alt)', color: 'var(--gx-text)', border: '1px solid var(--gx-border)' }, success: { duration: 3000, iconTheme: { primary: '#14B8A6', secondary: '#fff' } }, error: { duration: 6000, iconTheme: { primary: '#ef4444', secondary: '#fff' } } }} />
-      <div className={isDesktop ? 'desktop-shell' : 'browser-app-shell'}>
-        {!isDesktop && <ProductNav />}
+      <div className="browser-app-shell">
+        <ProductNav />
+        <BrowserSessionBar
+          onSave={handleSaveSession}
+          onLoad={handleLoadSession}
+          onReportBug={() => setBugReportOpen(true)}
+        />
 
-        {isDesktop ? (
-          <DesktopProjectBar
-            projectName={desktopProjectName}
-            recentProjects={desktopRecentProjects}
-            hasRecovery={desktopHasRecovery}
-            isSaving={desktopSaving}
-            isDirty={desktopProjectDirty}
-            onNew={() => { void handleDesktopNew(); }}
-            onOpen={() => { void handleDesktopOpen(); }}
-            onOpenRecent={id => { void handleDesktopOpenRecent(id); }}
-            onSave={() => { void handleDesktopSave(); }}
-            onSaveAs={() => { void handleDesktopSaveAs(); }}
-            onRecover={() => { void handleDesktopRecover(); }}
-          />
-        ) : (
-          <BrowserSessionBar onSave={handleSaveSession} onLoad={handleLoadSession} />
-        )}
-
-        <main className={isDesktop ? 'desktop-workspace' : 'browser-workspace'}>
-          <div className={isDesktop ? 'desktop-workspace-grid' : 'product-width browser-workspace-grid'}>
-              <div className={isDesktop ? 'desktop-inspector' : 'browser-inspector'}>
+        <main className="browser-workspace">
+          <div className="product-width browser-workspace-grid">
+              <div className="browser-inspector">
                 <ReferenceInput
                   referenceFile={referenceFile}
                   onFileChange={handleReferenceFileChange}
@@ -111,7 +93,7 @@ export default function Home() {
               </div>
 
               <div
-                className={isDesktop ? 'desktop-plot-pane' : 'browser-plot-pane'}
+                className="browser-plot-pane"
                 style={plotExpanded ? { zIndex: 10_000 } : undefined}
               >
                 <ImagePropertiesPanel imageProperties={imageProperties} onChange={setImageProperties} />
@@ -162,15 +144,7 @@ export default function Home() {
           </div>
         </main>
 
-        {isDesktop ? (
-          <DesktopStatusBar
-            progress={progress}
-            isProcessing={isProcessing}
-            referenceName={referenceFile?.name ?? null}
-            ringCount={rings.length}
-            isDirty={desktopProjectDirty}
-          />
-        ) : <ProductFooter />}
+        <ProductFooter />
       </div>
 
       {annotationEditorOpen && editingRingId && (
@@ -189,6 +163,13 @@ export default function Home() {
             onClose={() => { setAnnotationEditorOpen(false); setEditingRingId(null); }}
           />
         </Suspense>
+      )}
+
+      {bugReportOpen && (
+        <BugReportModal
+          debugOutput={consoleLogs.join('\n')}
+          onClose={() => setBugReportOpen(false)}
+        />
       )}
     </>
   );

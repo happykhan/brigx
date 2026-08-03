@@ -8,26 +8,32 @@ const QUERY = path.join(FIXTURES, 'query.fa')
 const BAKTA_GFF3 = path.join(FIXTURES, 'bakta.gff3')
 
 test.describe('BRIGX e2e — circular genome plot', () => {
-  test('landing page explains the product and offers web and desktop editions', async ({ page }) => {
+  test('landing page explains the web product', async ({ page }) => {
     await page.goto('/')
 
-    await expect(page.getByRole('heading', { name: 'Circular genome comparison without uploading your data.' })).toBeVisible()
-    await expect(page.getByRole('img', { name: /representative circular comparison/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Circular genome comparison for microbial genomics' })).toBeVisible()
+    await expect(page.getByRole('img', { name: /repository example data/i })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Open the web app' })).toHaveAttribute('href', '/app')
-    await expect(page.getByRole('link', { name: 'Get the desktop beta' })).toHaveAttribute('href', '/download')
-    await expect(page.getByRole('heading', { name: 'One scientific engine. Two ways to work.' })).toBeVisible()
-    await expect(page.getByText(/editable annotation table are original BRIGX implementations/)).toBeVisible()
+    await expect(page.getByText('Repository example data')).toBeVisible()
+    await expect(page.getByText(/All processing runs locally in your browser/)).toBeVisible()
   })
 
   test('landing page uses the dedicated mobile composition without horizontal overflow', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
 
-    await expect(page.getByRole('heading', { name: 'Web edition' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Desktop beta' })).toBeVisible()
-    await expect(page.locator('.product-table-wrap')).toBeHidden()
+    await expect(page.getByRole('heading', { name: 'Circular genome comparison for microbial genomics' })).toBeVisible()
     await expect(page.locator('.gx-nav-logo-sub')).toBeHidden()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  })
+
+  test('opens a published comparison as an interactive read-only viewer', async ({ page }) => {
+    await page.goto('/publication/ecoli-comparison')
+
+    await expect(page.getByRole('heading', { name: 'E. coli genome comparison' })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Read-only interactive genome comparison' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Zoom in (or scroll up)' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Reference Genome' })).toHaveCount(0)
   })
 
   test('loads the app with Reference Genome section visible', async ({ page }) => {
@@ -35,6 +41,18 @@ test.describe('BRIGX e2e — circular genome plot', () => {
 
     await expect(page.getByRole('heading', { name: 'Reference Genome' })).toBeVisible()
     await expect(page.getByText('Load a reference genome to begin')).toBeVisible()
+  })
+
+  test('shows bug reporting only inside the web app', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByRole('button', { name: 'Report a bug' })).toHaveCount(0)
+
+    await page.goto('/app')
+    await page.getByRole('button', { name: 'Report a bug' }).click()
+    await expect(page.getByRole('dialog', { name: 'Report a bug' })).toBeVisible()
+    await expect(page.getByLabel('What happened?')).toBeVisible()
+    await expect(page.getByLabel(/Email address/)).toBeVisible()
+    await expect(page.getByText(/Do not include confidential/)).toBeVisible()
   })
 
   test('uploading a reference FASTA shows the filename', async ({ page }) => {
@@ -107,22 +125,21 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await page.goto('/about')
 
     await expect(page.getByRole('heading', { name: 'About BRIGX' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Data handling and privacy' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Third-party software' })).toBeVisible()
+    await expect(page.getByText(/Genome and annotation files are processed locally/)).toBeVisible()
     await expect(page.getByRole('link', { name: 'GNU General Public License v3.0' })).toHaveAttribute('href', /LICENSE$/)
     await expect(page.getByRole('link', { name: 'complete third-party notice' })).toHaveAttribute('href', /THIRD_PARTY_NOTICES\.md$/)
     await expect(page.getByText(/editable annotation table are original BRIGX implementations/)).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'GenomicX UI' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Example data' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Attribution and trademarks' })).toHaveCount(0)
   })
 
-  test('download page identifies the unsigned beta before offering packages', async ({ page }) => {
+  test('desktop page is limited to a coming-soon notice', async ({ page }) => {
     await page.goto('/download')
 
-    await expect(page.getByRole('heading', { name: 'BRIGX Desktop Beta' })).toBeVisible()
-    await expect(page.getByText('Unsigned community build.')).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Installation notes' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Download' })).toHaveCount(2)
-    await expect(page.getByText(/macOS downloads are paused/)).toBeVisible()
-    await expect(page.getByText(/Microsoft Defender SmartScreen/)).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Coming soon' })).toBeVisible()
+    await expect(page.getByText(/applications need to be signed before we can distribute them properly/)).toBeVisible()
+    await expect(page.getByText(/Apple charges US\$99 a year/)).toBeVisible()
   })
 
   test('runs an alignment with the bundled integrity-checked BLAST assets', async ({ page }) => {

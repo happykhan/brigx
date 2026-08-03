@@ -68,24 +68,9 @@ async function loadModuleFactory(name: BlastAssetName): Promise<{ factory: Blast
   ]);
 
   const moduleText = new TextDecoder().decode(moduleBinary);
-  const moduleUrl = URL.createObjectURL(new Blob([
-    moduleText,
-    '\nexport default Module;\n',
-  ], { type: 'text/javascript' }));
-  try {
-    // The Blob contains only the exact bytes verified above plus a fixed export.
-    const namespace: unknown = await import(/* @vite-ignore */ moduleUrl);
-    if (!isModuleNamespace(namespace) || typeof namespace.default !== 'function') {
-      throw new Error(`${name}.js did not provide an Emscripten module factory`);
-    }
-    return { factory: namespace.default as BlastModuleFactory, wasmBinary };
-  } finally {
-    URL.revokeObjectURL(moduleUrl);
-  }
-}
-
-function isModuleNamespace(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  const moduleWrapper = new Function('Module', moduleText + '; return Module;');
+  const factory = moduleWrapper({}) as BlastModuleFactory;
+  return { factory, wasmBinary };
 }
 
 async function initializeBlast() {

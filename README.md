@@ -1,8 +1,8 @@
 # BRIGx
 
-A free, local-first circular genome comparison tool for the web and desktop — the successor to [BRIG](https://pmc.ncbi.nlm.nih.gov/articles/PMC3163573/) (BLAST Ring Image Generator).
+A browser-based circular genome comparison tool — the successor to [BRIG](https://pmc.ncbi.nlm.nih.gov/articles/PMC3163573/) (BLAST Ring Image Generator), rebuilt for the modern web.
 
-Product site at [brigx.genomicx.org](https://brigx.genomicx.org) · [Open the web application](https://brigx.genomicx.org/app) · Part of the [GenomicX](https://genomicx.org) ecosystem.
+Live at [brigx.genomicx.org](https://brigx.genomicx.org) · Part of the [GenomicX](https://genomicx.org) ecosystem.
 
 ## Features
 
@@ -14,44 +14,27 @@ Product site at [brigx.genomicx.org](https://brigx.genomicx.org) · [Open the we
 - **Multi-FASTA references** with configurable spacers and contig boundary visualisation
 - **Interactive** zoom, pan, and fullscreen
 - **Export** as SVG (publication quality), PNG, or JSON session
-- **Privacy first** — analysis data stays on your device; nothing is uploaded
-- **Offline desktop edition** with native projects, recovery, and exports; public beta downloads currently cover Windows and Linux
+- **Privacy first** — all data stays in your browser; nothing is uploaded
 
 ## Quick start
 
 BRIGX requires Node.js 24 LTS for development and release builds.
 
 ```bash
-npm ci
-npm run dev      # http://localhost:5173
-npm test         # Unit and domain tests (Vitest)
+npm install
+npm run dev      # http://localhost:3000
+npm test         # 157 tests (Vitest)
 npm run build    # Production build
 npm run verify   # Full release verification, including Chromium workflows
 ```
 
-## Desktop edition
-
-The small Tauri desktop shell runs the same integrity-checked BLAST WebAssembly pipeline as the web application. It uses the operating system's webview instead of bundling a browser engine, and does not add accounts, payments, telemetry, cloud storage, or a separate native analysis engine.
-
-```bash
-npm run desktop:dev       # Desktop shell with Vite hot reload
-npm run desktop:test      # Real Tauri workflow and security-boundary tests
-npm run desktop:package   # Optimised current-platform executable
-npm run desktop:make      # Current-platform installer/package
-```
-
-Desktop `.brigx` projects save settings, annotations, completed plot data, source-file paths, and source-file hashes. They do not duplicate genome contents, so referenced input files must remain available. See [the desktop build and release guide](DESKTOP.md).
-
-Public desktop builds use an explicitly labelled `desktop-beta-v*` GitHub prerelease channel. Windows builds remain unsigned and disclose the expected SmartScreen warning. macOS packages are built and tested but withheld from public downloads until Developer ID signing and Apple notarisation are configured.
-
 ## How it works
 
-BRIGX runs locally in the browser or desktop shell. Versioned BLAST binaries are compiled to WebAssembly, served from the BRIGX application origin, and verified with SHA-256 before execution. Alignments run inside Web Workers so the UI stays responsive. Genome and annotation file contents are not uploaded to an analysis server.
+BRIGx runs entirely in the browser. Versioned BLAST binaries are compiled to WebAssembly, served from the BRIGX origin, and verified with SHA-256 before execution. Alignments run inside Web Workers so the UI stays responsive. Genome and annotation file contents are not uploaded to an analysis server.
 
 ## Tech stack
 
 - Vite + React + TypeScript
-- Tauri 2 + Rust with the operating system webview
 - BLAST 2.2.26 compiled to WebAssembly (Emscripten)
 - Web Workers for parallel alignment
 - [@genomicx/ui](https://github.com/happykhan/genomicx-ui) shared components (NavBar, AppFooter, LogConsole, ThemeToggle)

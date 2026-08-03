@@ -71,8 +71,9 @@ The Desktop GitHub Actions workflow:
 4. requires and uses code-signing credentials for stable macOS and Windows releases;
 5. validates that the tag and application versions agree;
 6. records build-provenance attestations for tags;
-7. uploads packages as workflow artifacts;
-8. publishes Windows and Linux packages plus `SHA256SUMS.txt` for a `desktop-beta-v*` tag, or creates a signed draft release for a `v*` tag.
+7. requires stable macOS builds to pass strict code-signature verification, Gatekeeper assessment, and notarisation-ticket validation;
+8. uploads packages as workflow artifacts;
+9. publishes Windows and Linux packages plus `SHA256SUMS.txt` for a `desktop-beta-v*` tag, or creates a signed draft release for a `v*` tag.
 
 Versions are changed deliberately in a tested pull request with `npm version <version> --no-git-tag-version`. BRIGX does not bump to an untested version after a merge.
 

@@ -65,3 +65,4 @@ The download page must state the expected SmartScreen warning before a person do
 - the GPL source corresponding to the tag.
 
 Stable `v*` releases remain signing-gated. Unsigned beta tags use `desktop-beta-v*` and create GitHub prereleases.
+Before upload, every stable macOS build must pass strict code-signature verification, Gatekeeper assessment, and notarisation-ticket validation for both the application bundle and DMG.

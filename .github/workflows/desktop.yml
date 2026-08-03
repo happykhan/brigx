@@ -267,6 +267,26 @@ jobs:
           fi
           npm run tauri -- build "${arguments[@]}"
 
+      - name: Verify signed and notarised macOS release
+        if: startsWith(github.ref, 'refs/tags/v') && runner.os == 'macOS'
+        shell: bash
+        run: |
+          bundle_root="src-tauri/target"
+          if [[ -n '${{ matrix.target }}' ]]; then
+            bundle_root="$bundle_root/${{ matrix.target }}"
+          fi
+          bundle_root="$bundle_root/release/bundle"
+          app_path=$(find "$bundle_root/macos" -maxdepth 1 -type d -name '*.app' -print -quit)
+          dmg_path=$(find "$bundle_root/dmg" -maxdepth 1 -type f -name '*.dmg' -print -quit)
+          if [[ -z "$app_path" || -z "$dmg_path" ]]; then
+            echo 'Signed macOS app bundle or DMG was not produced.' >&2
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=4 "$app_path"
+          spctl --assess --type execute --verbose=4 "$app_path"
+          xcrun stapler validate "$app_path"
+          xcrun stapler validate "$dmg_path"
+
       - name: Remove temporary Apple signing material
         if: always() && runner.os == 'macOS'
         shell: bash

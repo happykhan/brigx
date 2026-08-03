@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased corrections
+
+- Withheld unsigned macOS beta downloads after confirming that Gatekeeper rejects the browser-downloaded app bundle as damaged; signed and notarised packages are required before macOS distribution resumes.
+- Reworked the landing page for mobile readability and removed implementation provenance commentary from product-facing copy.
+
 ## 0.7.0 — Product website and desktop beta
 
 - Replaced the application-at-root experience with a dedicated BRIGX product website and clear web/desktop paths.

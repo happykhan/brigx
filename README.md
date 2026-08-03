@@ -15,7 +15,7 @@ Product site at [brigx.genomicx.org](https://brigx.genomicx.org) · [Open the we
 - **Interactive** zoom, pan, and fullscreen
 - **Export** as SVG (publication quality), PNG, or JSON session
 - **Privacy first** — analysis data stays on your device; nothing is uploaded
-- **Offline desktop edition** for macOS, Windows, and Linux with native projects, recovery, and exports
+- **Offline desktop edition** with native projects, recovery, and exports; public beta downloads currently cover Windows and Linux
 
 ## Quick start
 
@@ -42,7 +42,7 @@ npm run desktop:make      # Current-platform installer/package
 
 Desktop `.brigx` projects save settings, annotations, completed plot data, source-file paths, and source-file hashes. They do not duplicate genome contents, so referenced input files must remain available. See [the desktop build and release guide](DESKTOP.md).
 
-Public desktop builds use an explicitly labelled, unsigned `desktop-beta-v*` GitHub prerelease channel until paid Apple notarisation and Windows publisher signing are configured. The website and release notes explain the expected Gatekeeper and SmartScreen warnings before download.
+Public desktop builds use an explicitly labelled `desktop-beta-v*` GitHub prerelease channel. Windows builds remain unsigned and disclose the expected SmartScreen warning. macOS packages are built and tested but withheld from public downloads until Developer ID signing and Apple notarisation are configured.
 
 ## How it works
 

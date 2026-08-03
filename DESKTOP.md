@@ -59,7 +59,7 @@ npm run licences:rust:generate
 npm run quality:licenses
 ```
 
-The About page links the main runtime projects and licences. BRIGX does not embed CGView.js or copy its source; the circular renderer and annotation table are first-party implementations.
+The About page links the main runtime projects and licences. The circular renderer and annotation table are original BRIGX implementations.
 
 ## Release workflow
 
@@ -71,8 +71,9 @@ The Desktop GitHub Actions workflow:
 4. requires and uses code-signing credentials for stable macOS and Windows releases;
 5. validates that the tag and application versions agree;
 6. records build-provenance attestations for tags;
-7. uploads packages as workflow artifacts;
-8. publishes an unsigned GitHub prerelease and `SHA256SUMS.txt` for a `desktop-beta-v*` tag, or creates a signed draft release for a `v*` tag.
+7. requires stable macOS builds to pass strict code-signature verification, Gatekeeper assessment, and notarisation-ticket validation;
+8. uploads packages as workflow artifacts;
+9. publishes Windows and Linux packages plus `SHA256SUMS.txt` for a `desktop-beta-v*` tag, or creates a signed draft release for a `v*` tag.
 
 Versions are changed deliberately in a tested pull request with `npm version <version> --no-git-tag-version`. BRIGX does not bump to an untested version after a merge.
 
@@ -85,7 +86,7 @@ git tag desktop-beta-v0.7.0
 git push origin desktop-beta-v0.7.0
 ```
 
-The tag packages and immediately publishes a GitHub prerelease using `docs/DESKTOP_BETA_RELEASE.md`. macOS Gatekeeper and Windows SmartScreen warnings are expected and must be disclosed on both the website and release page. Linux packages distribute normally. Beta packages still receive checksums and GitHub build-provenance attestations.
+The tag packages every target for CI validation, then publishes Windows and Linux packages in a GitHub prerelease using `docs/DESKTOP_BETA_RELEASE.md`. Unsigned macOS DMGs are withheld because browser-downloaded applications can be rejected by Gatekeeper as damaged. They join the public release only after Developer ID signing and notarisation are configured. Windows SmartScreen warnings are disclosed on both the website and release page. Published beta packages receive checksums and GitHub build-provenance attestations.
 
 Before publishing any release:
 

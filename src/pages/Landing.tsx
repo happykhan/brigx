@@ -21,7 +21,7 @@ export default function LandingPage() {
             <h1 id="product-title">Circular genome comparison without uploading your data.</h1>
             <p className="product-lede">
               BRIGX turns whole-genome BLAST comparisons into precise, publication-ready circular maps.
-              Use it immediately in the browser or install the offline desktop beta.
+              Use it immediately in the browser, or install the offline desktop beta on Windows and Linux.
             </p>
             <div className="product-actions">
               <Link to="/app" className="gx-btn gx-btn-primary">Open the web app</Link>
@@ -56,7 +56,7 @@ export default function LandingPage() {
           <div className="product-section-intro">
             <p className="product-kicker">Choose your edition</p>
             <h2 id="choose-title">One scientific engine. Two ways to work.</h2>
-            <p>The browser and desktop editions use the same renderer and integrity-checked BLAST WebAssembly pipeline.</p>
+            <p>The browser and desktop editions use the same renderer and integrity-checked BLAST WebAssembly pipeline. Desktop beta downloads are currently available for Windows and Linux.</p>
           </div>
           <div className="product-table-wrap">
             <table className="product-comparison">
@@ -70,6 +70,20 @@ export default function LandingPage() {
                 <tr><th scope="row">Recommended for</th><td data-edition="Web">Most users</td><td data-edition="Desktop beta">Offline and project-based work</td></tr>
               </tbody>
             </table>
+          </div>
+          <div className="product-editions-mobile">
+            <section aria-labelledby="web-edition-title">
+              <p className="product-step-number">Recommended</p>
+              <h3 id="web-edition-title">Web edition</h3>
+              <p>Open it instantly. Analysis stays in your browser and updates arrive with the website.</p>
+              <Link to="/app" className="product-text-link">Open the web app <span aria-hidden="true">→</span></Link>
+            </section>
+            <section aria-labelledby="desktop-edition-title">
+              <p className="product-step-number">Windows · Linux</p>
+              <h3 id="desktop-edition-title">Desktop beta</h3>
+              <p>Work offline with native <code>.brigx</code> projects and recovery. Updates are manual during beta.</p>
+              <Link to="/download" className="product-text-link">Get the desktop beta <span aria-hidden="true">→</span></Link>
+            </section>
           </div>
           <div className="product-section-actions">
             <Link to="/app" className="product-text-link">Open BRIGX on the web <span aria-hidden="true">→</span></Link>
@@ -98,7 +112,7 @@ export default function LandingPage() {
           <h2 id="origin-title">A modern successor to BLAST Ring Image Generator.</h2>
           <p>
             BRIGX carries the familiar comparative-genomics workflow into a local-first web and desktop application.
-            Its circular renderer and annotation table are first-party implementations; CGView.js is neither embedded nor copied.
+            Its circular renderer and editable annotation table are original BRIGX implementations.
           </p>
           <a className="product-text-link" href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3163573/" target="_blank" rel="noopener noreferrer">
             Read the original BRIG paper <span aria-hidden="true">↗</span>

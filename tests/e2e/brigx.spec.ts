@@ -15,6 +15,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByRole('img', { name: /repository example data/i })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Open the web app' })).toHaveAttribute('href', '/app')
     await expect(page.getByText('Repository example data')).toBeVisible()
+    await expect(page.locator('footer').getByText('BRIGX', { exact: true })).toBeVisible()
     await expect(page.getByText(/All processing runs locally in your browser/)).toBeVisible()
   })
 

@@ -70,6 +70,26 @@ input:focus-visible {
   flex: 1;
 }
 
+.product-footer {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 1.25rem max(1rem, calc((100% - var(--brigx-measure)) / 2));
+  border-top: 1px solid var(--brigx-rule);
+  color: var(--gx-text);
+}
+
+.product-footer strong {
+  display: block;
+  line-height: 1.4;
+}
+
+.product-footer p {
+  margin: 0.2rem 0 0;
+  color: var(--gx-text-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
 .product-width {
   width: min(calc(100% - 2rem), var(--brigx-measure));
   margin-inline: auto;

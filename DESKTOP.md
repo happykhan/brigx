@@ -67,19 +67,34 @@ The Desktop GitHub Actions workflow:
 
 1. runs Rust tests and the real Tauri/WASM scientific workflow on Linux;
 2. builds each operating-system package from `Cargo.lock` and `package-lock.json`;
-3. requires and uses code-signing credentials for tagged macOS and Windows releases;
-4. records build-provenance attestations for tags;
-5. uploads packages as workflow artifacts;
-6. creates a draft GitHub release and `SHA256SUMS.txt` for a `v*` tag.
+3. separates unsigned `desktop-beta-v*` prereleases from signing-gated stable `v*` releases;
+4. requires and uses code-signing credentials for stable macOS and Windows releases;
+5. validates that the tag and application versions agree;
+6. records build-provenance attestations for tags;
+7. uploads packages as workflow artifacts;
+8. publishes an unsigned GitHub prerelease and `SHA256SUMS.txt` for a `desktop-beta-v*` tag, or creates a signed draft release for a `v*` tag.
 
-Before publishing a release:
+Versions are changed deliberately in a tested pull request with `npm version <version> --no-git-tag-version`. BRIGX does not bump to an untested version after a merge.
+
+### Zero-cost desktop beta
+
+The public beta channel is explicitly an unsigned community build. Create a tag matching the package version, for example:
+
+```bash
+git tag desktop-beta-v0.7.0
+git push origin desktop-beta-v0.7.0
+```
+
+The tag packages and immediately publishes a GitHub prerelease using `docs/DESKTOP_BETA_RELEASE.md`. macOS Gatekeeper and Windows SmartScreen warnings are expected and must be disclosed on both the website and release page. Linux packages distribute normally. Beta packages still receive checksums and GitHub build-provenance attestations.
+
+Before publishing any release:
 
 - verify every matrix job, package hash, and provenance attestation;
-- configure `APPLE_ID`, `APPLE_PASSWORD` (or `APPLE_APP_SPECIFIC_PASSWORD`), `APPLE_TEAM_ID`, `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, and `KEYCHAIN_PASSWORD` with a Developer ID Application certificate;
-- configure `WINDOWS_CERTIFICATE_BASE64` and `WINDOWS_CERTIFICATE_PASSWORD` with a trusted, valid Authenticode certificate containing its private key;
 - install each artifact on a clean supported system and repeat a BLAST/project/export smoke test;
 - confirm the tag identifies the exact corresponding GPL source;
 - inspect the bundled BRIGX and third-party licence files;
 - record the measured download and installed sizes in the release notes.
 
-Unsigned local packages are development artifacts only. Signing credentials are never stored in this repository. Automatic updates remain deliberately excluded until BRIGX has a stable signed release channel.
+Before publishing a stable `v*` release, additionally configure `APPLE_ID`, `APPLE_PASSWORD` (or `APPLE_APP_SPECIFIC_PASSWORD`), `APPLE_TEAM_ID`, `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, and `KEYCHAIN_PASSWORD` with a Developer ID Application certificate, plus `WINDOWS_CERTIFICATE_BASE64` and `WINDOWS_CERTIFICATE_PASSWORD` with a trusted, valid Authenticode certificate containing its private key.
+
+Signing credentials are never stored in this repository. Automatic updates remain deliberately excluded until BRIGX has a stable signed release channel.

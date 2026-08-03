@@ -65,7 +65,11 @@ describe('BRIGX Tauri desktop', () => {
     ).toBe(true);
     await expect($('h1=BRIGX')).toBeDisplayed();
     await expect($('nav[aria-label="Desktop project controls"]')).toBeDisplayed();
+    await expect($('footer[aria-label="Application status"]')).toBeDisplayed();
     await expect($('[data-testid="desktop-project-name"]')).toHaveText('Unsaved project');
+    expect((await browser.$$('.gx-nav')).length).toBe(0);
+    expect((await browser.$$('.gx-footer')).length).toBe(0);
+    expect(await browser.getTitle()).toContain('BRIGX Desktop Beta');
 
     const boundary = await browser.execute(() => ({
       apiVersion: window.brigxDesktop?.apiVersion,

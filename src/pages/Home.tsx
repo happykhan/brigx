@@ -1,8 +1,10 @@
 
 import { lazy, Suspense, useState as useReactState, useCallback, useEffect, useMemo } from 'react';
 import { Toaster } from 'react-hot-toast';
-import { NavBar, AppFooter, LogConsole } from '@genomicx/ui';
+import { LogConsole } from '@genomicx/ui';
+import BrowserSessionBar from '@/components/BrowserSessionBar';
 import CircularPlot from '@/components/CircularPlot';
+import DesktopStatusBar from '@/components/DesktopStatusBar';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ExportPanel from '@/components/ExportPanel';
 import ReferenceInput from '@/components/ReferenceInput';
@@ -11,8 +13,9 @@ import ControlPanel from '@/components/ControlPanel';
 import StatisticsPanel from '@/components/StatisticsPanel';
 import ImagePropertiesPanel from '@/components/ImagePropertiesPanel';
 import DesktopProjectBar from '@/components/DesktopProjectBar';
+import ProductFooter from '@/components/ProductFooter';
+import ProductNav from '@/components/ProductNav';
 import { useBRIGController } from '@/hooks/useBRIGController';
-import { APP_VERSION } from '@/lib/version';
 import type { PlotViewState } from '@/lib/types';
 
 const AnnotationEditor = lazy(() => import('@/components/AnnotationEditor'));
@@ -70,12 +73,8 @@ export default function Home() {
   return (
     <>
       <Toaster position="bottom-right" toastOptions={{ style: { background: 'var(--gx-bg-alt)', color: 'var(--gx-text)', border: '1px solid var(--gx-border)' }, success: { duration: 3000, iconTheme: { primary: '#14B8A6', secondary: '#fff' } }, error: { duration: 6000, iconTheme: { primary: '#ef4444', secondary: '#fff' } } }} />
-      <div className="min-h-screen flex flex-col" style={{ background: 'var(--gx-bg)' }}>
-        <NavBar
-          appName="BRIGX"
-          appSubtitle={isDesktop ? 'Offline Desktop Ring Image Generator' : 'Browser-based Ring Image Generator'}
-          version={APP_VERSION}
-        />
+      <div className={isDesktop ? 'desktop-shell' : 'browser-app-shell'}>
+        {!isDesktop && <ProductNav />}
 
         {isDesktop ? (
           <DesktopProjectBar
@@ -92,37 +91,12 @@ export default function Home() {
             onRecover={() => { void handleDesktopRecover(); }}
           />
         ) : (
-          <nav style={{ background: 'var(--gx-bg-alt)', borderBottom: '1px solid var(--gx-border)' }}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex overflow-x-auto">
-            <button
-              type="button"
-              onClick={handleSaveSession}
-              className="text-sm px-4 py-2.5 shrink-0"
-              style={{ color: 'var(--gx-text-muted)', borderBottom: '2px solid transparent' }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--gx-text)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--gx-text-muted)')}
-              title="Download the current configuration and results as a JSON file"
-            >
-              Save Session
-            </button>
-            <label
-              className="text-sm px-4 py-2.5 shrink-0 cursor-pointer"
-              style={{ color: 'var(--gx-text-muted)', borderBottom: '2px solid transparent' }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--gx-text)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--gx-text-muted)')}
-              title="Restore a previously saved session from a JSON file"
-            >
-              Load Session
-              <input type="file" accept=".json" onChange={handleLoadSession} className="hidden" />
-            </label>
-          </div>
-          </nav>
+          <BrowserSessionBar onSave={handleSaveSession} onLoad={handleLoadSession} />
         )}
 
-        <main className="flex-1 py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 lg:items-start">
-              <div className="lg:col-span-1 space-y-6 animate-fade-in lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-2">
+        <main className={isDesktop ? 'desktop-workspace' : 'browser-workspace'}>
+          <div className={isDesktop ? 'desktop-workspace-grid' : 'product-width browser-workspace-grid'}>
+              <div className={isDesktop ? 'desktop-inspector' : 'browser-inspector'}>
                 <ReferenceInput
                   referenceFile={referenceFile}
                   onFileChange={handleReferenceFileChange}
@@ -137,7 +111,7 @@ export default function Home() {
               </div>
 
               <div
-                className="lg:col-span-2 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto animate-slide-up"
+                className={isDesktop ? 'desktop-plot-pane' : 'browser-plot-pane'}
                 style={plotExpanded ? { zIndex: 10_000 } : undefined}
               >
                 <ImagePropertiesPanel imageProperties={imageProperties} onChange={setImageProperties} />
@@ -185,11 +159,18 @@ export default function Home() {
 
                 {plotData && <StatisticsPanel plotData={plotData} />}
               </div>
-            </div>
           </div>
         </main>
 
-        <AppFooter appName="BRIGX" bugReportEmail="nabil@happykhan.com" bugReportUrl="https://github.com/happykhan/brigx/issues" bugReportItems={['A description of what happened and what you expected', 'A minimised or synthetic reproducer, if needed — never send confidential or patient-identifiable genome data', isDesktop ? 'A saved .brigx project with only safe test data, if relevant' : 'A saved session file with only safe test data, if relevant', 'Debug console output (copy from the Debug Console panel)', isDesktop ? 'Operating system and BRIGX version' : 'Browser name and version']} />
+        {isDesktop ? (
+          <DesktopStatusBar
+            progress={progress}
+            isProcessing={isProcessing}
+            referenceName={referenceFile?.name ?? null}
+            ringCount={rings.length}
+            isDirty={desktopProjectDirty}
+          />
+        ) : <ProductFooter />}
       </div>
 
       {annotationEditorOpen && editingRingId && (

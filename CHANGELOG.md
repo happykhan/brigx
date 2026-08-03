@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0 — Product website and desktop beta
+
+- Replaced the application-at-root experience with a dedicated BRIGX product website and clear web/desktop paths.
+- Moved the browser workbench to `/app` and added a versioned desktop download and installation page at `/download`.
+- Added a real representative comparison rendered by BRIGX's first-party circular renderer to the landing page.
+- Reworked the About page as the authoritative privacy, licence, citation, provenance, and third-party record.
+- Separated browser and desktop shells while preserving one renderer and integrity-checked BLAST WebAssembly pipeline.
+- Removed website navigation and the website footer from Tauri; added a compact project toolbar, full-height scientific workspace, desktop status bar, and Beta-aware project window title.
+- Added an unsigned `desktop-beta-v*` GitHub prerelease channel with six platform packages, checksums, provenance attestations, and installation warnings.
+- Retained signing requirements for stable `v*` releases and removed untested automatic post-merge version bumps.
+- Added a committed visual contract, route/browser coverage, responsive/mobile comparison rendering, and desktop shell assertions.
+
 All notable changes to BRIGx will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).

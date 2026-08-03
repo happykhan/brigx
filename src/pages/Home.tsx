@@ -3,6 +3,7 @@ import { lazy, Suspense, useState as useReactState, useCallback, useMemo } from 
 import { Toaster } from 'react-hot-toast';
 import { LogConsole } from '@genomicx/ui';
 import BrowserSessionBar from '@/components/BrowserSessionBar';
+import BugReportModal from '@/components/BugReportModal';
 import CircularPlot from '@/components/CircularPlot';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ExportPanel from '@/components/ExportPanel';
@@ -48,6 +49,7 @@ export default function Home() {
   } = useBRIGController();
 
   const [plotViewState, setPlotViewState] = useReactState<PlotViewState | null>(null);
+  const [bugReportOpen, setBugReportOpen] = useReactState(false);
   const handleViewStateChange = useCallback((state: PlotViewState) => {
     setPlotViewState(previous => samePlotViewState(previous, state) ? previous : state);
   }, []);
@@ -68,7 +70,11 @@ export default function Home() {
       <Toaster position="bottom-right" toastOptions={{ style: { background: 'var(--gx-bg-alt)', color: 'var(--gx-text)', border: '1px solid var(--gx-border)' }, success: { duration: 3000, iconTheme: { primary: '#14B8A6', secondary: '#fff' } }, error: { duration: 6000, iconTheme: { primary: '#ef4444', secondary: '#fff' } } }} />
       <div className="browser-app-shell">
         <ProductNav />
-        <BrowserSessionBar onSave={handleSaveSession} onLoad={handleLoadSession} />
+        <BrowserSessionBar
+          onSave={handleSaveSession}
+          onLoad={handleLoadSession}
+          onReportBug={() => setBugReportOpen(true)}
+        />
 
         <main className="browser-workspace">
           <div className="product-width browser-workspace-grid">
@@ -157,6 +163,13 @@ export default function Home() {
             onClose={() => { setAnnotationEditorOpen(false); setEditingRingId(null); }}
           />
         </Suspense>
+      )}
+
+      {bugReportOpen && (
+        <BugReportModal
+          debugOutput={consoleLogs.join('\n')}
+          onClose={() => setBugReportOpen(false)}
+        />
       )}
     </>
   );

@@ -11,20 +11,29 @@ test.describe('BRIGX e2e — circular genome plot', () => {
   test('landing page explains the web product', async ({ page }) => {
     await page.goto('/')
 
-    await expect(page.getByRole('heading', { name: 'Circular genome comparison without uploading your data.' })).toBeVisible()
-    await expect(page.getByRole('img', { name: /representative circular comparison/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Circular genome comparison for microbial genomics' })).toBeVisible()
+    await expect(page.getByRole('img', { name: /repository example data/i })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Open the web app' })).toHaveAttribute('href', '/app')
-    await expect(page.getByRole('heading', { name: 'Open it and start comparing genomes.' })).toBeVisible()
-    await expect(page.getByText(/editable annotation table are original BRIGX implementations/)).toBeVisible()
+    await expect(page.getByText('Repository example data')).toBeVisible()
+    await expect(page.getByText(/All processing runs locally in your browser/)).toBeVisible()
   })
 
   test('landing page uses the dedicated mobile composition without horizontal overflow', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
 
-    await expect(page.getByRole('heading', { name: 'Open it and start comparing genomes.' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Circular genome comparison for microbial genomics' })).toBeVisible()
     await expect(page.locator('.gx-nav-logo-sub')).toBeHidden()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  })
+
+  test('opens a published comparison as an interactive read-only viewer', async ({ page }) => {
+    await page.goto('/publication/ecoli-comparison')
+
+    await expect(page.getByRole('heading', { name: 'E. coli genome comparison' })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Read-only interactive genome comparison' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Zoom in (or scroll up)' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Reference Genome' })).toHaveCount(0)
   })
 
   test('loads the app with Reference Genome section visible', async ({ page }) => {
@@ -32,6 +41,18 @@ test.describe('BRIGX e2e — circular genome plot', () => {
 
     await expect(page.getByRole('heading', { name: 'Reference Genome' })).toBeVisible()
     await expect(page.getByText('Load a reference genome to begin')).toBeVisible()
+  })
+
+  test('shows bug reporting only inside the web app', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByRole('button', { name: 'Report a bug' })).toHaveCount(0)
+
+    await page.goto('/app')
+    await page.getByRole('button', { name: 'Report a bug' }).click()
+    await expect(page.getByRole('dialog', { name: 'Report a bug' })).toBeVisible()
+    await expect(page.getByLabel('What happened?')).toBeVisible()
+    await expect(page.getByLabel(/Email address/)).toBeVisible()
+    await expect(page.getByText(/Do not include confidential/)).toBeVisible()
   })
 
   test('uploading a reference FASTA shows the filename', async ({ page }) => {
@@ -115,8 +136,8 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await page.goto('/download')
 
     await expect(page.getByRole('heading', { name: 'Coming soon' })).toBeVisible()
-    await expect(page.getByText(/There is no supported desktop download/)).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Open the web app' })).toHaveAttribute('href', '/app')
+    await expect(page.getByText(/distributing it properly requires paid code signing/)).toBeVisible()
+    await expect(page.getByText(/Apple charges US\$99 a year/)).toBeVisible()
   })
 
   test('runs an alignment with the bundled integrity-checked BLAST assets', async ({ page }) => {

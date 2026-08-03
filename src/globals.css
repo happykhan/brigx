@@ -99,6 +99,71 @@ input:focus-visible {
   padding-bottom: 1rem;
 }
 
+.product-lede a {
+  color: var(--gx-text);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.publication-page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: clamp(1rem, 3vw, 2.5rem);
+  background: var(--gx-bg);
+}
+
+.publication-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+  max-width: 90rem;
+  margin: 0 auto 1.5rem;
+}
+
+.publication-header h1 {
+  margin: 0.35rem 0 0;
+  color: var(--gx-text);
+  font-size: clamp(1.8rem, 4vw, 3.5rem);
+}
+
+.publication-header p {
+  margin: 0.5rem 0 0;
+  color: var(--gx-text-muted);
+}
+
+.publication-viewer {
+  height: calc(100vh - 11rem);
+  min-height: 34rem;
+  max-width: 90rem;
+  margin: 0 auto;
+  border: 1px solid var(--brigx-rule-strong);
+  background: var(--gx-surface);
+}
+
+.publication-viewer > div {
+  height: 100%;
+}
+
+.publication-message {
+  display: grid;
+  place-content: center;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .publication-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .publication-viewer {
+    height: 70vh;
+    min-height: 26rem;
+  }
+}
+
 .product-hero h1,
 .product-document h1 {
   max-width: 13ch;

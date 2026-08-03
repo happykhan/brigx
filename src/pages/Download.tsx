@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import ProductFooter from '@/components/ProductFooter';
 import ProductNav from '@/components/ProductNav';
 
@@ -11,11 +10,10 @@ export default function DownloadPage() {
           <p className="product-kicker">Desktop edition</p>
           <h1>Coming soon</h1>
           <p>
-            BRIGX is currently focused on the web application. There is no supported desktop download at this time.
+            A desktop version is possible, but distributing it properly requires paid code signing. Apple charges
+            US$99 a year, while Windows signing typically costs around US$10 a month. For now, we’re focusing on the
+            web version.
           </p>
-          <div className="product-actions">
-            <Link to="/app" className="gx-btn gx-btn-primary">Open the web app</Link>
-          </div>
         </header>
       </main>
       <ProductFooter />

@@ -1,36 +1,153 @@
-
+import { useEffect, useRef, useState } from 'react';
+import { APP_VERSION } from '@/lib/version';
 
 interface BugReportModalProps {
+  debugOutput: string;
   onClose: () => void;
 }
 
-export default function BugReportModal({ onClose }: BugReportModalProps) {
+interface TurnstileApi {
+  render: (container: HTMLElement, options: {
+    sitekey: string;
+    callback: (token: string) => void;
+    'expired-callback': () => void;
+    'error-callback': () => void;
+  }) => string;
+  remove: (widgetId: string) => void;
+}
+
+declare global {
+  interface Window {
+    turnstile?: TurnstileApi;
+  }
+}
+
+const TURNSTILE_SCRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+const TEST_SITE_KEY = '1x00000000000000000000AA';
+
+export default function BugReportModal({ debugOutput, onClose }: BugReportModalProps) {
+  const [happened, setHappened] = useState('');
+  const [expected, setExpected] = useState('');
+  const [steps, setSteps] = useState('');
+  const [email, setEmail] = useState('');
+  const [includeDebugOutput, setIncludeDebugOutput] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
+  const turnstileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const sitekey = import.meta.env.VITE_TURNSTILE_SITE_KEY || (import.meta.env.DEV ? TEST_SITE_KEY : '');
+    if (!sitekey || !turnstileRef.current) return;
+
+    let widgetId: string | null = null;
+    let cancelled = false;
+
+    const renderWidget = () => {
+      if (cancelled || !window.turnstile || !turnstileRef.current || widgetId) return;
+      widgetId = window.turnstile.render(turnstileRef.current, {
+        sitekey,
+        callback: setTurnstileToken,
+        'expired-callback': () => setTurnstileToken(''),
+        'error-callback': () => setTurnstileToken(''),
+      });
+    };
+
+    const existingScript = document.querySelector<HTMLScriptElement>(`script[src="${TURNSTILE_SCRIPT}"]`);
+    if (existingScript) {
+      if (window.turnstile) renderWidget();
+      else existingScript.addEventListener('load', renderWidget, { once: true });
+    } else {
+      const script = document.createElement('script');
+      script.src = TURNSTILE_SCRIPT;
+      script.async = true;
+      script.defer = true;
+      script.addEventListener('load', renderWidget, { once: true });
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      cancelled = true;
+      if (widgetId && window.turnstile) window.turnstile.remove(widgetId);
+    };
+  }, []);
+
+  const submitReport = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setStatus('sending');
+    setErrorMessage('');
+
+    try {
+      const response = await fetch('/api/report-bug', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          happened,
+          expected,
+          steps,
+          email,
+          debugOutput: includeDebugOutput ? debugOutput : '',
+          turnstileToken,
+          environment: {
+            appVersion: APP_VERSION,
+            page: window.location.href,
+            userAgent: navigator.userAgent,
+          },
+        }),
+      });
+
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || 'The report could not be sent.');
+      setStatus('sent');
+    } catch (error) {
+      setStatus('error');
+      setErrorMessage(error instanceof Error ? error.message : 'The report could not be sent.');
+    }
+  };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(0, 0, 0, 0.6)' }} onClick={onClose}>
-      <div className="rounded-lg max-w-md w-full p-6" style={{ background: 'var(--gx-bg-alt)' }} onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-labelledby="bug-report-title" className="rounded-lg max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto" style={{ background: 'var(--gx-bg-alt)' }} onClick={event => event.stopPropagation()}>
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold" style={{ color: 'var(--gx-text)' }}>Report a Bug</h3>
-          <button onClick={onClose} style={{ color: 'var(--gx-text-muted)' }}>&times;</button>
+          <h2 id="bug-report-title" className="text-xl font-semibold">Report a bug</h2>
+          <button type="button" onClick={onClose} aria-label="Close bug report">×</button>
         </div>
-        <div className="space-y-3 text-sm" style={{ color: 'var(--gx-text)' }}>
-          <p>To report a bug, please email the following to:</p>
-          <p className="font-mono font-bold" style={{ color: 'var(--gx-accent)' }}>
-            <a href="mailto:nabil@happykhan.com">nabil@happykhan.com</a>
-          </p>
-          <div className="space-y-2 p-3 rounded" style={{ background: 'var(--gx-surface)' }}>
-            <p className="font-semibold">Please include:</p>
-            <ol className="list-decimal pl-5 space-y-1" style={{ color: 'var(--gx-text-muted)' }}>
-              <li>A description of what happened and what you expected</li>
-              <li>Your input files (reference + query genomes)</li>
-              <li>Saved session file (use &quot;Save Session&quot; button)</li>
-              <li>Debug console output (copy from the Debug Console panel)</li>
-              <li>Browser name and version</li>
-            </ol>
+
+        {status === 'sent' ? (
+          <div>
+            <p>Thanks. Your report has been sent.</p>
+            <button type="button" className="btn-primary mt-5" onClick={onClose}>Close</button>
           </div>
-          <p className="text-xs" style={{ color: 'var(--gx-text-muted)' }}>
-            You can also open an issue on <a href="https://github.com/happykhan/brigx/issues" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gx-accent)', textDecoration: 'underline' }}>GitHub</a>.
-          </p>
-        </div>
+        ) : (
+          <form className="space-y-4" onSubmit={submitReport}>
+            <label className="block">
+              <span className="block text-sm font-medium mb-1">What happened?</span>
+              <textarea required maxLength={4000} rows={4} className="input-field w-full" value={happened} onChange={event => setHappened(event.target.value)} />
+            </label>
+            <label className="block">
+              <span className="block text-sm font-medium mb-1">What did you expect?</span>
+              <textarea required maxLength={2000} rows={3} className="input-field w-full" value={expected} onChange={event => setExpected(event.target.value)} />
+            </label>
+            <label className="block">
+              <span className="block text-sm font-medium mb-1">Steps to reproduce</span>
+              <textarea required maxLength={4000} rows={4} className="input-field w-full" value={steps} onChange={event => setSteps(event.target.value)} />
+            </label>
+            <label className="block">
+              <span className="block text-sm font-medium mb-1">Email address <span className="font-normal" style={{ color: 'var(--gx-text-muted)' }}>(optional)</span></span>
+              <input type="email" maxLength={254} className="input-field w-full" value={email} onChange={event => setEmail(event.target.value)} />
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={includeDebugOutput} onChange={event => setIncludeDebugOutput(event.target.checked)} />
+              Include the BRIGX debug output with this report
+            </label>
+            <p className="text-xs" style={{ color: 'var(--gx-text-muted)' }}>Do not include confidential, patient-identifiable, or raw sequence data.</p>
+            <div ref={turnstileRef} />
+            {status === 'error' && <p role="alert" style={{ color: 'var(--gx-error)' }}>{errorMessage}</p>}
+            <button type="submit" className="btn-primary" disabled={status === 'sending' || !turnstileToken}>
+              {status === 'sending' ? 'Sending…' : 'Send report'}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

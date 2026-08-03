@@ -1,6 +1,7 @@
 
-import { lazy, Suspense, useState as useReactState, useCallback, useMemo } from 'react';
+import { lazy, Suspense, useState as useReactState, useCallback, useEffect, useMemo, useRef } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
+import { useSearchParams } from 'react-router-dom';
 import { LogConsole } from '@genomicx/ui';
 import BrowserSessionBar from '@/components/BrowserSessionBar';
 import BugReportModal from '@/components/BugReportModal';
@@ -47,9 +48,12 @@ export default function Home() {
     ringAnnotations, referenceAnnotations, referenceAnnotationFileName, referenceLength,
     handleReferenceFileChange, handleAnnotationsChange, handleOpenAnnotationEditor,
     handleReferenceAnnotationsFileChange, handleClearReferenceAnnotations,
-    handleRun, handleSaveSession, handleLoadSession,
+    handleRun, handleSaveSession, handleLoadSession, handleLoadSessionUrl,
   } = useBRIGController();
 
+  const [searchParams] = useSearchParams();
+  const sessionUrl = searchParams.get('url');
+  const loadedSessionUrlRef = useRef<string | null>(null);
   const [plotViewState, setPlotViewState] = useReactState<PlotViewState | null>(null);
   const [bugReportOpen, setBugReportOpen] = useReactState(false);
   const handleViewStateChange = useCallback((state: PlotViewState) => {
@@ -86,6 +90,12 @@ export default function Home() {
         toast.error('Could not create the read-only preview');
       });
   }, [displayedPlotData, imageProperties]);
+
+  useEffect(() => {
+    if (!sessionUrl || loadedSessionUrlRef.current === sessionUrl) return;
+    loadedSessionUrlRef.current = sessionUrl;
+    void handleLoadSessionUrl(sessionUrl);
+  }, [handleLoadSessionUrl, sessionUrl]);
 
   return (
     <>

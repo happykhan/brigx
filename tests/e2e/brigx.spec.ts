@@ -6,6 +6,9 @@ const FIXTURES = path.join(process.cwd(), 'tests/fixtures')
 const REFERENCE = path.join(FIXTURES, 'reference.fa')
 const QUERY = path.join(FIXTURES, 'query.fa')
 const BAKTA_GFF3 = path.join(FIXTURES, 'bakta.gff3')
+const EXAMPLE_SESSION = path.join(process.cwd(), 'public/examples/ecoli-comparison.brigx-session.json')
+const GITHUB_SESSION_URL = 'https://github.com/happykhan/brigx/blob/master/public/examples/ecoli-comparison.brigx-session.json'
+const RAW_GITHUB_SESSION_URL = 'https://raw.githubusercontent.com/happykhan/brigx/master/public/examples/ecoli-comparison.brigx-session.json'
 
 test.describe('BRIGX e2e — circular genome plot', () => {
   test('landing page explains the web product', async ({ page }) => {
@@ -69,6 +72,37 @@ test.describe('BRIGX e2e — circular genome plot', () => {
 
     await expect(page.getByRole('heading', { name: 'E. coli genome comparison' })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Read-only interactive genome comparison' })).toBeVisible()
+  })
+
+  test('previews a GitHub session URL as a read-only result', async ({ page }) => {
+    await page.route(RAW_GITHUB_SESSION_URL, route => route.fulfill({
+      path: EXAMPLE_SESSION,
+      contentType: 'application/json',
+    }))
+    await page.goto(`/preview?url=${encodeURIComponent(GITHUB_SESSION_URL)}`)
+
+    await expect(page.getByRole('heading', { name: 'E. coli genome comparison' })).toBeVisible()
+    await expect(page.getByText('Loaded from a public GitHub session · read-only preview')).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Read-only interactive genome comparison' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Edit session' })).toHaveAttribute(
+      'href',
+      `/app?url=${encodeURIComponent(GITHUB_SESSION_URL)}`,
+    )
+    await expect(page.getByRole('heading', { name: 'Reference Genome' })).toHaveCount(0)
+  })
+
+  test('loads the same GitHub session URL into the editable app', async ({ page }) => {
+    await page.route(RAW_GITHUB_SESSION_URL, route => route.fulfill({
+      path: EXAMPLE_SESSION,
+      contentType: 'application/json',
+    }))
+    await page.goto(`/app?url=${encodeURIComponent(GITHUB_SESSION_URL)}`)
+
+    await expect(page.getByText('GitHub session and saved result loaded for editing.')).toBeVisible()
+    await expect(page.getByPlaceholder('Plot title...')).toHaveValue('E. coli genome comparison')
+    await expect(page.getByText('E. coli CFT073', { exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Preview result' })).toBeEnabled()
   })
 
   test('loads the app with Reference Genome section visible', async ({ page }) => {

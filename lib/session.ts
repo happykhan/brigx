@@ -2,8 +2,12 @@
 // Saves ring configuration, annotations, image settings, and alignment params
 // Does NOT save file contents (too large) - only file names for reference
 
-import type { PipelineParams, Annotation, AnnotationShape, RingConfig } from './types';
+import type { PipelineParams, Annotation, AnnotationShape, CircularPlotData, RingConfig } from './types';
 import type { ImagePropertiesConfig } from '@/components/ImageProperties';
+import { createResultSnapshot, parseResultSnapshot, type ResultSnapshot } from './resultSnapshot';
+
+export const SESSION_TYPE = 'brigx-session';
+export const SESSION_SCHEMA_VERSION = 1;
 
 export interface RingSessionData {
   id: string;
@@ -20,6 +24,8 @@ export interface RingSessionData {
 }
 
 export interface BRIGXSession {
+  type?: typeof SESSION_TYPE;
+  schemaVersion?: typeof SESSION_SCHEMA_VERSION;
   version: string;
   timestamp: number;
   referenceFileName: string;
@@ -27,6 +33,8 @@ export interface BRIGXSession {
   rings: RingSessionData[];
   params: PipelineParams;
   imageConfig: ImagePropertiesConfig;
+  /** Embedded rendered output. Present in new saves; absent in legacy configuration-only sessions. */
+  result?: ResultSnapshot;
 }
 
 /**
@@ -40,8 +48,11 @@ export function exportSession(
   params: PipelineParams,
   imageConfig: ImagePropertiesConfig,
   referenceAnnotations: readonly Annotation[] = [],
+  plotData?: CircularPlotData | null,
 ): string {
   const session: BRIGXSession = {
+    type: SESSION_TYPE,
+    schemaVersion: SESSION_SCHEMA_VERSION,
     version,
     timestamp: Date.now(),
     referenceFileName,
@@ -60,7 +71,8 @@ export function exportSession(
       annotations: ringAnnotations[r.id] || []
     })),
     params,
-    imageConfig
+    imageConfig,
+    result: plotData ? createResultSnapshot(plotData, imageConfig) : undefined,
   };
 
   return JSON.stringify(session, null, 2);
@@ -76,7 +88,9 @@ export function importSession(json: string): BRIGXSession {
     throw new Error('Invalid BRIGX session file');
   }
 
-  return session;
+  return session.result
+    ? { ...session, result: parseResultSnapshot(session.result) }
+    : session;
 }
 
 /**
@@ -181,7 +195,17 @@ function isImageConfig(value: unknown): value is ImagePropertiesConfig {
 
 function isSession(value: unknown): value is BRIGXSession {
   if (!isRecord(value)) return false;
-  return typeof value.version === 'string'
+  let validResult = true;
+  if (value.result !== undefined) {
+    try {
+      parseResultSnapshot(value.result);
+    } catch {
+      validResult = false;
+    }
+  }
+  return (value.type === undefined || value.type === SESSION_TYPE)
+    && (value.schemaVersion === undefined || value.schemaVersion === SESSION_SCHEMA_VERSION)
+    && typeof value.version === 'string'
     && value.version.length > 0
     && isFiniteNumber(value.timestamp)
     && typeof value.referenceFileName === 'string'
@@ -192,5 +216,6 @@ function isSession(value: unknown): value is BRIGXSession {
     && Array.isArray(value.rings)
     && value.rings.every(isRing)
     && isPipelineParams(value.params)
-    && isImageConfig(value.imageConfig);
+    && isImageConfig(value.imageConfig)
+    && validResult;
 }

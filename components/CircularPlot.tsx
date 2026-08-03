@@ -10,6 +10,7 @@ interface CircularPlotProps {
   data: CircularPlotData;
   imageProperties: ImagePropertiesConfig;
   onViewStateChange?: (state: PlotViewState) => void;
+  squarePlot?: boolean;
 }
 
 interface TooltipInfo extends PlotTooltip {
@@ -17,7 +18,7 @@ interface TooltipInfo extends PlotTooltip {
   y: number;
 }
 
-export default function CircularPlot({ data, imageProperties, onViewStateChange }: CircularPlotProps) {
+export default function CircularPlot({ data, imageProperties, onViewStateChange, squarePlot = false }: CircularPlotProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<CanvasPlotRenderer | null>(null);
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
@@ -220,7 +221,7 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange 
   }, []);
 
   return (
-    <div className="relative h-full flex flex-col">
+    <div className={`relative flex flex-col ${squarePlot ? '' : 'h-full'}`}>
       {/* Toolbar - horizontal, always visible */}
       <div className="flex items-center justify-between px-3 py-1.5 rounded-t-lg" style={{ background: 'var(--gx-surface)', borderBottom: '1px solid var(--gx-border)' }}>
         <div className="flex items-center gap-1">
@@ -253,7 +254,7 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange 
       {/* Plot area */}
       <div
         ref={wrapperRef}
-        className="flex-1 min-h-0 overflow-hidden flex items-center justify-center"
+        className={`${squarePlot ? 'aspect-square flex-none' : 'flex-1 min-h-0'} overflow-hidden flex items-center justify-center`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

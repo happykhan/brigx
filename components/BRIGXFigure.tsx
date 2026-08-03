@@ -29,16 +29,10 @@ export default function BRIGXFigure() {
 
   return (
     <section
+      className="landing-preview"
       aria-label="Interactive read-only E. coli comparison"
-      style={{
-        height: 'min(70vw, 43rem)',
-        minHeight: '30rem',
-        overflow: 'hidden',
-        background: 'var(--gx-surface)',
-        border: '1px solid var(--brigx-rule-strong)',
-      }}
     >
-      {publication && <CircularPlot data={publication.plot} imageProperties={publication.imageConfig} />}
+      {publication && <CircularPlot data={publication.plot} imageProperties={publication.imageConfig} squarePlot />}
       {!publication && !loadFailed && <div className="publication-message h-full">Loading comparison…</div>}
       {loadFailed && <div className="publication-message h-full">Comparison unavailable.</div>}
     </section>

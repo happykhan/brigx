@@ -19,6 +19,13 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByText('Rendered live by BRIGX')).toHaveCount(0)
     await expect(page.locator('footer').getByText('BRIGX', { exact: true })).toBeVisible()
     await expect(page.getByText(/All processing runs locally in your browser/)).toBeVisible()
+
+    const previewBox = await page.getByRole('region', { name: 'Interactive read-only E. coli comparison' }).boundingBox()
+    const canvasBox = await page.locator('.landing-preview canvas').boundingBox()
+    expect(previewBox).not.toBeNull()
+    expect(canvasBox).not.toBeNull()
+    expect(Math.abs(previewBox!.width - canvasBox!.width)).toBeLessThan(4)
+    expect(previewBox!.height - canvasBox!.height).toBeLessThan(60)
   })
 
   test('landing page uses the dedicated mobile composition without horizontal overflow', async ({ page }) => {
@@ -37,6 +44,31 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByRole('region', { name: 'Read-only interactive genome comparison' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Zoom in (or scroll up)' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Reference Genome' })).toHaveCount(0)
+  })
+
+  test('opens a generated plot as a browser-local read-only preview', async ({ page, context }) => {
+    await page.goto('/app')
+    await expect(page.getByRole('button', { name: 'Preview result' })).toBeDisabled()
+    await page.getByLabel('Reference genome file').setInputFiles(REFERENCE)
+    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 30_000 })
+
+    const previewPagePromise = context.waitForEvent('page')
+    await page.getByRole('button', { name: 'Preview result' }).click()
+    const previewPage = await previewPagePromise
+    await previewPage.waitForURL(/\/preview\/[a-f0-9-]+$/)
+
+    await expect(previewPage.getByText(/Local preview.*not shareable/)).toBeVisible()
+    await expect(previewPage.getByRole('region', { name: 'Read-only interactive genome comparison' })).toBeVisible()
+    await expect(previewPage.getByRole('button', { name: 'Download result' })).toBeVisible()
+    await expect(previewPage.getByRole('heading', { name: 'Reference Genome' })).toHaveCount(0)
+  })
+
+  test('opens a portable result file in the read-only viewer', async ({ page }) => {
+    await page.goto('/preview')
+    await page.getByLabel('BRIGX result file').setInputFiles(path.join(process.cwd(), 'public/publications/ecoli-comparison.json'))
+
+    await expect(page.getByRole('heading', { name: 'E. coli genome comparison' })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Read-only interactive genome comparison' })).toBeVisible()
   })
 
   test('loads the app with Reference Genome section visible', async ({ page }) => {

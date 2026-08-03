@@ -8,14 +8,13 @@ const QUERY = path.join(FIXTURES, 'query.fa')
 const BAKTA_GFF3 = path.join(FIXTURES, 'bakta.gff3')
 
 test.describe('BRIGX e2e — circular genome plot', () => {
-  test('landing page explains the product and offers web and desktop editions', async ({ page }) => {
+  test('landing page explains the web product', async ({ page }) => {
     await page.goto('/')
 
     await expect(page.getByRole('heading', { name: 'Circular genome comparison without uploading your data.' })).toBeVisible()
     await expect(page.getByRole('img', { name: /representative circular comparison/i })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Open the web app' })).toHaveAttribute('href', '/app')
-    await expect(page.getByRole('link', { name: 'Get the desktop beta' })).toHaveAttribute('href', '/download')
-    await expect(page.getByRole('heading', { name: 'One scientific engine. Two ways to work.' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Open it and start comparing genomes.' })).toBeVisible()
     await expect(page.getByText(/editable annotation table are original BRIGX implementations/)).toBeVisible()
   })
 
@@ -23,9 +22,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
 
-    await expect(page.getByRole('heading', { name: 'Web edition' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Desktop beta' })).toBeVisible()
-    await expect(page.locator('.product-table-wrap')).toBeHidden()
+    await expect(page.getByRole('heading', { name: 'Open it and start comparing genomes.' })).toBeVisible()
     await expect(page.locator('.gx-nav-logo-sub')).toBeHidden()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   })
@@ -114,15 +111,12 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByText(/editable annotation table are original BRIGX implementations/)).toBeVisible()
   })
 
-  test('download page identifies the unsigned beta before offering packages', async ({ page }) => {
+  test('desktop page is limited to a coming-soon notice', async ({ page }) => {
     await page.goto('/download')
 
-    await expect(page.getByRole('heading', { name: 'BRIGX Desktop Beta' })).toBeVisible()
-    await expect(page.getByText('Unsigned community build.')).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Installation notes' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Download' })).toHaveCount(2)
-    await expect(page.getByText(/macOS downloads are paused/)).toBeVisible()
-    await expect(page.getByText(/Microsoft Defender SmartScreen/)).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Coming soon' })).toBeVisible()
+    await expect(page.getByText(/There is no supported desktop download/)).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Open the web app' })).toHaveAttribute('href', '/app')
   })
 
   test('runs an alignment with the bundled integrity-checked BLAST assets', async ({ page }) => {

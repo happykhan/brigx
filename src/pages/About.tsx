@@ -25,22 +25,16 @@ export default function AboutPage() {
               <h2 className="text-2xl font-semibold mt-6 mb-4">Overview</h2>
               <p className="mb-4">
                 BRIGX (BLAST Ring Image Generator eXtended) is a free, open-source comparative genomics tool
-                available for the web and as an offline desktop application.
+                that runs in the web browser.
                 It creates interactive circular genome comparison plots inspired by the original BRIG application,
                 with publication-ready SVG and PNG export.
               </p>
 
               <h2 className="text-2xl font-semibold mt-8 mb-4">Data handling and privacy</h2>
               <p className="mb-4">
-                Genome and annotation files are processed locally in your browser or on your computer.
+                Genome and annotation files are processed locally in your browser.
                 BRIGX does not upload file contents to an analysis server. This release contains no accounts,
                 cloud storage, advertising, telemetry, or analytics.
-              </p>
-              <p className="mb-4">
-                Desktop project files store settings, completed plot data, SHA-256 checksums, and local paths to
-                source files; they do not copy genome contents into the project. Treat a <code>.brigx</code> file as
-                potentially sensitive because its paths and filenames may reveal information about your computer
-                or work. Recovery snapshots stay in BRIGX&apos;s local application-data directory.
               </p>
               <p className="mb-4">
                 As with any website, the hosting provider may receive ordinary request metadata such as IP address,
@@ -85,15 +79,6 @@ export default function AboutPage() {
                       <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}><ExternalLink href="https://emscripten.org/docs/introducing_emscripten/emscripten_license.html">MIT/NCSA</ExternalLink></td>
                     </tr>
                     <tr>
-                      <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>
-                        <ExternalLink href="https://tauri.app/">Tauri 2</ExternalLink> with the operating-system webview
-                      </td>
-                      <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>Desktop application runtime</td>
-                      <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>
-                        <ExternalLink href="https://github.com/tauri-apps/tauri#license">MIT or Apache-2.0; system-webview terms</ExternalLink>
-                      </td>
-                    </tr>
-                    <tr>
                       <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}><ExternalLink href="https://react.dev/">React and React DOM</ExternalLink></td>
                       <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>User interface</td>
                       <td className="p-2 border" style={{ borderColor: 'var(--gx-border)' }}>MIT</td>
@@ -124,8 +109,7 @@ export default function AboutPage() {
 
               <p className="mb-4">
                 BRIGX&apos;s circular renderer and editable annotation table are original BRIGX implementations. Alignment
-                uses the bundled BLAST WebAssembly modules listed above. Desktop packages also include the full licence
-                texts for their locked Rust dependencies.
+                uses the bundled BLAST WebAssembly modules listed above.
               </p>
 
               <h2 className="text-2xl font-semibold mt-8 mb-4">Example data</h2>
@@ -165,9 +149,6 @@ export default function AboutPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                   </svg>
                   Open the web application
-                </Link>
-                <Link to="/download" className="inline-flex items-center font-medium ml-6" style={{ color: 'var(--gx-accent)' }}>
-                  Desktop downloads
                 </Link>
               </div>
             </div>

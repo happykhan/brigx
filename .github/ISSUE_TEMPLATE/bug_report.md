@@ -27,7 +27,7 @@ What actually happens. Include any error messages shown in the browser console (
 
 ## Input files
 
-Describe the formats and approximate sizes involved. If a reproducer is needed, attach only a minimised, synthetic, or public test case. **Do not attach confidential, embargoed, patient-identifiable, or otherwise sensitive genome data.**
+If applicable, attach or describe the input files used (genome FASTA, reference, etc.). For large files, describe the format and size, and note whether the bug is reproducible with a smaller/synthetic file.
 
 - Reference genome: (e.g. *E. coli* K-12, ~4.6 Mb)
 - Query genomes: (number and approximate sizes)
@@ -36,8 +36,7 @@ Describe the formats and approximate sizes involved. If a reproducer is needed, 
 ## Environment
 
 - OS: (e.g. macOS 14, Ubuntu 22.04, Windows 11)
-- Edition: (Web / Desktop)
-- Browser, for Web: (e.g. Chrome 124, Firefox 125)
+- Browser: (e.g. Chrome 124, Firefox 125)
 - BRIGx version: (shown in the app footer, e.g. v0.5.5)
 
 ## Additional context

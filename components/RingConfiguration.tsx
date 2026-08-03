@@ -1,8 +1,6 @@
 
 
 import { useState } from 'react';
-import toast from 'react-hot-toast';
-import { isDesktopApp, pickDesktopInputFiles } from '@/lib/desktopBridge';
 import type { RingConfig, RingData } from '@/lib/types';
 
 /** Small controlled hex input that syncs with external colour state on blur / valid input. */
@@ -56,7 +54,6 @@ const PRESET_COLORS = [
 ];
 
 export default function RingConfiguration({ rings, setRings, onEditAnnotations, ringDataList }: RingConfigurationProps) {
-  const desktop = isDesktopApp();
 
   const addNewRing = () => {
     console.log('[RingConfiguration] Add New Ring clicked, current rings:', rings.length);
@@ -81,21 +78,13 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations, 
     setRings(rings.map(r => r.id === id ? { ...r, ...updates } : r));
   };
 
-  const addFilesToRing = (id: string, files: FileList | readonly File[] | null) => {
+  const addFilesToRing = (id: string, files: FileList | null) => {
     if (!files) return;
     const ring = rings.find(r => r.id === id);
     if (!ring) return;
 
     const newFiles = Array.from(files);
     updateRing(id, { files: [...ring.files, ...newFiles] });
-  };
-
-  const pickDesktopRingFiles = (ringId: string) => {
-    void pickDesktopInputFiles('ring', { ringId, multiple: true }).then(files => {
-      addFilesToRing(ringId, files);
-    }).catch(error => {
-      toast.error(`Failed to open ring file: ${error instanceof Error ? error.message : String(error)}`);
-    });
   };
 
   const removeFileFromRing = (ringId: string, fileIndex: number) => {
@@ -296,28 +285,16 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations, 
                     />
                     Labels
                   </label>
-                  {desktop ? (
-                    <button
-                      type="button"
-                      aria-label={`Add files to ${ring.legendText}`}
-                      onClick={() => pickDesktopRingFiles(ring.id)}
-                      className="text-xs cursor-pointer hover:underline"
-                      style={{ color: 'var(--gx-accent)' }}
-                    >
-                      + Add Files
-                    </button>
-                  ) : (
-                    <label className="text-xs cursor-pointer hover:underline" style={{ color: 'var(--gx-accent)' }}>
-                      + Add Files
-                      <input
-                        type="file"
-                        multiple
-                        accept=".fasta,.fa,.fna,.gbk,.gb,.gbff,.genbank,.fasta.gz,.fa.gz,.fna.gz,.gbk.gz,.gb.gz,.gbff.gz,.genbank.gz,.gz,.graph,.bedgraph,.wig,.bed,.sam"
-                        onChange={(e) => addFilesToRing(ring.id, e.target.files)}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
+                  <label className="text-xs cursor-pointer hover:underline" style={{ color: 'var(--gx-accent)' }}>
+                    + Add Files
+                    <input
+                      type="file"
+                      multiple
+                      accept=".fasta,.fa,.fna,.gbk,.gb,.gbff,.genbank,.fasta.gz,.fa.gz,.fna.gz,.gbk.gz,.gb.gz,.gbff.gz,.genbank.gz,.gz,.graph,.bedgraph,.wig,.bed,.sam"
+                      onChange={(e) => addFilesToRing(ring.id, e.target.files)}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
               </div>
 

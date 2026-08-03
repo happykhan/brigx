@@ -8,7 +8,6 @@ const notices = await readFile(path.join(root, 'THIRD_PARTY_NOTICES.md'), 'utf8'
 
 const expectedLicences = new Map([
   ['@genomicx/ui', new Set(['GPL-3.0', 'GPL-3.0-only'])],
-  ['@tauri-apps/api', new Set(['Apache-2.0 OR MIT', 'MIT OR Apache-2.0'])],
   ['pako', new Set(['(MIT AND Zlib)', 'MIT', 'Zlib'])],
   ['react', new Set(['MIT'])],
   ['react-dom', new Set(['MIT'])],

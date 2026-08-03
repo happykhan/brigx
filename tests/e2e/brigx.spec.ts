@@ -12,9 +12,11 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await page.goto('/')
 
     await expect(page.getByRole('heading', { name: 'Circular genome comparison for microbial genomics' })).toBeVisible()
-    await expect(page.getByRole('img', { name: /repository example data/i })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Interactive read-only E. coli comparison' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Zoom in (or scroll up)' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Open the web app' })).toHaveAttribute('href', '/app')
-    await expect(page.getByText('Repository example data')).toBeVisible()
+    await expect(page.getByText('Repository example data')).toHaveCount(0)
+    await expect(page.getByText('Rendered live by BRIGX')).toHaveCount(0)
     await expect(page.locator('footer').getByText('BRIGX', { exact: true })).toBeVisible()
     await expect(page.getByText(/All processing runs locally in your browser/)).toBeVisible()
   })

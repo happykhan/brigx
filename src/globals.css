@@ -188,6 +188,33 @@ input:focus-visible {
   color: var(--gx-text-muted);
 }
 
+.preview-url-form {
+  display: grid;
+  width: min(42rem, calc(100vw - 2rem));
+  gap: 0.45rem;
+  text-align: left;
+}
+
+.preview-url-form label {
+  color: var(--gx-text-muted);
+  font-family: var(--gx-font-mono);
+  font-size: 0.72rem;
+}
+
+.preview-url-form > div {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.preview-url-form input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--brigx-rule-strong);
+  background: var(--gx-surface);
+  padding: 0.7rem 0.8rem;
+  color: var(--gx-text);
+}
+
 .publication-viewer {
   height: calc(100vh - 11rem);
   min-height: 34rem;
@@ -216,6 +243,10 @@ input:focus-visible {
 
   .publication-actions {
     justify-content: flex-start;
+  }
+
+  .preview-url-form > div {
+    flex-direction: column;
   }
 
   .publication-viewer {

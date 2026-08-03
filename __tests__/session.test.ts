@@ -26,6 +26,12 @@ const mockImageConfig = {
   labelFontSize: 9
 };
 
+const mockPlot = {
+  reference: { name: 'reference.fna', length: 1200 },
+  rings: [],
+  config: { minIdentity: 70, minAlignmentLength: 100 },
+};
+
 describe('Session Export/Import', () => {
   it('should export and re-import a session', () => {
     const rings = [
@@ -64,6 +70,7 @@ describe('Session Export/Import', () => {
       mockParams,
       mockImageConfig,
       referenceAnnotations,
+      mockPlot,
     );
     const session = importSession(json);
 
@@ -79,6 +86,9 @@ describe('Session Export/Import', () => {
     expect(session.params.minIdentity).toBe(70);
     expect(session.params.alignerOptions).toBe('-W 28');
     expect(session.imageConfig.title).toBe('Test Image');
+    expect(session.type).toBe('brigx-session');
+    expect(session.schemaVersion).toBe(1);
+    expect(session.result?.plot).toEqual(mockPlot);
   });
 
   it('should reject invalid session JSON', () => {
@@ -100,6 +110,15 @@ describe('Session Export/Import', () => {
 
     expect(session.timestamp).toBeGreaterThan(0);
     expect(session.timestamp).toBeLessThanOrEqual(Date.now());
+  });
+
+  it('should keep loading legacy sessions without an embedded result', () => {
+    const legacy = JSON.parse(exportSession('0.2.0', 'ref.fna', [], {}, mockParams, mockImageConfig));
+    delete legacy.type;
+    delete legacy.schemaVersion;
+    delete legacy.result;
+
+    expect(importSession(JSON.stringify(legacy)).result).toBeUndefined();
   });
 });
 

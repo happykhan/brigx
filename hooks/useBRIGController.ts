@@ -6,6 +6,8 @@ import type { PipelineParams, ProgressUpdate, RingConfig, Annotation } from '@/l
 import { APP_VERSION } from '@/lib/version';
 import type { BRIGController as BRIGControllerType } from '@/lib/controller';
 import { exportSession, importSession } from '@/lib/session';
+import type { BRIGXSession } from '@/lib/session';
+import { fetchGitHubJson } from '@/lib/remoteJson';
 import { readFileText } from '@/lib/fileAccess';
 import { extractReferenceAnnotationFile } from '@/lib/featureParser';
 import { INITIAL_PLOT_STATE, plotStateReducer } from '@/lib/plotState';
@@ -309,6 +311,14 @@ export function useBRIGController() {
       params,
       imageProperties,
       referenceAnnotations,
+      plotData ? {
+        ...plotData,
+        reference: {
+          ...plotData.reference,
+          gcContent: params.showGCContent !== false ? plotData.reference.gcContent : undefined,
+          gcSkew: params.showGCSkew !== false ? plotData.reference.gcSkew : undefined,
+        },
+      } : null,
     );
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -320,14 +330,11 @@ export function useBRIGController() {
     toast.success('Session saved');
   };
 
-  const handleLoadSession = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const json = await readFileText(file);
-      const session = importSession(json);
-
+  const restoreSession = (session: BRIGXSession) => {
+      referenceGenerationRef.current += 1;
+      controllerRef.current?.cleanup();
+      controllerRef.current = null;
+      setReferenceFile(null);
       // Restore rings (without files - they can't be serialized)
       const restoredRings: RingConfig[] = session.rings.map(r => ({
         id: r.id,
@@ -355,18 +362,50 @@ export function useBRIGController() {
       const restoredReferenceAnnotations = session.referenceAnnotations ?? [];
       setReferenceAnnotations(restoredReferenceAnnotations);
       setReferenceAnnotationFileName(restoredReferenceAnnotations.length > 0 ? 'Loaded from session' : null);
-      dispatchPlot({ type: 'reference-annotations', annotations: restoredReferenceAnnotations });
+      if (session.result) {
+        dispatchPlot({ type: 'replace', data: session.result.plot });
+      } else {
+        dispatchPlot({ type: 'clear' });
+      }
 
       // Restore params and image config
       setParams(session.params);
       setImageProperties(session.imageConfig);
+      setProgress(session.result
+        ? { step: 'Loaded saved result', percent: 100 }
+        : { step: 'Session loaded', percent: 0 });
+  };
 
-      toast.success('Session loaded. Re-add reference and ring files to run alignments.');
+  const handleLoadSession = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const session = importSession(await readFileText(file));
+      restoreSession(session);
+
+      toast.success(session.result
+        ? 'Session and saved result loaded. Re-add source files to rerun alignments.'
+        : 'Session loaded. Re-add reference and ring files to run alignments.');
     } catch (error) {
       toast.error(`Failed to load session: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     e.target.value = '';
+  };
+
+  const handleLoadSessionUrl = async (url: string) => {
+    try {
+      const session = importSession(await fetchGitHubJson(url));
+      restoreSession(session);
+      toast.success(session.result
+        ? 'GitHub session and saved result loaded for editing.'
+        : 'GitHub session loaded. Re-add source files to run alignments.');
+      return true;
+    } catch (error) {
+      toast.error(`Failed to load GitHub session: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
   };
 
   return {
@@ -401,5 +440,6 @@ export function useBRIGController() {
     handleRun,
     handleSaveSession,
     handleLoadSession,
+    handleLoadSessionUrl,
   };
 }

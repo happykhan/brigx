@@ -7,8 +7,9 @@ import {
 
 interface ResultViewerProps {
   snapshot: ResultSnapshot;
-  mode: 'preview' | 'publication' | 'file';
+  mode: 'preview' | 'publication' | 'file' | 'remote';
   onOpenFile?: () => void;
+  editUrl?: string;
 }
 
 function downloadSnapshot(snapshot: ResultSnapshot) {
@@ -21,7 +22,7 @@ function downloadSnapshot(snapshot: ResultSnapshot) {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-export default function ResultViewer({ snapshot, mode, onOpenFile }: ResultViewerProps) {
+export default function ResultViewer({ snapshot, mode, onOpenFile, editUrl }: ResultViewerProps) {
   return (
     <main className="publication-page">
       <header className="publication-header">
@@ -34,13 +35,18 @@ export default function ResultViewer({ snapshot, mode, onOpenFile }: ResultViewe
           {mode === 'preview' && (
             <p className="publication-note">Local preview · available in this browser for 24 hours · this URL is not shareable</p>
           )}
+          {mode === 'remote' && (
+            <p className="publication-note">Loaded from a public GitHub session · read-only preview</p>
+          )}
         </div>
         <div className="publication-actions">
           {mode !== 'publication' && (
             <button type="button" className="gx-btn" onClick={() => downloadSnapshot(snapshot)}>Download result</button>
           )}
           {onOpenFile && <button type="button" className="gx-btn" onClick={onOpenFile}>Open another result</button>}
-          <Link to="/app" className="gx-btn gx-btn-primary">Open BRIGX</Link>
+          {editUrl
+            ? <Link to={editUrl} className="gx-btn gx-btn-primary">Edit session</Link>
+            : <Link to="/app" className="gx-btn gx-btn-primary">Open BRIGX</Link>}
         </div>
       </header>
       <section className="publication-viewer" aria-label="Read-only interactive genome comparison">

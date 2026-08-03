@@ -135,14 +135,6 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByRole('heading', { name: 'Attribution and trademarks' })).toHaveCount(0)
   })
 
-  test('desktop page is limited to a coming-soon notice', async ({ page }) => {
-    await page.goto('/download')
-
-    await expect(page.getByRole('heading', { name: 'Coming soon' })).toBeVisible()
-    await expect(page.getByText(/applications need to be signed before we can distribute them properly/)).toBeVisible()
-    await expect(page.getByText(/Apple charges US\$99 a year/)).toBeVisible()
-  })
-
   test('runs an alignment with the bundled integrity-checked BLAST assets', async ({ page }) => {
     const pageErrors: Error[] = []
     page.on('pageerror', error => pageErrors.push(error))

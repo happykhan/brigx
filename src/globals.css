@@ -119,6 +119,15 @@ input:focus-visible {
   padding-bottom: 1rem;
 }
 
+.landing-preview {
+  width: min(100%, 43rem);
+  min-height: 12rem;
+  justify-self: center;
+  overflow: hidden;
+  border: 1px solid var(--brigx-rule-strong);
+  background: var(--gx-surface);
+}
+
 .product-lede a {
   color: var(--gx-text);
   text-decoration: underline;
@@ -152,6 +161,33 @@ input:focus-visible {
   color: var(--gx-text-muted);
 }
 
+.publication-header .publication-note {
+  color: var(--gx-accent);
+  font-family: var(--gx-font-mono);
+  font-size: 0.72rem;
+}
+
+.publication-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.preview-file-picker {
+  gap: 1rem;
+}
+
+.preview-file-picker h1,
+.preview-file-picker p {
+  max-width: 38rem;
+  margin: 0;
+}
+
+.preview-file-picker p {
+  color: var(--gx-text-muted);
+}
+
 .publication-viewer {
   height: calc(100vh - 11rem);
   min-height: 34rem;
@@ -176,6 +212,10 @@ input:focus-visible {
     align-items: flex-start;
     flex-direction: column;
     gap: 1rem;
+  }
+
+  .publication-actions {
+    justify-content: flex-start;
   }
 
   .publication-viewer {
@@ -746,6 +786,11 @@ input:focus-visible {
 .browser-session-inner button:hover,
 .browser-session-inner label:hover {
   color: var(--gx-accent);
+}
+
+.browser-session-inner button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .browser-workspace {

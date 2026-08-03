@@ -1,6 +1,6 @@
 
 import { lazy, Suspense, useState as useReactState, useCallback, useMemo } from 'react';
-import { Toaster } from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import { LogConsole } from '@genomicx/ui';
 import BrowserSessionBar from '@/components/BrowserSessionBar';
 import BugReportModal from '@/components/BugReportModal';
@@ -15,6 +15,8 @@ import ImagePropertiesPanel from '@/components/ImagePropertiesPanel';
 import ProductFooter from '@/components/ProductFooter';
 import ProductNav from '@/components/ProductNav';
 import { useBRIGController } from '@/hooks/useBRIGController';
+import { createPreviewId, saveResultPreview } from '@/lib/resultPreviewStore';
+import { createResultSnapshot } from '@/lib/resultSnapshot';
 import type { PlotViewState } from '@/lib/types';
 
 const AnnotationEditor = lazy(() => import('@/components/AnnotationEditor'));
@@ -64,6 +66,26 @@ export default function Home() {
       },
     };
   }, [plotData, params.showGCContent, params.showGCSkew]);
+  const handlePreview = useCallback(() => {
+    if (!displayedPlotData) return;
+    const id = createPreviewId();
+    const previewUrl = `/preview/${id}`;
+    const previewWindow = window.open('', '_blank');
+    void saveResultPreview(id, createResultSnapshot(displayedPlotData, imageProperties))
+      .then(() => {
+        if (previewWindow) {
+          previewWindow.opener = null;
+          previewWindow.location.href = previewUrl;
+        } else {
+          window.location.href = previewUrl;
+        }
+      })
+      .catch(error => {
+        previewWindow?.close();
+        console.error('Preview error:', error);
+        toast.error('Could not create the read-only preview');
+      });
+  }, [displayedPlotData, imageProperties]);
 
   return (
     <>
@@ -73,6 +95,8 @@ export default function Home() {
         <BrowserSessionBar
           onSave={handleSaveSession}
           onLoad={handleLoadSession}
+          onPreview={handlePreview}
+          previewDisabled={!displayedPlotData}
           onReportBug={() => setBugReportOpen(true)}
         />
 

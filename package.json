@@ -1,7 +1,7 @@
 {
     "name": "brig-web",
     "productName": "BRIGX",
-    "version": "0.6.30",
+    "version": "0.6.31",
     "description": "Browser-based circular genome comparison tool — BLAST Ring Image Generator in the browser",
     "private": true,
     "type": "module",

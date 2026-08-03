@@ -359,7 +359,7 @@ dependencies = [
 
 [[package]]
 name = "brigx"
-version = "0.6.30"
+version = "0.6.31"
 dependencies = [
  "atomic-write-file",
  "mime_guess",

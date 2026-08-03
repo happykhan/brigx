@@ -125,18 +125,20 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await page.goto('/about')
 
     await expect(page.getByRole('heading', { name: 'About BRIGX' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Data handling and privacy' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Third-party software' })).toBeVisible()
+    await expect(page.getByText(/Genome and annotation files are processed locally/)).toBeVisible()
     await expect(page.getByRole('link', { name: 'GNU General Public License v3.0' })).toHaveAttribute('href', /LICENSE$/)
     await expect(page.getByRole('link', { name: 'complete third-party notice' })).toHaveAttribute('href', /THIRD_PARTY_NOTICES\.md$/)
     await expect(page.getByText(/editable annotation table are original BRIGX implementations/)).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'GenomicX UI' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Example data' })).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Attribution and trademarks' })).toHaveCount(0)
   })
 
   test('desktop page is limited to a coming-soon notice', async ({ page }) => {
     await page.goto('/download')
 
     await expect(page.getByRole('heading', { name: 'Coming soon' })).toBeVisible()
-    await expect(page.getByText(/distributing it properly requires paid code signing/)).toBeVisible()
+    await expect(page.getByText(/applications need to be signed before we can distribute them properly/)).toBeVisible()
     await expect(page.getByText(/Apple charges US\$99 a year/)).toBeVisible()
   })
 

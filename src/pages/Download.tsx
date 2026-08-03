@@ -7,12 +7,10 @@ export default function DownloadPage() {
       <ProductNav />
       <main className="product-width product-document">
         <header className="product-document-header">
-          <p className="product-kicker">Desktop edition</p>
           <h1>Coming soon</h1>
           <p>
-            A desktop version is possible, but distributing it properly requires paid code signing. Apple charges
-            US$99 a year, while Windows signing typically costs around US$10 a month. For now, we’re focusing on the
-            web version.
+            A desktop version is possible, but applications need to be signed before we can distribute them properly.
+            Apple charges US$99 a year, and Windows signing costs about US$10 a month.
           </p>
         </header>
       </main>

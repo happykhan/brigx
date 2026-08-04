@@ -26,11 +26,11 @@ type BlastModuleFactory = (options: BlastModuleOptions) => Promise<BlastModule> 
 
 const BLAST_ASSET_HASHES = {
   blastall: {
-    js: '1f9d7c8374d72cf03f5f2c2f81ba0e4c1ddeb2deb0bafa9ff08ca0541fddce0e',
+    js: '92aabbcbe79d948613965331816f1d8643ab9cdf08357d36f22f112464c1bdb2',
     wasm: 'f7f4e1b6ee56625f2f42ef9d278c5f270a7ade09aef11753c3e248c007d2c139',
   },
   formatdb: {
-    js: '760874788a0e65458c32e86c578ca0b7e1eb983c046576b819382d05ddb042b2',
+    js: '3ed2b214d7c540b5c85babd88932f8193d1dfffb03fa1da013da3a7ea98a41a7',
     wasm: 'ab867d4eabccde92b4a1e2452d5156d2838f4e7051828104f50cf7a4dbc0df63',
   },
 } as const;
@@ -67,9 +67,17 @@ async function loadModuleFactory(name: BlastAssetName): Promise<{ factory: Blast
     verifySha256(`${name}.wasm`, wasmBinary, BLAST_ASSET_HASHES[name].wasm),
   ]);
 
-  const moduleText = new TextDecoder().decode(moduleBinary);
-  const moduleWrapper = new Function('Module', moduleText + '; return Module;');
-  const factory = moduleWrapper({}) as BlastModuleFactory;
+  // The generated Emscripten glue is served as an ES module. Importing it as
+  // code keeps the production CSP effective; evaluating the downloaded text
+  // with Function would require the unsafe-eval CSP exception.
+  const moduleUrl = `/wasm/blast/${name}.js`;
+  const moduleNamespace = await import(/* @vite-ignore */ moduleUrl) as {
+    default?: BlastModuleFactory;
+  };
+  const factory = moduleNamespace.default;
+  if (typeof factory !== 'function') {
+    throw new Error(`${name}.js did not export an Emscripten module factory`);
+  }
   return { factory, wasmBinary };
 }
 

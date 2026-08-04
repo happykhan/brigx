@@ -204,6 +204,25 @@ test.describe('BRIGX e2e — circular genome plot', () => {
   })
 
   test('runs an alignment with the bundled integrity-checked BLAST assets', async ({ page }) => {
+    const productionHeaders = await fs.readFile(path.join(process.cwd(), 'public/_headers'), 'utf8')
+    const contentSecurityPolicy = productionHeaders.match(/^\s*Content-Security-Policy:\s*(.+)$/m)?.[1]
+    if (!contentSecurityPolicy) throw new Error('Production Content-Security-Policy header is missing')
+
+    await page.route('**/*', async route => {
+      if (route.request().resourceType() !== 'document') {
+        await route.continue()
+        return
+      }
+      const response = await route.fetch()
+      await route.fulfill({
+        response,
+        headers: {
+          ...response.headers(),
+          'content-security-policy': contentSecurityPolicy,
+        },
+      })
+    })
+
     const pageErrors: Error[] = []
     page.on('pageerror', error => pageErrors.push(error))
     await page.goto('/app')

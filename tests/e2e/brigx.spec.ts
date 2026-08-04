@@ -234,7 +234,12 @@ test.describe('BRIGX e2e — circular genome plot', () => {
 
     const assetNames = ['formatdb.js', 'formatdb.wasm', 'blastall.js', 'blastall.wasm']
     const assetResponses = assetNames.map(assetName => page.waitForResponse(
-      response => response.url().endsWith(`/wasm/blast/${assetName}`) && response.status() === 200,
+      response => {
+        const url = new URL(response.url())
+        return url.pathname.endsWith(`/wasm/blast/${assetName}`)
+          && /^[a-f0-9]{64}$/.test(url.searchParams.get('v') ?? '')
+          && response.status() === 200
+      },
     ))
 
     await page.getByRole('button', { name: 'Run Alignments' }).click()

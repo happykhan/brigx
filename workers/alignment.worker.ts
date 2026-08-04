@@ -49,9 +49,13 @@ let cachedRefSequence: string | null = null;
 let cachedDbFiles: Map<string, Uint8Array> | null = null;
 
 async function loadModuleFactory(name: BlastAssetName): Promise<{ factory: BlastModuleFactory; wasmBinary: ArrayBuffer }> {
+  // Include the expected digest in the URL so a newly deployed worker never
+  // receives an older glue or WASM response from the browser/CDN cache.
+  const jsUrl = `/wasm/blast/${name}.js?v=${BLAST_ASSET_HASHES[name].js}`;
+  const wasmUrl = `/wasm/blast/${name}.wasm?v=${BLAST_ASSET_HASHES[name].wasm}`;
   const [jsResponse, wasmResponse] = await Promise.all([
-    fetch(`/wasm/blast/${name}.js`),
-    fetch(`/wasm/blast/${name}.wasm`),
+    fetch(jsUrl),
+    fetch(wasmUrl),
   ]);
 
   if (!jsResponse.ok) throw new Error(`Failed to fetch ${name}.js: ${jsResponse.status}`);
@@ -70,8 +74,7 @@ async function loadModuleFactory(name: BlastAssetName): Promise<{ factory: Blast
   // The generated Emscripten glue is served as an ES module. Importing it as
   // code keeps the production CSP effective; evaluating the downloaded text
   // with Function would require the unsafe-eval CSP exception.
-  const moduleUrl = `/wasm/blast/${name}.js`;
-  const moduleNamespace = await import(/* @vite-ignore */ moduleUrl) as {
+  const moduleNamespace = await import(/* @vite-ignore */ jsUrl) as {
     default?: BlastModuleFactory;
   };
   const factory = moduleNamespace.default;

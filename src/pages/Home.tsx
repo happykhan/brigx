@@ -189,7 +189,6 @@ export default function Home() {
 
       {bugReportOpen && (
         <BugReportModal
-          debugOutput={consoleLogs.join('\n')}
           onClose={() => setBugReportOpen(false)}
         />
       )}

@@ -26,7 +26,7 @@ Confirm that the feature file and loaded reference use the same assembly and coo
 
 ## Alignment workers fail to start
 
-Open the debug console and retain the complete error. Reload once to exclude a stale browser asset, then use **Report a bug** and include the debug output, browser version and whether the failure occurs with the bundled example.
+Open the debug console and retain the complete error. Reload once to exclude a stale browser asset, then use **Report a bug** to email nabil@happykhan.com. Include the error message, steps to reproduce, browser and operating system, and whether the failure occurs with the bundled example. Do not send confidential, patient-identifiable, or raw sequence data.
 
 ## A public session URL does not load
 

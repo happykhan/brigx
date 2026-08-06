@@ -44,12 +44,16 @@ function renderLabel(
   const featureRadius = (innerRadius + outerRadius) / 2;
   const featureX = centerX + featureRadius * Math.cos(midAngle);
   const featureY = centerY + featureRadius * Math.sin(midAngle);
+  const labelRadius = Math.hypot(layout.labelX - centerX, layout.labelY - centerY);
+  const elbowRadius = labelRadius >= featureRadius
+    ? outerRadius + 10
+    : Math.max(0, innerRadius - 10);
+  const elbowX = centerX + elbowRadius * Math.cos(midAngle);
+  const elbowY = centerY + elbowRadius * Math.sin(midAngle);
 
-  const leader = svgElement('line');
-  leader.setAttribute('x1', String(featureX));
-  leader.setAttribute('y1', String(featureY));
-  leader.setAttribute('x2', String(layout.labelX));
-  leader.setAttribute('y2', String(layout.labelY));
+  const leader = svgElement('polyline');
+  leader.setAttribute('points', `${featureX},${featureY} ${elbowX},${elbowY} ${layout.labelX},${layout.labelY}`);
+  leader.setAttribute('fill', 'none');
   leader.setAttribute('stroke', '#333');
   leader.setAttribute('stroke-width', '1');
   leader.setAttribute('opacity', '0.6');

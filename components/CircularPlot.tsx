@@ -196,10 +196,11 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange,
 
     const hit = rendererRef.current.hitTest(canvasX, canvasY, zoom, pan.x, pan.y);
     if (hit) {
+      const bounds = wrapperRef.current?.getBoundingClientRect();
       setTooltip({
         ...hit,
-        x: e.clientX,
-        y: e.clientY,
+        x: bounds ? e.clientX - bounds.left : 0,
+        y: bounds ? e.clientY - bounds.top : 0,
       });
     } else {
       setTooltip(null);
@@ -207,11 +208,18 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange,
   };
 
   const handleMouseUp = () => { setIsDragging(false); setDraggingLegend(null); };
+  const handleMouseLeave = () => { handleMouseUp(); setTooltip(null); };
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.2, 5));
   const handleZoomOut = () => setZoom(prev => Math.max(prev / 1.2, 0.3));
   const handleResetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
   const handleCenterView = () => setPan({ x: 0, y: 0 });
+  const handleResetLegends = () => {
+    if (!rendererRef.current) return;
+    rendererRef.current.resetLegendPositions();
+    rendererRef.current.redraw(zoomRef.current, panRef.current.x, panRef.current.y);
+    emitViewState();
+  };
 
   // Scroll to zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -230,7 +238,7 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange,
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
             </svg>
           </button>
-          <div className="text-xs font-mono w-12 text-center" style={{ color: 'var(--gx-text-muted)' }}>
+          <div data-testid="plot-zoom" className="text-xs font-mono w-12 text-center" style={{ color: 'var(--gx-text-muted)' }}>
             {Math.round(zoom * 100)}%
           </div>
           <button type="button" onClick={handleZoomIn} className="p-1.5 rounded hover:opacity-80" style={{ color: 'var(--gx-text)' }} title="Zoom in (or scroll up)">
@@ -246,19 +254,25 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange,
             <span className="text-xs">Centre</span>
           </button>
         </div>
-        <button type="button" onClick={handleResetView} className="text-xs px-2 py-1 rounded hover:opacity-80" style={{ color: 'var(--gx-text-muted)' }} title="Reset zoom to 100% and centre the plot">
-          Reset
-        </button>
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={handleResetLegends} className="text-xs px-2 py-1 rounded hover:opacity-80" style={{ color: 'var(--gx-text-muted)' }} title="Return both legends to their default positions without changing the plot view">
+            Reset legends
+          </button>
+          <button type="button" onClick={handleResetView} className="text-xs px-2 py-1 rounded hover:opacity-80" style={{ color: 'var(--gx-text-muted)' }} title="Reset zoom to 100% and centre the plot">
+            Reset zoom
+          </button>
+        </div>
       </div>
 
       {/* Plot area */}
       <div
         ref={wrapperRef}
-        className={`${squarePlot ? 'aspect-square flex-none' : 'flex-1 min-h-0'} overflow-hidden flex items-center justify-center`}
+        data-testid="plot-area"
+        className={`${squarePlot ? 'aspect-square flex-none' : 'flex-1 min-h-0'} relative overflow-hidden flex items-center justify-center`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
         onWheel={handleWheel}
         style={{ cursor: draggingLegend ? 'move' : isDragging ? 'grabbing' : 'grab', background: 'white' }}
       >
@@ -266,20 +280,20 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange,
           ref={canvasRef}
           style={{ maxWidth: '100%', maxHeight: '100%' }}
         />
-      </div>
-
-      {tooltip && tooltip.x != null && tooltip.y != null && (
-        <div
-          className="fixed text-sm rounded px-3 py-2 pointer-events-none z-50"
-          style={{
-            left: tooltip.x + 10,
-            top: tooltip.y + 10,
-            background: 'var(--gx-bg)',
-            color: 'var(--gx-text)',
-            border: '1px solid var(--gx-border)',
-            boxShadow: 'var(--gx-shadow)',
-          }}
-        >
+        {tooltip && tooltip.x != null && tooltip.y != null && (
+          <div
+            data-testid="plot-tooltip"
+            className="absolute text-sm rounded px-3 py-2 pointer-events-none z-10 max-w-56"
+            style={{
+              left: tooltip.x,
+              top: tooltip.y,
+              transform: `${tooltip.x > (wrapperRef.current?.clientWidth ?? 0) / 2 ? 'translateX(calc(-100% - 10px))' : 'translateX(10px)'} ${tooltip.y > (wrapperRef.current?.clientHeight ?? 0) / 2 ? 'translateY(calc(-100% - 10px))' : 'translateY(10px)'}`,
+              background: 'var(--gx-bg)',
+              color: 'var(--gx-text)',
+              border: '1px solid var(--gx-border)',
+              boxShadow: 'var(--gx-shadow)',
+            }}
+          >
           {tooltip.type === 'gc-content' ? (
             <>
               <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>GC Content</div>
@@ -338,8 +352,9 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange,
               )}
             </>
           )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

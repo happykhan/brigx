@@ -71,12 +71,19 @@ async function loadModuleFactory(name: BlastAssetName): Promise<{ factory: Blast
     verifySha256(`${name}.wasm`, wasmBinary, BLAST_ASSET_HASHES[name].wasm),
   ]);
 
-  // The generated Emscripten glue is served as an ES module. Importing it as
-  // code keeps the production CSP effective; evaluating the downloaded text
-  // with Function would require the unsafe-eval CSP exception.
-  const moduleNamespace = await import(/* @vite-ignore */ jsUrl) as {
-    default?: BlastModuleFactory;
-  };
+  // Import the exact bytes that passed integrity verification. A blob module
+  // avoids a second network request and prevents Vite's development server
+  // from treating a public runtime asset as source code. This remains CSP-safe
+  // because it does not evaluate a string with Function or eval.
+  const moduleUrl = URL.createObjectURL(new Blob([moduleBinary], { type: 'text/javascript' }));
+  let moduleNamespace: { default?: BlastModuleFactory };
+  try {
+    moduleNamespace = await import(/* @vite-ignore */ moduleUrl) as {
+      default?: BlastModuleFactory;
+    };
+  } finally {
+    URL.revokeObjectURL(moduleUrl);
+  }
   const factory = moduleNamespace.default;
   if (typeof factory !== 'function') {
     throw new Error(`${name}.js did not export an Emscripten module factory`);

@@ -187,7 +187,6 @@ export function useBRIGController() {
   // Auto-update plot when ring settings change (colors, thresholds, visibility, annotations)
   // NOTE: This should NOT depend on cachedPlotData to avoid overwriting alignment results
   useEffect(() => {
-    console.log('[Page] Ring settings changed, updating plot');
     dispatchPlot({ type: 'configure', rings, annotationsByRing: ringAnnotations });
   }, [rings, ringAnnotations]); // Removed cachedPlotData from dependencies!
 
@@ -280,7 +279,7 @@ export function useBRIGController() {
       if (runGeneration !== referenceGenerationRef.current) return;
       const msg = error instanceof Error ? error.message : String(error);
       console.error('[Page] Alignment error:', error);
-      toast.error(`Error: ${msg}`, { duration: 6000 });
+      toast.error('Alignment failed. See error details below.', { duration: 6000 });
       setProgress({ step: 'Error', percent: 0, message: msg });
     } finally {
       setIsProcessing(false);

@@ -55,6 +55,12 @@ export class CanvasPlotRenderer {
     return { gcLegendPos: this.gcLegendPos, ringLegendPos: this.ringLegendPos };
   }
 
+  /** Restore both draggable legends to their default corners. */
+  resetLegendPositions(): void {
+    this.gcLegendPos = null;
+    this.ringLegendPos = null;
+  }
+
   render(canvas: HTMLCanvasElement, data: CircularPlotData, zoom: number = 1, panX: number = 0, panY: number = 0): void {
     this.canvas = canvas;
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;

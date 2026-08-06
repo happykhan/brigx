@@ -1,0 +1,73 @@
+site_name: BRIGX Manual
+site_description: User manual for browser-based circular genome comparison with BRIGX
+site_url: https://happykhan.github.io/BRIGx/
+repo_url: https://github.com/happykhan/BRIGx
+repo_name: happykhan/BRIGx
+edit_uri: edit/master/docs/
+
+exclude_docs: |
+  README.md
+  feedback-browser-audit-2026-08-02.md
+  thermonuclear-review-2026-08-02.md
+
+theme:
+  name: material
+  language: en
+  logo: assets/brigx-mark.svg
+  favicon: assets/brigx-mark.svg
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - content.action.edit
+    - content.code.copy
+    - search.highlight
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Quick start: getting-started.md
+      - Understanding BLAST results: blast-and-interpretation.md
+  - Worked guides:
+      - Whole-genome comparison: guides/whole-genome-comparison.md
+      - Multi-FASTA reference: guides/multi-fasta-reference.md
+      - Graphs and assemblies: guides/graphs-and-assemblies.md
+      - Custom annotations: guides/custom-annotations.md
+  - Configuration:
+      - Ring configuration: reference/ring-configuration.md
+      - Image properties: reference/image-properties.md
+      - Sessions and sharing: reference/sessions-and-sharing.md
+      - File formats: reference/file-formats.md
+  - Troubleshooting: troubleshooting.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra_css:
+  - stylesheets/extra.css
+
+copyright: BRIGX is released under the GNU GPL v3.0.

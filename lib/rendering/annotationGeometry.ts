@@ -31,6 +31,66 @@ export interface ArrowGeometry {
   isForward: boolean;
 }
 
+const TWO_PI = Math.PI * 2;
+const LABEL_GAP = 8;
+
+function normaliseAngle(angle: number): number {
+  const normalised = angle % TWO_PI;
+  return normalised < 0 ? normalised + TWO_PI : normalised;
+}
+
+function selectEvenly<T>(items: readonly T[], maximum: number): T[] {
+  if (items.length <= maximum) return [...items];
+  if (maximum <= 1) return [items[Math.floor(items.length / 2)]];
+
+  return Array.from({ length: maximum }, (_, index) => (
+    items[Math.round(index * (items.length - 1) / (maximum - 1))]
+  ));
+}
+
+function layoutHalfCircle(
+  layouts: readonly AnnotationLabelLayout[],
+  minimumAngle: number,
+  maximumAngle: number,
+  labelDistance: number,
+): AnnotationLabelLayout[] {
+  if (layouts.length === 0) return [];
+
+  const widestLabel = Math.max(...layouts.map(layout => layout.width));
+  const tallestLabel = Math.max(...layouts.map(layout => layout.height));
+  const angularSeparation = (Math.max(widestLabel, tallestLabel) + LABEL_GAP) / labelDistance;
+  const halfSpan = (maximumAngle - minimumAngle) / 2;
+  const boundaryPadding = Math.min(
+    (widestLabel / 2 + LABEL_GAP) / labelDistance,
+    halfSpan - 0.01,
+  );
+  const usableSpan = Math.max(0, maximumAngle - minimumAngle - boundaryPadding * 2);
+  const capacity = Math.max(1, Math.floor(usableSpan / angularSeparation) + 1);
+  const selected = selectEvenly(layouts, capacity);
+  const lowerBound = minimumAngle + boundaryPadding;
+  const upperBound = maximumAngle - boundaryPadding;
+
+  selected[0].adjustedAngle = Math.max(lowerBound, selected[0].adjustedAngle);
+  for (let index = 1; index < selected.length; index++) {
+    selected[index].adjustedAngle = Math.max(
+      selected[index].adjustedAngle,
+      selected[index - 1].adjustedAngle + angularSeparation,
+    );
+  }
+
+  if (selected[selected.length - 1].adjustedAngle > upperBound) {
+    selected[selected.length - 1].adjustedAngle = upperBound;
+    for (let index = selected.length - 2; index >= 0; index--) {
+      selected[index].adjustedAngle = Math.min(
+        selected[index].adjustedAngle,
+        selected[index + 1].adjustedAngle - angularSeparation,
+      );
+    }
+  }
+
+  return selected;
+}
+
 export function annotationAngles(annotation: Annotation, referenceLength: number): AnnotationAngles {
   const start = Math.max(1, Math.min(annotation.start, referenceLength));
   const end = Math.max(1, Math.min(annotation.end, referenceLength));
@@ -59,37 +119,33 @@ export function layoutAnnotationLabels(
         adjustedAngle: midAngle,
         labelX: 0,
         labelY: 0,
-        width: annotation.label.length * fontSize * 0.6,
-        height: fontSize + 4,
+        width: annotation.label.length * fontSize * 0.6 + 8,
+        height: fontSize + 6,
       };
+    });
+
+  const right = layouts
+    .filter(layout => Math.cos(layout.midAngle) >= 0)
+    .map(layout => {
+      const angle = normaliseAngle(layout.midAngle);
+      layout.adjustedAngle = angle > Math.PI ? angle - TWO_PI : angle;
+      return layout;
     })
-    .sort((left, right) => left.midAngle - right.midAngle);
+    .sort((left, rightLayout) => left.adjustedAngle - rightLayout.adjustedAngle);
+  const left = layouts
+    .filter(layout => Math.cos(layout.midAngle) < 0)
+    .map(layout => {
+      layout.adjustedAngle = normaliseAngle(layout.midAngle);
+      return layout;
+    })
+    .sort((left, rightLayout) => left.adjustedAngle - rightLayout.adjustedAngle);
 
-  for (let iteration = 0; iteration < 15; iteration++) {
-    let hasOverlap = false;
-    for (let i = 0; i < layouts.length; i++) {
-      for (let j = i + 1; j < layouts.length; j++) {
-        const current = layouts[i];
-        const next = layouts[j];
-        const averageWidth = (current.width + next.width) / 2;
-        const averageHeight = (current.height + next.height) / 2;
-        const minimumSeparation = (Math.max(averageWidth, averageHeight) + 10) / labelDistance;
-        let angleDifference = Math.abs(next.adjustedAngle - current.adjustedAngle);
-        if (angleDifference > Math.PI) angleDifference = 2 * Math.PI - angleDifference;
+  const placed = [
+    ...layoutHalfCircle(right, -Math.PI / 2, Math.PI / 2, labelDistance),
+    ...layoutHalfCircle(left, Math.PI / 2, Math.PI * 1.5, labelDistance),
+  ];
 
-        if (angleDifference < minimumSeparation) {
-          hasOverlap = true;
-          const adjustment = minimumSeparation - angleDifference;
-          const direction = next.adjustedAngle > current.adjustedAngle ? 1 : -1;
-          current.adjustedAngle -= adjustment * 0.4 * direction;
-          next.adjustedAngle += adjustment * 0.4 * direction;
-        }
-      }
-    }
-    if (!hasOverlap) break;
-  }
-
-  return new Map(layouts.map(layout => {
+  return new Map(placed.map(layout => {
     layout.labelX = centerX + labelDistance * Math.cos(layout.adjustedAngle);
     layout.labelY = centerY + labelDistance * Math.sin(layout.adjustedAngle);
     return [layout.annotation.id, layout];

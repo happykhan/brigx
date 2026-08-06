@@ -36,6 +36,83 @@ export function summarizeConsoleArguments(args: readonly unknown[]): string {
   return args.map(argument => summarizeValue(argument, seen, 0)).join(' ');
 }
 
+const VISIBLE_FIELD_LABELS: Record<string, string> = {
+  id: 'ID',
+  minIdentity: 'Minimum identity',
+  minAlignmentLength: 'Minimum alignment length',
+  colorScheme: 'Colour scheme',
+  forceAlignment: 'Force alignment',
+  alignerOptions: 'Aligner options',
+  legendText: 'Legend',
+  files: 'Files',
+  color: 'Colour',
+  upperThreshold: 'Upper threshold',
+  lowerThreshold: 'Lower threshold',
+};
+
+function visibleFieldLabel(key: string): string {
+  if (VISIBLE_FIELD_LABELS[key]) return VISIBLE_FIELD_LABELS[key];
+  const spaced = key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim();
+  return spaced ? spaced.charAt(0).toUpperCase() + spaced.slice(1) : key;
+}
+
+function visibleFieldValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return 'Not set';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (Array.isArray(value)) return value.length ? value.map(visibleFieldValue).join(', ') : 'None';
+  if (typeof value === 'object') {
+    return Object.entries(value)
+      .map(([key, item]) => `${visibleFieldLabel(key)}: ${visibleFieldValue(item)}`)
+      .join(', ');
+  }
+  if (value === '[]') return 'None';
+  const capturedCount = typeof value === 'string' && value.match(/^\[(\d+) items\]$/);
+  if (capturedCount) return `${capturedCount[1]} items`;
+  return String(value);
+}
+
+function formatVisibleObject(message: string): string {
+  const objectStart = message.indexOf('{');
+  if (objectStart < 0 || !message.endsWith('}')) return message;
+
+  try {
+    const value: unknown = JSON.parse(message.slice(objectStart));
+    if (!value || Array.isArray(value) || typeof value !== 'object') return message;
+
+    const heading = message.slice(0, objectStart).trim().replace(/:$/, '');
+    const entries = Object.entries(value);
+    if (entries.length === 0) return heading ? `${heading}: No details` : 'No details';
+
+    const details = entries
+      .map(([key, item]) => `• ${visibleFieldLabel(key)}: ${visibleFieldValue(item)}`)
+      .join('\n');
+    return heading ? `${heading}:\n${details}` : details;
+  } catch {
+    return message;
+  }
+}
+
+/** Remove capture metadata and implementation origins from the on-page console. */
+export function formatVisibleConsoleLine(line: string): string {
+  const captured = line.match(/^\[(LOG|WARN|ERROR)\]\s*(.*)$/s);
+  const level = captured?.[1];
+  const message = formatVisibleObject(
+    (captured?.[2] ?? line).replace(/^(?:\[[^\]]+\]\s*)+/, ''),
+  );
+
+  if (level === 'ERROR') return `Error: ${message}`;
+  if (level === 'WARN') return `Warning: ${message}`;
+  return message;
+}
+
+/** Hide routine render chatter that cannot help diagnose a failed analysis. */
+export function isUsefulConsoleLine(line: string): boolean {
+  return !line.includes('Ring settings changed, updating plot');
+}
+
 /** Capture browser console output for the on-page diagnostic console. */
 export function useConsoleCapture() {
   const [logs, setLogs] = useState<string[]>([]);

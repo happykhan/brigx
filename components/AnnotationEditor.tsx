@@ -250,7 +250,7 @@ export default function AnnotationEditor({
         </div>
 
         <p className="px-4 py-2 text-xs" style={{ color: 'var(--gx-text-muted)', borderBottom: '1px solid var(--gx-border)' }}>
-          This is an optional overlay on the selected query ring. Paste rows from a spreadsheet, or load shared reference features in the Reference Genome card.
+          This is an optional overlay on the selected query ring. Paste rows from a spreadsheet, or import GenBank or GFF3 features here.
         </p>
 
         <div className="p-4 flex gap-2 flex-wrap" style={{ borderBottom: '1px solid var(--gx-border)' }}>

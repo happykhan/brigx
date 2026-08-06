@@ -102,6 +102,12 @@ function drawLabel(
   const featureRadius = (innerRadius + outerRadius) / 2;
   const featureX = centerX + featureRadius * Math.cos(midAngle);
   const featureY = centerY + featureRadius * Math.sin(midAngle);
+  const labelRadius = Math.hypot(layout.labelX - centerX, layout.labelY - centerY);
+  const elbowRadius = labelRadius >= featureRadius
+    ? outerRadius + 10
+    : Math.max(0, innerRadius - 10);
+  const elbowX = centerX + elbowRadius * Math.cos(midAngle);
+  const elbowY = centerY + elbowRadius * Math.sin(midAngle);
 
   context.save();
   context.globalAlpha = 0.6;
@@ -109,6 +115,7 @@ function drawLabel(
   context.lineWidth = 1;
   context.beginPath();
   context.moveTo(featureX, featureY);
+  context.lineTo(elbowX, elbowY);
   context.lineTo(layout.labelX, layout.labelY);
   context.stroke();
   context.restore();

@@ -14,7 +14,7 @@ export default function RingsPanel({ rings, setRings, onEditAnnotations, ringDat
   return (
     <div className="card">
       <p className="text-xs mb-3" style={{ color: 'var(--gx-text-muted)' }}>
-        Reference features belong in the Reference Genome card. Ring overlays are optional highlights tied to an individual query ring.
+        Each ring can contain sequence files, graph data or a custom feature overlay. Ring order runs from the inside out.
       </p>
       <RingConfiguration
         rings={rings}

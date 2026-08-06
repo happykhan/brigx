@@ -98,4 +98,40 @@ describe('editable SVG export', () => {
     expect(svg.querySelector('#title-group')?.textContent).toContain('BRIGX test');
     expect(exported).toContain('xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"');
   });
+
+  it('keeps dense annotation leaders on the feature side of the plot', () => {
+    const annotations = Array.from({ length: 90 }, (_, index) => {
+      const start = Math.floor(index * 10_000 / 90) + 1;
+      return {
+        id: `trna-${index}`,
+        start,
+        end: start + 20,
+        label: `trn${index}`,
+        shape: 'arrow-forward' as const,
+      };
+    });
+    const denseData: CircularPlotData = {
+      ...plotData,
+      rings: [{
+        ...plotData.rings[0],
+        queryId: 'dense-ring',
+        annotations,
+        showLabels: true,
+      }],
+    };
+    const container = document.createElement('div');
+    const svg = createRenderer().render(container, denseData);
+    const leaders = [...svg.querySelectorAll('#annotations-dense-ring polyline')];
+
+    expect(leaders.length).toBeGreaterThan(10);
+    expect(leaders.length).toBeLessThan(annotations.length);
+    for (const leader of leaders) {
+      const points = leader.getAttribute('points')!
+        .split(' ')
+        .map(point => point.split(',').map(Number));
+      const featureX = points[0][0];
+      const labelX = points[2][0];
+      expect((featureX - 500) * (labelX - 500)).toBeGreaterThanOrEqual(0);
+    }
+  });
 });

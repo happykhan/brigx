@@ -122,11 +122,15 @@ export class BRIGController {
         this.initializeAlignmentWorker(worker, index)
       )));
     } catch (error) {
-      workers.forEach(worker => worker.terminate());
-      this.alignmentWorkers = [];
+      this.resetAlignmentWorkers();
       throw error;
     }
     console.log('[Controller] All workers initialized successfully');
+  }
+
+  private resetAlignmentWorkers(): void {
+    this.alignmentWorkers.forEach(worker => worker.terminate());
+    this.alignmentWorkers = [];
   }
 
   private updateProgress(step: string, percent: number, message?: string) {
@@ -207,24 +211,41 @@ export class BRIGController {
   ): Promise<{ result: AlignmentResult; rawOutput: string }> {
     console.log(`[Controller] Starting alignment: ${query.name} vs ${reference.name}`);
     return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (
+        outcome: { result: AlignmentResult; rawOutput: string } | Error,
+      ) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        worker.onmessage = null;
+        worker.onerror = null;
+        if (outcome instanceof Error) reject(outcome);
+        else resolve(outcome);
+      };
       const timeout = setTimeout(() => {
         console.error(`[Controller] Alignment timeout for ${query.name}`);
-        reject(new Error(`Alignment timeout for ${query.name}`));
+        finish(new Error(`Alignment timeout for ${query.name}`));
       }, 300000); // 5 minutes
 
       worker.onmessage = (e) => {
         console.log(`[Controller] Received message from worker for ${query.name}, type: ${e.data.type}`);
         if (e.data.type === 'aligned') {
           console.log(`[Controller] Alignment completed for ${query.name}: ${e.data.result.hits?.length || 0} hits`);
-          clearTimeout(timeout);
-          resolve({ result: e.data.result, rawOutput: e.data.rawOutput });
+          finish({ result: e.data.result, rawOutput: e.data.rawOutput });
         } else if (e.data.type === 'error') {
           console.error(`[Controller] Alignment error for ${query.name}:`, e.data.error);
-          clearTimeout(timeout);
-          reject(new Error(e.data.error));
+          finish(new Error(e.data.error));
         } else {
           console.warn(`[Controller] Unexpected message type for ${query.name}:`, e.data.type);
         }
+      };
+
+      worker.onerror = event => {
+        const message = event instanceof ErrorEvent && event.message
+          ? event.message
+          : `Alignment worker crashed for ${query.name}`;
+        finish(new Error(message));
       };
 
       console.log(`[Controller] Sending alignment request for ${query.name}`);
@@ -529,16 +550,16 @@ export class BRIGController {
             `${ringIndex + 1}/${queryGenomes.length}`
           );
 
-          try {
-            const cacheKey = createAlignmentCacheKey(referenceFile, ring, params);
-            let result: { result: AlignmentResult; rawOutput: string };
+          const cacheKey = createAlignmentCacheKey(referenceFile, ring, params);
+          let result: { result: AlignmentResult; rawOutput: string };
 
-            if (!params.forceAlignment && this.alignmentCache.has(cacheKey)) {
-              console.log(`[Controller] Using cached alignment for ${query.name}`);
-              const cachedResult = this.alignmentCache.get(cacheKey)!;
-              result = { result: cachedResult, rawOutput: '' };
-            } else {
-              console.log(`[Controller] Aligning ${query.name} (${query.length} bp)`);
+          if (!params.forceAlignment && this.alignmentCache.has(cacheKey)) {
+            console.log(`[Controller] Using cached alignment for ${query.name}`);
+            const cachedResult = this.alignmentCache.get(cacheKey)!;
+            result = { result: cachedResult, rawOutput: '' };
+          } else {
+            console.log(`[Controller] Aligning ${query.name} (${query.length} bp)`);
+            try {
               result = await this.alignWithWorker(
                 this.alignmentWorkers[workerIndex],
                 reference,
@@ -548,22 +569,26 @@ export class BRIGController {
                   blastProgram: ring.blastType ?? params.blastProgram,
                 },
               );
-              this.alignmentCache.set(cacheKey, result.result);
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              throw new Error(`Alignment failed for ${query.name}: ${message}`);
             }
-
-            alignmentResults[ringIndex] = result;
-            console.log(`[Controller] Ring ${ringIndex + 1}/${queryGenomes.length} completed: ${result.result.hits?.length || 0} hits`);
-          } catch (error) {
-            console.error(`[Controller] Alignment error for ${query.name}:`, error);
-            alignmentResults[ringIndex] = emptyAlignment(ring, query.length, 'BLAST', params);
+            this.alignmentCache.set(cacheKey, result.result);
           }
+
+          alignmentResults[ringIndex] = result;
+          console.log(`[Controller] Ring ${ringIndex + 1}/${queryGenomes.length} completed: ${result.result.hits?.length || 0} hits`);
         }
       };
       
       // Start worker pool
-      await Promise.all(
+      const workerOutcomes = await Promise.allSettled(
         Array.from({ length: maxConcurrent }, (_, i) => processNextRing(i))
       );
+      const failedWorker = workerOutcomes.find(
+        (outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected',
+      );
+      if (failedWorker) throw failedWorker.reason;
       
       console.log(`[Controller] All ${alignmentResults.length} alignments completed`);
 
@@ -664,6 +689,9 @@ export class BRIGController {
       // Return complete plot data
       return finalData;
     } catch (error) {
+      // A worker that failed or timed out is not safe to reuse. Keep parsed
+      // files and successful alignment cache entries, but rebuild the pool on retry.
+      this.resetAlignmentWorkers();
       console.error('Pipeline error:', error);
       throw error;
     }
@@ -671,9 +699,8 @@ export class BRIGController {
 
   cleanup() {
     this.parserWorker?.terminate();
-    this.alignmentWorkers.forEach(w => w.terminate());
     this.parserWorker = undefined;
-    this.alignmentWorkers = [];
+    this.resetAlignmentWorkers();
     this.progressCallback = undefined;
   }
 }

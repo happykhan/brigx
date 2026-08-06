@@ -1,0 +1,18 @@
+:root {
+  --md-primary-fg-color: #0f766e;
+  --md-accent-fg-color: #4f46e5;
+}
+
+.md-typeset h1,
+.md-typeset h2 {
+  letter-spacing: -0.02em;
+}
+
+.md-typeset table:not([class]) th {
+  background: color-mix(in srgb, var(--md-primary-fg-color) 10%, transparent);
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 0.6rem;
+}

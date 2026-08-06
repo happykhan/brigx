@@ -15,6 +15,11 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
+  optimizeDeps: {
+    // The parser imports pako from a worker. Optimise it at server startup so
+    // the first reference upload does not invalidate the development graph.
+    include: ['pako'],
+  },
   worker: {
     format: 'es',
   },

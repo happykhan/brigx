@@ -835,6 +835,441 @@ input:focus-visible {
   align-items: start;
 }
 
+.ring-editor-shell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.ring-editor-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.ring-editor-card {
+  transition: border-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+}
+
+.ring-editor-card.is-collapsed {
+  padding-block: 0.85rem;
+}
+
+.ring-editor-card.is-dragging {
+  opacity: 0.48;
+}
+
+.ring-editor-card.is-drag-over {
+  border-color: var(--gx-accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gx-accent) 24%, transparent);
+}
+
+.ring-editor-drag-handle {
+  display: grid;
+  width: 2rem;
+  height: 2.5rem;
+  place-items: center;
+  color: var(--gx-text);
+  background: var(--gx-bg);
+  border: 1px solid var(--gx-border);
+  border-radius: var(--gx-radius-sm);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--gx-text) 10%, transparent);
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.ring-editor-drag-handle:hover,
+.ring-editor-drag-handle:focus-visible {
+  color: var(--gx-accent);
+  background: color-mix(in srgb, var(--gx-accent) 8%, var(--gx-bg));
+  border-color: var(--gx-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gx-accent) 18%, transparent);
+}
+
+.ring-editor-drag-handle:active {
+  cursor: grabbing;
+}
+
+.ring-editor-drag-handle svg {
+  width: 1rem;
+  height: 1.5rem;
+  fill: currentcolor;
+}
+
+.ring-editor-name {
+  min-width: 0;
+  width: 100%;
+}
+
+.ring-editor-main {
+  min-width: 0;
+}
+
+.ring-editor-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  min-width: 0;
+}
+
+.ring-editor-title-row {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.ring-editor-colour {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.ring-hex-input {
+  width: 7.5rem;
+  min-width: 0;
+}
+
+.ring-editor-card-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+
+.ring-editor-toggle,
+.ring-editor-remove {
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.ring-editor-toggle {
+  display: inline-flex;
+  min-width: 4.3rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding-inline: 0.55rem;
+  color: var(--gx-text);
+  background: color-mix(in srgb, var(--gx-accent) 10%, var(--gx-bg));
+  border: 1px solid color-mix(in srgb, var(--gx-accent) 28%, var(--gx-border));
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.ring-editor-toggle svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  flex: 0 0 auto;
+  stroke: currentcolor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+.ring-editor-toggle:hover,
+.ring-editor-toggle:focus-visible,
+.ring-editor-remove:hover,
+.ring-editor-remove:focus-visible {
+  background: color-mix(in srgb, var(--gx-accent) 10%, transparent);
+}
+
+.ring-editor-toggle:hover,
+.ring-editor-toggle:focus-visible {
+  color: var(--gx-accent);
+  background: color-mix(in srgb, var(--gx-accent) 16%, var(--gx-bg));
+  border-color: color-mix(in srgb, var(--gx-accent) 48%, var(--gx-border));
+}
+
+.ring-editor-remove {
+  display: grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  place-items: center;
+  border-radius: 999px;
+}
+
+.ring-editor-collapsed-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  padding-block: 0.1rem;
+}
+
+.ring-editor-collapsed-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: var(--gx-text);
+}
+
+.ring-editor-collapsed-swatch {
+  flex: 0 0 auto;
+  width: 1.15rem;
+  height: 1.15rem;
+  border: 2px solid var(--gx-border);
+  border-radius: 0.35rem;
+}
+
+.ring-editor-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.ring-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.gx-console-line {
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.console-error-panel {
+  padding: 1rem;
+  color: var(--gx-text);
+  background: color-mix(in srgb, var(--gx-error) 8%, var(--gx-bg-alt));
+  border: 1px solid color-mix(in srgb, var(--gx-error) 45%, var(--gx-border));
+  border-radius: var(--gx-radius-lg);
+}
+
+.console-error-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.console-error-heading strong {
+  color: var(--gx-error);
+  font-size: 0.875rem;
+}
+
+.console-error-heading p {
+  margin-top: 0.2rem;
+  color: var(--gx-text-muted);
+  font-size: 0.75rem;
+}
+
+.console-error-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.console-error-retry,
+.console-error-copy {
+  padding: 0.45rem 0.7rem;
+  font-size: 0.75rem;
+}
+
+.console-error-copy svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.console-error-panel pre {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  color: var(--gx-text);
+  border-top: 1px solid color-mix(in srgb, var(--gx-error) 22%, var(--gx-border));
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+
+.image-property-value {
+  display: inline-flex;
+  min-width: 4.5rem;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  padding: 0.25rem 0.45rem;
+  color: var(--gx-text-muted);
+  background: var(--gx-bg);
+  border: 1px dashed var(--gx-border);
+  border-radius: var(--gx-radius-sm);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  text-align: right;
+  cursor: text;
+}
+
+.image-property-value:hover,
+.image-property-value:focus-visible {
+  color: var(--gx-text);
+  background: var(--gx-bg);
+  border-color: var(--gx-border);
+}
+
+.image-property-value svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  flex: 0 0 auto;
+  fill: currentcolor;
+}
+
+.image-property-value-editor {
+  display: inline-flex;
+  min-width: 5rem;
+  min-height: 2rem;
+  align-items: center;
+  padding: 0 0.4rem;
+  color: var(--gx-text-muted);
+  background: var(--gx-bg);
+  border: 2px solid var(--gx-accent);
+  border-radius: var(--gx-radius-sm);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gx-accent) 18%, transparent);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.75rem;
+}
+
+.image-property-value-input {
+  width: 2.8rem;
+  min-width: 0;
+  padding: 0;
+  color: var(--gx-text);
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  text-align: right;
+  appearance: textfield;
+}
+
+.image-property-value-input::-webkit-inner-spin-button,
+.image-property-value-input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.image-property-range {
+  touch-action: none;
+}
+
+.reference-file-picker {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.reference-file-button {
+  padding: 0.65rem 0.85rem;
+  color: var(--gx-text-inverted);
+  background: var(--gx-accent);
+  border-color: var(--gx-accent);
+}
+
+.reference-file-button:hover {
+  color: var(--gx-text-inverted);
+  background: var(--gx-accent-hover);
+  border-color: var(--gx-accent-hover);
+}
+
+.reference-file-button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.reference-file-status {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0.65rem 0.8rem;
+  color: var(--gx-text-muted);
+  background: var(--gx-surface);
+  border: 1px solid var(--gx-border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.reference-file-status.is-selected {
+  color: var(--gx-text);
+}
+
+.reference-file-status svg {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.4rem;
+  color: var(--gx-accent);
+}
+
+.reference-file-status span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .console-error-heading {
+    flex-direction: column;
+  }
+
+  .console-error-actions {
+    justify-content: flex-start;
+  }
+
+  .reference-file-picker {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 639px) {
+  .ring-editor-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ring-editor-card-actions {
+    align-self: flex-end;
+  }
+
+  .ring-editor-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .ring-editor-shell {
+    gap: 0.75rem;
+  }
+
+  .ring-editor-controls {
+    gap: 0.4rem;
+  }
+}
+
 .browser-inspector,
 .browser-plot-pane {
   display: flex;

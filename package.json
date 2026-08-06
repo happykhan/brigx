@@ -29,7 +29,8 @@
         "version:minor": "npm version minor --no-git-tag-version",
         "test:coverage": "vitest run --coverage",
         "test:e2e": "playwright test",
-        "verify": "npm run lint && npm run quality:architecture && npm run quality:licenses && npm run quality:security && npm test && npm run build && npm run test:e2e"
+        "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
+        "verify": "npm run lint && npm run quality:architecture && npm run quality:licenses && npm run quality:security && npm test && npm run build && npm run test:e2e && npm run test:e2e:dev"
     },
     "dependencies": {
         "@genomicx/ui": "0.9.1",

@@ -7,6 +7,7 @@ import BrowserSessionBar from '@/components/BrowserSessionBar';
 import BugReportModal from '@/components/BugReportModal';
 import CircularPlot from '@/components/CircularPlot';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import ErrorReportPanel from '@/components/ErrorReportPanel';
 import ExportPanel from '@/components/ExportPanel';
 import ReferenceInput from '@/components/ReferenceInput';
 import RingsPanel from '@/components/RingsPanel';
@@ -16,6 +17,7 @@ import ImagePropertiesPanel from '@/components/ImagePropertiesPanel';
 import ProductFooter from '@/components/ProductFooter';
 import ProductNav from '@/components/ProductNav';
 import { useBRIGController } from '@/hooks/useBRIGController';
+import { formatVisibleConsoleLine, isUsefulConsoleLine } from '@/hooks/useConsoleCapture';
 import { createPreviewId, saveResultPreview } from '@/lib/resultPreviewStore';
 import { createResultSnapshot } from '@/lib/resultSnapshot';
 import type { PlotViewState } from '@/lib/types';
@@ -45,9 +47,8 @@ export default function Home() {
     isProcessing, consoleLogs, imageProperties, setImageProperties,
     plotExpanded, setPlotExpanded,
     annotationEditorOpen, setAnnotationEditorOpen, editingRingId, setEditingRingId,
-    ringAnnotations, referenceAnnotations, referenceAnnotationFileName, referenceLength,
+    ringAnnotations, referenceLength,
     handleReferenceFileChange, handleAnnotationsChange, handleOpenAnnotationEditor,
-    handleReferenceAnnotationsFileChange, handleClearReferenceAnnotations,
     handleRun, handleSaveSession, handleLoadSession, handleLoadSessionUrl,
   } = useBRIGController();
 
@@ -70,6 +71,10 @@ export default function Home() {
       },
     };
   }, [plotData, params.showGCContent, params.showGCSkew]);
+  const visibleConsoleLogs = useMemo(
+    () => consoleLogs.filter(isUsefulConsoleLine).map(formatVisibleConsoleLine),
+    [consoleLogs],
+  );
   const handlePreview = useCallback(() => {
     if (!displayedPlotData) return;
     const id = createPreviewId();
@@ -99,7 +104,7 @@ export default function Home() {
 
   return (
     <>
-      <Toaster position="bottom-right" toastOptions={{ style: { background: 'var(--gx-bg-alt)', color: 'var(--gx-text)', border: '1px solid var(--gx-border)' }, success: { duration: 3000, iconTheme: { primary: '#14B8A6', secondary: '#fff' } }, error: { duration: 6000, iconTheme: { primary: '#ef4444', secondary: '#fff' } } }} />
+      <Toaster position="bottom-right" toastOptions={{ style: { maxWidth: 'min(32rem, calc(100vw - 2rem))', whiteSpace: 'normal', overflowWrap: 'anywhere', background: 'var(--gx-bg-alt)', color: 'var(--gx-text)', border: '1px solid var(--gx-border)' }, success: { duration: 3000, iconTheme: { primary: '#14B8A6', secondary: '#fff' } }, error: { duration: 6000, iconTheme: { primary: '#ef4444', secondary: '#fff' } } }} />
       <div className="browser-app-shell">
         <ProductNav />
         <BrowserSessionBar
@@ -116,13 +121,8 @@ export default function Home() {
                 <ReferenceInput
                   referenceFile={referenceFile}
                   onFileChange={handleReferenceFileChange}
-                  referenceReady={referenceLength > 0}
-                  referenceAnnotationFileName={referenceAnnotationFileName}
-                  referenceAnnotationCount={referenceAnnotations.length}
-                  onReferenceAnnotationFileChange={handleReferenceAnnotationsFileChange}
-                  onClearReferenceAnnotations={handleClearReferenceAnnotations}
                 />
-                <RingsPanel rings={rings} setRings={setRings} onEditAnnotations={handleOpenAnnotationEditor} ringDataList={plotData?.rings} />
+                <ImagePropertiesPanel imageProperties={imageProperties} onChange={setImageProperties} />
                 <ControlPanel params={params} setParams={setParams} isProcessing={isProcessing} referenceFile={referenceFile} rings={rings} plotData={plotData} onRun={handleRun} />
               </div>
 
@@ -130,7 +130,7 @@ export default function Home() {
                 className="browser-plot-pane"
                 style={plotExpanded ? { zIndex: 10_000 } : undefined}
               >
-                <ImagePropertiesPanel imageProperties={imageProperties} onChange={setImageProperties} />
+                <RingsPanel rings={rings} setRings={setRings} onEditAnnotations={handleOpenAnnotationEditor} ringDataList={plotData?.rings} />
 
                 <div
                   className={`card ${plotExpanded ? 'fixed inset-0 flex flex-col' : ''}`}
@@ -170,7 +170,14 @@ export default function Home() {
                 </div>
 
                 <div className="mt-6 animate-fade-in">
-                  <LogConsole logs={consoleLogs} progress={progress} title="Debug Console" />
+                  {progress.step === 'Error' && progress.message && (
+                    <ErrorReportPanel error={progress.message} diagnosticLogs={consoleLogs} onRetry={handleRun} />
+                  )}
+                  <LogConsole
+                    logs={visibleConsoleLogs}
+                    progress={progress.step === 'Error' ? undefined : progress}
+                    title="Debug Console"
+                  />
                 </div>
 
                 {plotData && <StatisticsPanel plotData={plotData} />}

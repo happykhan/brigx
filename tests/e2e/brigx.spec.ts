@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Route } from '@playwright/test'
 import path from 'path'
 import fs from 'fs/promises'
 
@@ -38,6 +38,60 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByRole('heading', { name: 'Circular genome comparison for microbial genomics' })).toBeVisible()
     await expect(page.locator('.gx-nav-logo-sub')).toBeHidden()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  })
+
+  test('ring editor remains usable without horizontal overflow on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/app')
+
+    await page.getByRole('button', { name: 'Add New Ring' }).click()
+    await expect(page.getByTitle('Hex colour code')).toBeVisible()
+    await expect(page.getByTitle('Ring colour')).toBeVisible()
+    await expect(page.getByTitle('Remove ring')).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+    await expect(page.locator('.gx-console-body')).not.toContainText('[LOG]')
+    await expect(page.locator('.gx-console-body')).not.toContainText('[RingConfiguration]')
+    await expect(page.locator('.gx-console-body')).not.toContainText('Ring settings changed')
+  })
+
+  test('rings can be reordered with a drag handle', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 1000 })
+    await page.goto('/app')
+    await page.getByRole('button', { name: 'Add New Ring' }).click()
+    await page.getByRole('button', { name: 'Add New Ring' }).click()
+    await page.getByRole('button', { name: 'Add New Ring' }).click()
+
+    const ringCards = page.locator('.ring-editor-card')
+    const dragHandle = page.getByRole('button', { name: 'Drag Ring 3 to reorder' })
+    const handleBox = await dragHandle.boundingBox()
+    const firstCardBox = await ringCards.first().boundingBox()
+    expect(handleBox).not.toBeNull()
+    expect(firstCardBox).not.toBeNull()
+    await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(firstCardBox!.x + firstCardBox!.width / 2, firstCardBox!.y + firstCardBox!.height / 2, { steps: 8 })
+    await page.mouse.up()
+    await expect.poll(() => ringCards.locator('.ring-editor-name').evaluateAll(
+      elements => elements.map(element => (element as HTMLInputElement).value),
+    )).toEqual(['Ring 3', 'Ring 1', 'Ring 2'])
+  })
+
+  test('ring cards can collapse into a compact summary row', async ({ page }) => {
+    await page.goto('/app')
+    await page.getByRole('button', { name: 'Add New Ring' }).click()
+
+    const card = page.locator('.ring-editor-card').first()
+    await page.getByRole('button', { name: 'Collapse Ring 1' }).click()
+
+    await expect(card).toHaveClass(/is-collapsed/)
+    await expect(card.getByText('Ring 1', { exact: true })).toBeVisible()
+    await expect(card.locator('.ring-editor-collapsed-swatch')).toBeVisible()
+    await expect(card.getByRole('button', { name: 'Drag Ring 1 to reorder' })).toBeVisible()
+    await expect(card.locator('.ring-editor-fields')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Expand Ring 1' }).click()
+    await expect(card).not.toHaveClass(/is-collapsed/)
+    await expect(card.locator('.ring-editor-fields')).toHaveCount(1)
   })
 
   test('opens a published comparison as an interactive read-only viewer', async ({ page }) => {
@@ -103,6 +157,38 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByText('E. coli CFT073', { exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Preview result' })).toBeEnabled()
+
+    const plotArea = page.getByTestId('plot-area')
+    await plotArea.scrollIntoViewIfNeeded()
+    const plotBox = await plotArea.boundingBox()
+    const canvasBox = await plotArea.locator('canvas').boundingBox()
+    expect(plotBox).not.toBeNull()
+    expect(canvasBox).not.toBeNull()
+    const tooltip = page.getByTestId('plot-tooltip')
+    let foundTooltip = false
+    for (const radius of [0.34, 0.39, 0.43]) {
+      for (let step = 0; step < 16; step += 1) {
+        const angle = (step / 16) * Math.PI * 2
+        await page.mouse.move(
+          canvasBox!.x + canvasBox!.width * (0.5 + Math.cos(angle) * radius),
+          canvasBox!.y + canvasBox!.height * (0.5 + Math.sin(angle) * radius),
+        )
+        if (await tooltip.count() === 1) {
+          foundTooltip = true
+          break
+        }
+      }
+      if (foundTooltip) break
+    }
+
+    expect(foundTooltip).toBe(true)
+    await expect(tooltip).toBeVisible()
+    const tooltipBox = await tooltip.boundingBox()
+    expect(tooltipBox).not.toBeNull()
+    expect(tooltipBox!.x).toBeGreaterThanOrEqual(plotBox!.x)
+    expect(tooltipBox!.y).toBeGreaterThanOrEqual(plotBox!.y)
+    expect(tooltipBox!.x + tooltipBox!.width).toBeLessThanOrEqual(plotBox!.x + plotBox!.width)
+    expect(tooltipBox!.y + tooltipBox!.height).toBeLessThanOrEqual(plotBox!.y + plotBox!.height)
   })
 
   test('loads the app with Reference Genome section visible', async ({ page }) => {
@@ -127,10 +213,17 @@ test.describe('BRIGX e2e — circular genome plot', () => {
   test('uploading a reference FASTA shows the filename', async ({ page }) => {
     await page.goto('/app')
 
+    await expect(page.getByRole('button', { name: 'Choose reference file' })).toBeVisible()
+    await expect(page.getByText('No file selected', { exact: true })).toBeVisible()
     const refInput = page.locator('input[type="file"][accept*=".fa"]').first()
     await refInput.setInputFiles(REFERENCE)
 
     await expect(page.getByText('reference.fa', { exact: true })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('button', { name: 'Replace file' })).toBeVisible()
+    const consoleBody = page.locator('.gx-console-body')
+    await expect(consoleBody).toContainText('Parameters:')
+    await expect(consoleBody).toContainText('• Minimum identity: 70')
+    await expect(consoleBody).not.toContainText('{"minIdentity"')
   })
 
   test('uploading reference shows the Run button', async ({ page }) => {
@@ -179,15 +272,19 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     expect(pageErrors).toEqual([])
   })
 
-  test('loads Bakta GFF3 on the reference track', async ({ page }) => {
+  test('imports Bakta GFF3 through a custom ring overlay', async ({ page }) => {
     await page.goto('/app')
 
     await page.getByLabel('Reference genome file').setInputFiles(REFERENCE)
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 30_000 })
-    await page.getByLabel('Companion reference annotation file').setInputFiles(BAKTA_GFF3)
+    await page.getByRole('button', { name: 'Add New Ring' }).click()
+    await page.getByRole('button', { name: 'Custom Ring Overlay' }).click()
+    await page.getByRole('button', { name: 'Import GFF3 Features' }).click()
+    await page.locator('input[accept=".gff3,.gff"]').setInputFiles(BAKTA_GFF3)
 
-    await expect(page.getByText(/bakta\.gff3 — 2 CDS feature\(s\)/)).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Centre' })).toBeVisible()
+    await expect(page.getByTestId('annotation-row')).toHaveCount(2)
+    await expect(page.getByText(/^2 annotation\(s\) \| Reference:/)).toBeVisible()
+    await expect(page.getByLabel('Companion reference annotation file')).toHaveCount(0)
   })
 
   test('about page discloses privacy, licences, and third-party software', async ({ page }) => {
@@ -233,6 +330,13 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await page.locator('input[type="file"][multiple]').setInputFiles(QUERY)
 
     const assetNames = ['formatdb.js', 'formatdb.wasm', 'blastall.js', 'blastall.wasm']
+    const requestedAssets: string[] = []
+    page.on('request', request => {
+      const pathname = new URL(request.url()).pathname
+      if (assetNames.some(assetName => pathname.endsWith(`/wasm/blast/${assetName}`))) {
+        requestedAssets.push(pathname)
+      }
+    })
     const assetResponses = assetNames.map(assetName => page.waitForResponse(
       response => {
         const url = new URL(response.url())
@@ -245,7 +349,49 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await page.getByRole('button', { name: 'Run Alignments' }).click()
     await Promise.all(assetResponses)
     await expect(page.getByText('Alignments completed successfully!')).toBeVisible({ timeout: 30_000 })
+    for (const moduleName of ['formatdb', 'blastall']) {
+      const jsRequests = requestedAssets.filter(pathname => pathname.endsWith(`/wasm/blast/${moduleName}.js`))
+      const wasmRequests = requestedAssets.filter(pathname => pathname.endsWith(`/wasm/blast/${moduleName}.wasm`))
+      expect(jsRequests.length).toBeGreaterThan(0)
+      expect(jsRequests).toHaveLength(wasmRequests.length)
+    }
     expect(pageErrors).toEqual([])
+  })
+
+  test('copies an alignment error and its diagnostic context', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    const formatdbPattern = '**/wasm/blast/formatdb.js*'
+    const failFormatdb = (route: Route) => route.fulfill({
+      status: 503,
+      contentType: 'text/plain',
+      body: 'Deliberate test failure',
+    })
+    await page.route(formatdbPattern, failFormatdb)
+    await page.goto('/app')
+
+    await page.getByLabel('Reference genome file').setInputFiles(REFERENCE)
+    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 30_000 })
+    await page.getByRole('button', { name: 'Add New Ring' }).click()
+    await page.locator('input[type="file"][multiple]').setInputFiles(QUERY)
+    await page.getByRole('button', { name: 'Run Alignments' }).click()
+
+    const errorPanel = page.getByRole('region', { name: 'Alignment error' })
+    await expect(errorPanel).toBeVisible({ timeout: 30_000 })
+    await expect(errorPanel).toContainText('Failed to fetch formatdb.js: 503')
+    await expect(page.getByText('Alignment failed. See error details below.')).toBeVisible()
+    await expect(errorPanel.getByRole('button', { name: 'Retry alignment' })).toBeVisible()
+    await errorPanel.getByRole('button', { name: 'Copy error details' }).click()
+    await expect(errorPanel.getByRole('button', { name: 'Copied' })).toBeVisible()
+
+    const copied = await page.evaluate(() => navigator.clipboard.readText())
+    expect(copied).toContain('BRIGX error\n\nFailed to fetch formatdb.js: 503')
+    expect(copied).toContain('Diagnostic log')
+    expect(copied).toContain('[ERROR] [Page] Alignment error:')
+
+    await page.unroute(formatdbPattern, failFormatdb)
+    await errorPanel.getByRole('button', { name: 'Retry alignment' }).click()
+    await expect(page.getByText('Alignments completed successfully!')).toBeVisible({ timeout: 30_000 })
+    await expect(errorPanel).toBeHidden()
   })
 
   test('expanded plot controls remain clickable and SVG downloads', async ({ page }) => {
@@ -273,5 +419,53 @@ test.describe('BRIGX e2e — circular genome plot', () => {
 
     await page.getByRole('button', { name: 'Shrink plot' }).click()
     await expect(page.getByRole('button', { name: 'Expand plot' })).toBeVisible()
+  })
+
+  test('legend and zoom resets are separate controls', async ({ page }) => {
+    await page.goto('/app')
+    await page.getByLabel('Reference genome file').setInputFiles(REFERENCE)
+    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 30_000 })
+
+    await page.getByRole('button', { name: 'Zoom in (or scroll up)' }).click()
+    await page.getByRole('button', { name: 'Zoom in (or scroll up)' }).click()
+    await expect(page.getByTestId('plot-zoom')).toHaveText('144%')
+
+    await page.getByRole('button', { name: 'Reset legends' }).click()
+    await expect(page.getByTestId('plot-zoom')).toHaveText('144%')
+
+    await page.getByRole('button', { name: 'Reset zoom' }).click()
+    await expect(page.getByTestId('plot-zoom')).toHaveText('100%')
+  })
+
+  test('image property sliders drag smoothly and values can be typed directly', async ({ page }) => {
+    await page.goto('/app')
+    await page.getByRole('button', { name: 'Fonts' }).click()
+
+    const labelFontSlider = page.getByRole('slider', { name: 'Label Font slider' })
+    await expect(labelFontSlider).toHaveValue('14')
+
+    const sliderBox = await labelFontSlider.boundingBox()
+    expect(sliderBox).not.toBeNull()
+    await labelFontSlider.evaluate(element => { element.dataset.dragTest = 'same-element' })
+    const sliderY = sliderBox!.y + sliderBox!.height / 2
+    await page.mouse.move(sliderBox!.x + sliderBox!.width * 0.6, sliderY)
+    await page.mouse.down()
+    await page.mouse.move(sliderBox!.x + sliderBox!.width * 0.8, sliderY, { steps: 8 })
+    await expect(labelFontSlider).toHaveAttribute('data-drag-test', 'same-element')
+    await page.mouse.up()
+
+    await page.getByRole('button', { name: 'Edit Label Font value' }).click()
+    const labelFontValue = page.getByRole('spinbutton', { name: 'Label Font value' })
+    await expect(labelFontValue).toBeFocused()
+    await labelFontValue.fill('18')
+    await labelFontValue.press('Enter')
+
+    await expect(labelFontSlider).toHaveValue('18')
+    await expect(page.getByRole('button', { name: 'Edit Label Font value' })).toHaveText('18px')
+
+    await labelFontSlider.focus()
+    await labelFontSlider.press('ArrowRight')
+    await expect(labelFontSlider).toHaveValue('19')
+    await expect(page.getByRole('button', { name: 'Edit Label Font value' })).toHaveText('19px')
   })
 })

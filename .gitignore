@@ -43,6 +43,9 @@ Thumbs.db
 # TypeScript
 # vercel
 .vercel/
+.venv-docs/
+site/
+tmp/
 .vscode/
 yarn-debug.log*
 yarn-error.log*

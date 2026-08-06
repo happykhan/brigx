@@ -53,6 +53,7 @@ export default function Home() {
   const [searchParams] = useSearchParams();
   const sessionUrl = searchParams.get('url');
   const loadedSessionUrlRef = useRef<string | null>(null);
+  const plotCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [plotViewState, setPlotViewState] = useReactState<PlotViewState | null>(null);
   const [plotCentreSignal, setPlotCentreSignal] = useReactState(0);
   const [bugReportOpen, setBugReportOpen] = useReactState(false);
@@ -128,14 +129,14 @@ export default function Home() {
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
                         )}
                       </button>
-                      {plotData && <ExportPanel plotData={plotData} imageProperties={imageProperties} viewState={plotViewState} />}
+                      {plotData && <ExportPanel plotData={plotData} imageProperties={imageProperties} viewState={plotViewState} plotCanvasRef={plotCanvasRef} />}
                     </div>
                   </div>
 
                   {displayedPlotData ? (
                     <div className={plotExpanded ? 'flex-1 min-h-0' : ''}>
                       <ErrorBoundary>
-                        <CircularPlot data={displayedPlotData} imageProperties={imageProperties} onViewStateChange={handleViewStateChange} centreViewSignal={plotCentreSignal} />
+                        <CircularPlot data={displayedPlotData} imageProperties={imageProperties} onViewStateChange={handleViewStateChange} centreViewSignal={plotCentreSignal} exportCanvasRef={plotCanvasRef} />
                       </ErrorBoundary>
                     </div>
                   ) : (

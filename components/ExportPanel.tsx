@@ -1,6 +1,6 @@
 
 
-import { useState } from 'react';
+import { useState, type RefObject } from 'react';
 import toast from 'react-hot-toast';
 import type { CircularPlotData, PlotViewState } from '@/lib/types';
 import { CircularPlotRenderer } from '@/lib/renderer';
@@ -10,6 +10,7 @@ interface ExportPanelProps {
   plotData: CircularPlotData;
   imageProperties: ImagePropertiesConfig;
   viewState?: PlotViewState | null;
+  plotCanvasRef?: RefObject<HTMLCanvasElement | null>;
 }
 
 // The interactive canvas uses a fixed 1000x1000 logical coordinate system.
@@ -71,7 +72,7 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
   });
 }
 
-export default function ExportPanel({ plotData, imageProperties, viewState }: ExportPanelProps) {
+export default function ExportPanel({ plotData, imageProperties, viewState, plotCanvasRef }: ExportPanelProps) {
   const [isExporting, setIsExporting] = useState(false);
   const exportSVG = () => {
     const svgString = renderPlotSVG(plotData, imageProperties, viewState);
@@ -83,9 +84,11 @@ export default function ExportPanel({ plotData, imageProperties, viewState }: Ex
   const exportPNG = async () => {
     setIsExporting(true);
     try {
-      const svgString = renderPlotSVG(plotData, imageProperties, viewState);
+      const sourceCanvas = plotCanvasRef?.current;
+      if (!sourceCanvas) throw new Error('The plot canvas is not ready');
 
-      // Convert SVG to PNG
+      // Rasterise the live interactive canvas so PNG output preserves the
+      // exact current zoom, pan, labels and dragged legend positions.
       const canvas = document.createElement('canvas');
       canvas.width = 1200;
       canvas.height = 1200;
@@ -98,24 +101,7 @@ export default function ExportPanel({ plotData, imageProperties, viewState }: Ex
       // Fill white background
       ctx.fillStyle = 'white';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Create image from SVG
-      const img = new Image();
-      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
-
-      await new Promise((resolve, reject) => {
-        img.onload = () => {
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          URL.revokeObjectURL(url);
-          resolve(undefined);
-        };
-        img.onerror = () => {
-          URL.revokeObjectURL(url);
-          reject(new Error('Failed to load SVG image'));
-        };
-        img.src = url;
-      });
+      ctx.drawImage(sourceCanvas, 0, 0, canvas.width, canvas.height);
 
       const pngBlob = await canvasToBlob(canvas, 'image/png');
       downloadBlob(pngBlob, `brig-plot-${Date.now()}.png`);

@@ -1,6 +1,6 @@
 
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, type RefObject } from 'react';
 import type { CircularPlotData, PlotViewState } from '@/lib/types';
 import type { ImagePropertiesConfig } from './ImageProperties';
 import { CanvasPlotRenderer } from '@/lib/canvas-renderer';
@@ -12,6 +12,7 @@ interface CircularPlotProps {
   onViewStateChange?: (state: PlotViewState) => void;
   squarePlot?: boolean;
   centreViewSignal?: number;
+  exportCanvasRef?: RefObject<HTMLCanvasElement | null>;
 }
 
 interface TooltipInfo extends PlotTooltip {
@@ -19,7 +20,7 @@ interface TooltipInfo extends PlotTooltip {
   y: number;
 }
 
-export default function CircularPlot({ data, imageProperties, onViewStateChange, squarePlot = false, centreViewSignal = 0 }: CircularPlotProps) {
+export default function CircularPlot({ data, imageProperties, onViewStateChange, squarePlot = false, centreViewSignal = 0, exportCanvasRef }: CircularPlotProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<CanvasPlotRenderer | null>(null);
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
@@ -43,6 +44,11 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange,
   const onViewStateChangeRef = useRef(onViewStateChange);
   const previousCentreViewSignal = useRef(centreViewSignal);
   onViewStateChangeRef.current = onViewStateChange;
+
+  const setCanvasElement = useCallback((canvas: HTMLCanvasElement | null) => {
+    canvasRef.current = canvas;
+    if (exportCanvasRef) exportCanvasRef.current = canvas;
+  }, [exportCanvasRef]);
 
   /** Emit current view state to parent (for SVG export). */
   const emitViewState = useCallback(() => {
@@ -290,7 +296,7 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange,
         style={{ cursor: draggingLegend ? 'move' : isDragging ? 'grabbing' : 'grab', background: 'var(--gx-bg-alt)' }}
       >
         <canvas
-          ref={canvasRef}
+          ref={setCanvasElement}
           style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', background: 'white', boxShadow: '0 0 0 1px var(--gx-border)' }}
         />
         {tooltip && tooltip.x != null && tooltip.y != null && (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import CircularPlot from '@/components/CircularPlot';
 import type { ImagePropertiesConfig } from '@/components/ImageProperties';
+import { importSession } from '@/lib/session';
 import type { CircularPlotData } from '@/lib/types';
 
 interface PublicationData {
@@ -14,12 +15,19 @@ export default function BRIGXFigure() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/publications/ecoli-comparison.json', { signal: controller.signal })
+    fetch('/examples/ecoli-comparison.brigx-session.json', { signal: controller.signal })
       .then(response => {
         if (!response.ok) throw new Error(`Comparison data returned ${response.status}`);
-        return response.json() as Promise<PublicationData>;
+        return response.text();
       })
-      .then(setPublication)
+      .then(json => {
+        const session = importSession(json);
+        if (!session.result) throw new Error('Example session has no embedded result');
+        setPublication({
+          plot: session.result.plot,
+          imageConfig: session.result.imageConfig,
+        });
+      })
       .catch(error => {
         if (error instanceof DOMException && error.name === 'AbortError') return;
         setLoadFailed(true);

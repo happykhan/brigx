@@ -97,7 +97,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
   test('opens a published comparison as an interactive read-only viewer', async ({ page }) => {
     await page.goto('/publication/ecoli-comparison')
 
-    await expect(page.getByRole('heading', { name: 'E. coli genome comparison' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'BRIGX Example' })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Read-only interactive genome comparison' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Zoom in (or scroll up)' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Reference Genome' })).toHaveCount(0)
@@ -124,7 +124,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await page.goto('/preview')
     await page.getByLabel('BRIGX result file').setInputFiles(path.join(process.cwd(), 'public/publications/ecoli-comparison.json'))
 
-    await expect(page.getByRole('heading', { name: 'E. coli genome comparison' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'BRIGX Example' })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Read-only interactive genome comparison' })).toBeVisible()
   })
 
@@ -135,7 +135,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     }))
     await page.goto(`/preview?url=${encodeURIComponent(GITHUB_SESSION_URL)}`)
 
-    await expect(page.getByRole('heading', { name: 'E. coli genome comparison' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'BRIGX Example' })).toBeVisible()
     await expect(page.getByText('Loaded from a public GitHub session · read-only preview')).toBeVisible()
     await expect(page.getByRole('region', { name: 'Read-only interactive genome comparison' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Edit session' })).toHaveAttribute(
@@ -153,8 +153,8 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await page.goto(`/app?url=${encodeURIComponent(GITHUB_SESSION_URL)}`)
 
     await expect(page.getByText('GitHub session and saved result loaded for editing.')).toBeVisible()
-    await expect(page.getByPlaceholder('Plot title...')).toHaveValue('E. coli genome comparison')
-    await expect(page.getByText('E. coli CFT073', { exact: true })).toBeVisible()
+    await expect(page.getByPlaceholder('Plot title...')).toHaveValue('BRIGX Example')
+    await expect(page.getByText('Ring 1', { exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Preview result' })).toBeEnabled()
 

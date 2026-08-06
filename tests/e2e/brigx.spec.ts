@@ -411,7 +411,9 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     })
 
     const pageErrors: Error[] = []
+    const consoleMessages: string[] = []
     page.on('pageerror', error => pageErrors.push(error))
+    page.on('console', message => consoleMessages.push(message.text()))
     await page.goto('/app')
 
     await page.getByLabel('Reference genome file').setInputFiles(REFERENCE)
@@ -439,6 +441,25 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await page.getByRole('button', { name: 'Run Alignments' }).click()
     await Promise.all(assetResponses)
     await expect(page.getByText('Alignments completed successfully!')).toBeVisible({ timeout: 30_000 })
+
+    const downloadAlignment = async () => {
+      const downloadPromise = page.waitForEvent('download')
+      await page.getByRole('button', { name: 'Download', exact: true }).click()
+      const download = await downloadPromise
+      const downloadPath = await download.path()
+      expect(downloadPath).not.toBeNull()
+      return fs.readFile(downloadPath!, 'utf8')
+    }
+    await expect(page.getByRole('button', { name: 'Download', exact: true })).toHaveCount(1)
+    const freshAlignment = await downloadAlignment()
+    expect(freshAlignment).toContain('#query\tsubject\t%identity')
+
+    await page.getByRole('button', { name: 'Run Alignments' }).click()
+    await expect.poll(() => consoleMessages.some(message => message.includes('Using cached alignment'))).toBe(true)
+    await expect(page.getByRole('button', { name: 'Download', exact: true })).toHaveCount(1)
+    const cachedAlignment = await downloadAlignment()
+    expect(cachedAlignment).toBe(freshAlignment)
+
     for (const moduleName of ['formatdb', 'blastall']) {
       const jsRequests = requestedAssets.filter(pathname => pathname.endsWith(`/wasm/blast/${moduleName}.js`))
       const wasmRequests = requestedAssets.filter(pathname => pathname.endsWith(`/wasm/blast/${moduleName}.wasm`))

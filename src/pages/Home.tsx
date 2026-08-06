@@ -54,6 +54,7 @@ export default function Home() {
   const sessionUrl = searchParams.get('url');
   const loadedSessionUrlRef = useRef<string | null>(null);
   const [plotViewState, setPlotViewState] = useReactState<PlotViewState | null>(null);
+  const [plotCentreSignal, setPlotCentreSignal] = useReactState(0);
   const [bugReportOpen, setBugReportOpen] = useReactState(false);
   const handleViewStateChange = useCallback((state: PlotViewState) => {
     setPlotViewState(previous => samePlotViewState(previous, state) ? previous : state);
@@ -78,6 +79,10 @@ export default function Home() {
     loadedSessionUrlRef.current = sessionUrl;
     void handleLoadSessionUrl(sessionUrl);
   }, [handleLoadSessionUrl, sessionUrl]);
+  const togglePlotExpanded = () => {
+    if (!plotExpanded) setPlotCentreSignal(signal => signal + 1);
+    setPlotExpanded(value => !value);
+  };
 
   return (
     <>
@@ -116,7 +121,7 @@ export default function Home() {
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="section-title mb-0">Circular Plot</h2>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => setPlotExpanded(value => !value)} className="btn-secondary text-xs px-2 py-1" title={plotExpanded ? 'Shrink plot' : 'Expand plot'}>
+                      <button onClick={togglePlotExpanded} className="btn-secondary text-xs px-2 py-1" title={plotExpanded ? 'Shrink plot' : 'Expand plot'}>
                         {plotExpanded ? (
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                         ) : (
@@ -130,7 +135,7 @@ export default function Home() {
                   {displayedPlotData ? (
                     <div className={plotExpanded ? 'flex-1 min-h-0' : ''}>
                       <ErrorBoundary>
-                        <CircularPlot data={displayedPlotData} imageProperties={imageProperties} onViewStateChange={handleViewStateChange} />
+                        <CircularPlot data={displayedPlotData} imageProperties={imageProperties} onViewStateChange={handleViewStateChange} centreViewSignal={plotCentreSignal} />
                       </ErrorBoundary>
                     </div>
                   ) : (

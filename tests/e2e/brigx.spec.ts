@@ -484,13 +484,48 @@ test.describe('BRIGX e2e — circular genome plot', () => {
   })
 
   test('expanded plot controls remain clickable and SVG downloads', async ({ page }) => {
+    await page.setViewportSize({ width: 2048, height: 722 })
     await page.goto('/app')
 
     await page.getByLabel('Reference genome file').setInputFiles(REFERENCE)
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 30_000 })
 
+    const inlinePlotArea = page.getByTestId('plot-area')
+    await inlinePlotArea.scrollIntoViewIfNeeded()
+    const inlineCanvasBox = await inlinePlotArea.locator('canvas').boundingBox()
+    expect(inlineCanvasBox).not.toBeNull()
+    const dragY = Math.max(1, Math.min(721, inlineCanvasBox!.y + inlineCanvasBox!.height / 2))
+    await page.mouse.move(inlineCanvasBox!.x + inlineCanvasBox!.width / 2, dragY)
+    await page.mouse.down()
+    await page.mouse.move(inlineCanvasBox!.x + inlineCanvasBox!.width / 2 + 180, dragY, { steps: 6 })
+    await page.mouse.up()
+    await expect(inlinePlotArea).not.toHaveAttribute('data-plot-pan-x', '0')
+
     await page.getByRole('button', { name: 'Expand plot' }).click()
     await expect(page.getByRole('button', { name: 'Shrink plot' })).toBeVisible()
+    const expandedPlotArea = page.getByTestId('plot-area')
+    await expect(expandedPlotArea).toHaveAttribute('data-plot-pan-x', '0')
+    await expect(expandedPlotArea).toHaveAttribute('data-plot-pan-y', '0')
+    await expect.poll(async () => {
+      const canvasRect = await expandedPlotArea.locator('canvas').evaluate(canvas => canvas.getBoundingClientRect())
+      return Math.abs(canvasRect.width - canvasRect.height)
+    }).toBeLessThan(2)
+    const expandedLayout = await expandedPlotArea.evaluate(element => {
+      const canvas = element.querySelector('canvas')!;
+      const wrapperRect = element.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+      return {
+        wrapperCentre: wrapperRect.left + wrapperRect.width / 2,
+        canvasCentre: canvasRect.left + canvasRect.width / 2,
+        canvasWidth: canvasRect.width,
+        canvasHeight: canvasRect.height,
+        wrapperBackground: getComputedStyle(element).backgroundColor,
+        canvasBackground: getComputedStyle(canvas).backgroundColor,
+      };
+    })
+    expect(Math.abs(expandedLayout.canvasWidth - expandedLayout.canvasHeight)).toBeLessThan(2)
+    expect(Math.abs(expandedLayout.wrapperCentre - expandedLayout.canvasCentre)).toBeLessThan(2)
+    expect(expandedLayout.wrapperBackground).not.toBe(expandedLayout.canvasBackground)
     await page.getByRole('button', { name: 'Zoom in (or scroll up)' }).click()
     await page.getByRole('button', { name: 'Zoom in (or scroll up)' }).click()
 

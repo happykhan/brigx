@@ -2,19 +2,19 @@
 
 A browser-based circular genome comparison tool — the successor to [BRIG](https://pmc.ncbi.nlm.nih.gov/articles/PMC3163573/) (BLAST Ring Image Generator), rebuilt for the modern web.
 
-Live at [brigx.genomicx.org](https://brigx.genomicx.org) · Part of the [GenomicX](https://genomicx.org) ecosystem.
+Live at [brigx.genomicx.org](https://brigx.genomicx.org). 
 
 ## Features
 
 - **BLAST in the browser** via WebAssembly (BLAST Legacy 2.2.26, compiled with Emscripten)
 - **4 parallel alignment workers** using Web Workers for fast whole-genome comparisons
 - **GC content and GC skew** rings with adaptive scaling
-- **Annotations** from GenBank features, tab-delimited files (BRIG 5-column format), BedGraph, Wiggle, BED
+- **Annotations** from GenBank features, tab-delimited files (BRIG 5-column csv format), BedGraph, Wiggle, BED
 - **Graph rings** for coverage or any numerical data (.graph, .bedgraph, .wig, .sam)
 - **Multi-FASTA references** with configurable spacers and contig boundary visualisation
 - **Interactive** zoom, pan, and fullscreen
 - **Export** as SVG (publication quality), PNG, or JSON session
-- **Privacy first** — all data stays in your browser; nothing is uploaded
+- **Privacy first** — all data stays in your browser; nothing is uploaded anywhere. 
 
 ## Quick start
 
@@ -27,18 +27,6 @@ npm test         # 157 tests (Vitest)
 npm run build    # Production build
 npm run verify   # Full release verification, including Chromium workflows
 ```
-
-## How it works
-
-BRIGx runs entirely in the browser. Versioned BLAST binaries are compiled to WebAssembly, served from the BRIGX origin, and verified with SHA-256 before execution. Alignments run inside Web Workers so the UI stays responsive. Genome and annotation file contents are not uploaded to an analysis server.
-
-## Tech stack
-
-- Vite + React + TypeScript
-- BLAST 2.2.26 compiled to WebAssembly (Emscripten)
-- Web Workers for parallel alignment
-- [@genomicx/ui](https://github.com/happykhan/genomicx-ui) shared components (NavBar, AppFooter, LogConsole, ThemeToggle)
-- SVG rendering (no dependencies)
 
 ## File formats
 
@@ -60,11 +48,11 @@ If you use BRIGx in your research, please cite the original BRIG paper:
 
 ## Contributing
 
-Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/happykhan/brigx/issues).
+Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/happykhan/brigx/issues). Or email me.
 
 ## Author
 
-Developed by [Nabil-Fareed Alikhan](https://happykhan.com), CGPS Oxford.
+Developed by [Nabil-Fareed Alikhan](https://happykhan.com). 
 
 ## License
 

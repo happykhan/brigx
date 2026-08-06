@@ -290,9 +290,16 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await page.goto('/app')
     await page.getByRole('button', { name: 'Report a bug' }).click()
     await expect(page.getByRole('dialog', { name: 'Report a bug' })).toBeVisible()
-    await expect(page.getByLabel('What happened?')).toBeVisible()
-    await expect(page.getByLabel(/Email address/)).toBeVisible()
+    await expect(page.getByRole('link', { name: 'nabil@happykhan.com' })).toHaveAttribute('href', 'mailto:nabil@happykhan.com')
+    const emailReportLink = page.getByRole('link', { name: 'Email bug report' })
+    await expect(emailReportLink).toBeVisible()
+    await expect(emailReportLink).toHaveAttribute('href', /^mailto:nabil@happykhan\.com\?subject=BRIGX%20bug%20report&body=/)
+    await expect(page.getByText(/what happened and what you expected/)).toBeVisible()
+    await expect(page.getByText(/steps needed to reproduce/)).toBeVisible()
+    await expect(page.getByText(/error message and a screenshot/)).toBeVisible()
+    await expect(page.getByText(/browser and operating system/)).toBeVisible()
     await expect(page.getByText(/Do not include confidential/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Send report' })).toHaveCount(0)
   })
 
   test('uploading a reference FASTA shows the filename', async ({ page }) => {

@@ -6,7 +6,7 @@ This is the standard BRIGX workflow: one reference genome in the centre and one 
 
 Use a complete or well-characterised genome when possible. The reference defines every coordinate around the circle; changing it changes the visual and biological frame of the comparison.
 
-FASTA is sufficient for sequence comparison. Use GenBank or GBFF when you also want embedded CDS annotations on the reference track.
+FASTA, GenBank and GBFF references can all be used for sequence comparison. To display selected annotations, import them explicitly through **Custom Ring Overlay**.
 
 ## Configure the rings
 

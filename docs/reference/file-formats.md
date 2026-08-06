@@ -3,7 +3,7 @@
 | Format | Extensions | Use |
 |---|---|---|
 | FASTA | `.fasta`, `.fa`, `.fna` | Reference or query sequences |
-| GenBank | `.gbk`, `.gb`, `.gbff`, `.genbank` | Sequences and embedded features |
+| GenBank | `.gbk`, `.gb`, `.gbff`, `.genbank` | Reference or query sequences; embedded features can be imported into a custom ring overlay |
 | Gzip | `.gz` variants | Compressed FASTA or GenBank inputs |
 | BRIG graph | `.graph` | Coordinate-value graph tracks |
 | BedGraph | `.bedgraph` | Coordinate-value graph tracks |

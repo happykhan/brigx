@@ -28,7 +28,7 @@ Rows can be pasted from a spreadsheet as tab-separated values.
 
 Use the import controls inside **Custom Ring Overlay** to extract features from GenBank or GFF3. Review coordinates and labels after import, especially if the annotation file was generated against a different reference build.
 
-Embedded CDS annotations from a GenBank/GBFF reference are handled automatically and do not need to be imported as a custom overlay.
+Annotations embedded in a GenBank/GBFF reference are not displayed automatically. Import the features you want through **Custom Ring Overlay**.
 
 !!! warning
     An annotation interval is drawn against reference coordinates. BRIGX does not lift coordinates between assemblies.

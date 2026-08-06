@@ -96,8 +96,23 @@ export default function BugReportModal({ debugOutput, onClose }: BugReportModalP
         }),
       });
 
-      const result = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(result.error || 'The report could not be sent.');
+      const responseBody = await response.text();
+      let result: { error?: string } = {};
+      if (responseBody) {
+        try {
+          result = JSON.parse(responseBody) as { error?: string };
+        } catch {
+          // Some hosting and proxy errors return HTML or plain text. The HTTP
+          // status below is more useful to the reporter than a JSON parse error.
+        }
+      }
+
+      if (!response.ok) {
+        const localDevelopmentError = import.meta.env.DEV && response.status === 404
+          ? 'Bug reports cannot be sent from the local Vite server because the Cloudflare reporting endpoint is not running. Submit the report from the deployed BRIGX site.'
+          : '';
+        throw new Error(result.error || localDevelopmentError || `The report could not be sent (HTTP ${response.status}).`);
+      }
       setStatus('sent');
     } catch (error) {
       setStatus('error');

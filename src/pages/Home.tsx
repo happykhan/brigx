@@ -1,6 +1,6 @@
 
 import { lazy, Suspense, useState as useReactState, useCallback, useEffect, useMemo, useRef } from 'react';
-import toast, { Toaster } from 'react-hot-toast';
+import { Toaster } from 'react-hot-toast';
 import { useSearchParams } from 'react-router-dom';
 import { LogConsole } from '@genomicx/ui';
 import BrowserSessionBar from '@/components/BrowserSessionBar';
@@ -18,8 +18,6 @@ import ProductFooter from '@/components/ProductFooter';
 import ProductNav from '@/components/ProductNav';
 import { useBRIGController } from '@/hooks/useBRIGController';
 import { formatVisibleConsoleLine, isUsefulConsoleLine } from '@/hooks/useConsoleCapture';
-import { createPreviewId, saveResultPreview } from '@/lib/resultPreviewStore';
-import { createResultSnapshot } from '@/lib/resultSnapshot';
 import type { PlotViewState } from '@/lib/types';
 
 const AnnotationEditor = lazy(() => import('@/components/AnnotationEditor'));
@@ -75,27 +73,6 @@ export default function Home() {
     () => consoleLogs.filter(isUsefulConsoleLine).map(formatVisibleConsoleLine),
     [consoleLogs],
   );
-  const handlePreview = useCallback(() => {
-    if (!displayedPlotData) return;
-    const id = createPreviewId();
-    const previewUrl = `/preview/${id}`;
-    const previewWindow = window.open('', '_blank');
-    void saveResultPreview(id, createResultSnapshot(displayedPlotData, imageProperties))
-      .then(() => {
-        if (previewWindow) {
-          previewWindow.opener = null;
-          previewWindow.location.href = previewUrl;
-        } else {
-          window.location.href = previewUrl;
-        }
-      })
-      .catch(error => {
-        previewWindow?.close();
-        console.error('Preview error:', error);
-        toast.error('Could not create the read-only preview');
-      });
-  }, [displayedPlotData, imageProperties]);
-
   useEffect(() => {
     if (!sessionUrl || loadedSessionUrlRef.current === sessionUrl) return;
     loadedSessionUrlRef.current = sessionUrl;
@@ -110,8 +87,6 @@ export default function Home() {
         <BrowserSessionBar
           onSave={handleSaveSession}
           onLoad={handleLoadSession}
-          onPreview={handlePreview}
-          previewDisabled={!displayedPlotData}
           onReportBug={() => setBugReportOpen(true)}
         />
 

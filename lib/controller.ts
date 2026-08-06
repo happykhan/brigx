@@ -9,10 +9,8 @@ import type {
   PipelineParams,
   ProgressUpdate,
   ContigBoundary,
-  GraphPoint,
-  Feature
+  GraphPoint
 } from './types';
-import { extractGenBankFeatures } from './featureParser';
 import { parseSAMCoverage } from '@/lib/samParser';
 import { parseGraphFile } from '@/lib/graphParser';
 import { normaliseFileAccessError, readFileText } from '@/lib/fileAccess';
@@ -364,26 +362,6 @@ export class BRIGController {
       }
       console.log(`[Controller] Reference: ${reference.name}, ${(reference.length / 1_000_000).toFixed(2)} Mbp`);
 
-      // Extract features from GenBank reference if applicable
-      let referenceFeatures: Feature[] = [];
-      const refExt = referenceFile.name.toLowerCase();
-      if (refExt.match(/\.(gbk|gb|genbank|gbff)(\.gz)?$/)) {
-        try {
-          const refText = await readFileText(referenceFile);
-          const annots = extractGenBankFeatures(refText, 'CDS');
-          referenceFeatures = annots.map(a => ({
-            type: 'CDS',
-            start: a.start,
-            end: a.end,
-            strand: (a.shape === 'arrow-forward' ? '+' : '-') as '+' | '-',
-            name: a.label,
-          }));
-          console.log(`[Controller] Extracted ${referenceFeatures.length} CDS features from reference`);
-        } catch (e) {
-          console.warn('[Controller] Failed to extract reference features:', e);
-        }
-      }
-
       console.log('[Controller] Step 2: Calculating GC content and skew');
       this.updateProgress('Calculating GC content and skew', 10);
       // Adapt window size to reference length: aim for ~500-5000 windows
@@ -406,7 +384,6 @@ export class BRIGController {
               length: reference.length,
               gcContent,
               gcSkew,
-              features: referenceFeatures,
               contigs: contigBoundaries
             },
             rings: [], // Empty rings array initially
@@ -651,7 +628,6 @@ export class BRIGController {
                 length: reference.length,
                 gcContent,
                 gcSkew,
-                features: referenceFeatures,
                 contigs: contigBoundaries
               },
               rings: [...ringDataArray], // Send all rings processed so far
@@ -674,7 +650,6 @@ export class BRIGController {
           length: reference.length,
           gcContent,
           gcSkew,
-          features: referenceFeatures,
           contigs: contigBoundaries
         },
         rings: ringDataArray,

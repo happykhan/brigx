@@ -231,7 +231,7 @@ export default function AnnotationEditor({
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center z-50 p-4"
+      className="annotation-editor-backdrop fixed inset-0 flex items-center justify-center p-4"
       style={{ background: 'rgba(0, 0, 0, 0.6)' }}
       role="dialog"
       aria-modal="true"
@@ -302,10 +302,10 @@ export default function AnnotationEditor({
           </div>
         )}
 
-        <div className="flex-1 overflow-auto p-4" style={{ minHeight: '400px' }}>
-          <table className="w-full border-collapse text-sm" aria-label="Annotations">
+        <div className="flex-1 overflow-auto px-4 pb-4" style={{ minHeight: '400px' }}>
+          <table className="annotation-table w-full border-separate border-spacing-0 text-sm" aria-label="Annotations">
             <caption className="sr-only">Editable annotations. Use the checkboxes to select rows for deletion.</caption>
-            <thead className="sticky top-0 z-10" style={{ background: 'var(--gx-bg-alt)' }}>
+            <thead>
               <tr>
                 <th className="border p-2 w-12" style={{ borderColor: 'var(--gx-border)' }} scope="col">
                   <input

@@ -48,6 +48,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByTitle('Hex colour code')).toBeVisible()
     await expect(page.getByTitle('Ring colour')).toBeVisible()
     await expect(page.getByTitle('Remove ring')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Float panel' })).toHaveCount(0)
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
     await expect(page.locator('.gx-console-body')).not.toContainText('[LOG]')
     await expect(page.locator('.gx-console-body')).not.toContainText('[RingConfiguration]')
@@ -94,6 +95,88 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(card.locator('.ring-editor-fields')).toHaveCount(1)
   })
 
+  test('ring configuration can float, move, resize, minimise, dock and close', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/app')
+
+    const panel = page.getByTestId('rings-panel')
+    await page.getByRole('button', { name: 'Float panel' }).click()
+    await expect(panel).toHaveClass(/is-floating/)
+
+    const initialBox = await panel.boundingBox()
+    const headingBox = await page.getByRole('heading', { name: 'Ring Configuration' }).boundingBox()
+    expect(initialBox).not.toBeNull()
+    expect(headingBox).not.toBeNull()
+
+    await page.mouse.move(headingBox!.x + headingBox!.width / 2, headingBox!.y + headingBox!.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(headingBox!.x - 150, headingBox!.y + 90, { steps: 8 })
+    await page.mouse.up()
+
+    const movedBox = await panel.boundingBox()
+    expect(movedBox).not.toBeNull()
+    expect(movedBox!.x).toBeLessThan(initialBox!.x - 100)
+    expect(movedBox!.y).toBeGreaterThan(initialBox!.y + 50)
+
+    const resizeHandle = page.getByRole('button', { name: 'Resize Ring Configuration panel' })
+    const resizeBox = await resizeHandle.boundingBox()
+    expect(resizeBox).not.toBeNull()
+    await page.mouse.move(resizeBox!.x + resizeBox!.width / 2, resizeBox!.y + resizeBox!.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(resizeBox!.x + 80, resizeBox!.y + 50, { steps: 6 })
+    await page.mouse.up()
+
+    const resizedBox = await panel.boundingBox()
+    expect(resizedBox).not.toBeNull()
+    expect(resizedBox!.width).toBeGreaterThan(movedBox!.width + 50)
+    expect(resizedBox!.height).toBeGreaterThan(movedBox!.height + 30)
+
+    await page.reload()
+    await page.getByRole('button', { name: 'Float panel' }).click()
+    const restoredFrameBox = await page.getByTestId('rings-panel').boundingBox()
+    expect(restoredFrameBox).not.toBeNull()
+    expect(Math.abs(restoredFrameBox!.x - resizedBox!.x)).toBeLessThan(3)
+    expect(Math.abs(restoredFrameBox!.y - resizedBox!.y)).toBeLessThan(3)
+    expect(Math.abs(restoredFrameBox!.width - resizedBox!.width)).toBeLessThan(3)
+    expect(Math.abs(restoredFrameBox!.height - resizedBox!.height)).toBeLessThan(3)
+
+    await page.getByRole('button', { name: 'Minimise' }).click()
+    await expect(panel).toHaveClass(/is-minimised/)
+    expect((await panel.boundingBox())!.height).toBeLessThan(120)
+    await expect(page.getByRole('button', { name: 'Add New Ring' })).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Restore' }).click()
+    await page.getByRole('button', { name: 'Dock' }).click()
+    await expect(panel).toHaveClass(/is-docked/)
+
+    await page.getByRole('button', { name: 'Close', exact: true }).click()
+    await expect(panel).toHaveCount(0)
+    await page.getByRole('button', { name: 'Show Ring Configuration' }).click()
+    await expect(page.getByTestId('rings-panel')).toHaveClass(/is-docked/)
+  })
+
+  test('floating ring panel keeps its resize handle pinned while rings scroll', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/app')
+
+    await page.getByRole('button', { name: 'Float panel' }).click()
+    for (let index = 0; index < 4; index += 1) {
+      await page.getByRole('button', { name: 'Add New Ring' }).click()
+    }
+
+    const panel = page.getByTestId('rings-panel')
+    const scrollArea = panel.locator('.rings-panel-scroll-area')
+    await expect(scrollArea).toBeVisible()
+    await scrollArea.evaluate(element => { element.scrollTop = element.scrollHeight })
+
+    const panelBox = await panel.boundingBox()
+    const handleBox = await page.getByRole('button', { name: 'Resize Ring Configuration panel' }).boundingBox()
+    expect(panelBox).not.toBeNull()
+    expect(handleBox).not.toBeNull()
+    expect(Math.abs(panelBox!.x + panelBox!.width - handleBox!.x - handleBox!.width)).toBeLessThan(8)
+    expect(Math.abs(panelBox!.y + panelBox!.height - handleBox!.y - handleBox!.height)).toBeLessThan(8)
+  })
+
   test('opens a published comparison as an interactive read-only viewer', async ({ page }) => {
     await page.goto('/publication/ecoli-comparison')
 
@@ -103,29 +186,29 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByRole('heading', { name: 'Reference Genome' })).toHaveCount(0)
   })
 
-  test('opens a generated plot as a browser-local read-only preview', async ({ page, context }) => {
-    await page.goto('/app')
-    await expect(page.getByRole('button', { name: 'Preview result' })).toBeDisabled()
-    await page.getByLabel('Reference genome file').setInputFiles(REFERENCE)
-    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 30_000 })
-
-    const previewPagePromise = context.waitForEvent('page')
-    await page.getByRole('button', { name: 'Preview result' }).click()
-    const previewPage = await previewPagePromise
-    await previewPage.waitForURL(/\/preview\/[a-f0-9-]+$/)
-
-    await expect(previewPage.getByText(/Local preview.*not shareable/)).toBeVisible()
-    await expect(previewPage.getByRole('region', { name: 'Read-only interactive genome comparison' })).toBeVisible()
-    await expect(previewPage.getByRole('button', { name: 'Download result' })).toBeVisible()
-    await expect(previewPage.getByRole('heading', { name: 'Reference Genome' })).toHaveCount(0)
-  })
-
   test('opens a portable result file in the read-only viewer', async ({ page }) => {
-    await page.goto('/preview')
+    await page.goto('/viewer')
+    await expect(page.getByRole('link', { name: 'Viewer' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Open a read-only BRIGX result' })).toBeVisible()
     await page.getByLabel('BRIGX result file').setInputFiles(path.join(process.cwd(), 'public/publications/ecoli-comparison.json'))
 
     await expect(page.getByRole('heading', { name: 'BRIGX Example' })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Read-only interactive genome comparison' })).toBeVisible()
+    await expect(page.getByText('BRIGX read-only result', { exact: true })).toHaveCount(0)
+    const statistics = page.getByRole('region', { name: 'Comparison statistics' })
+    await expect(statistics.getByRole('heading', { name: 'Statistics' })).toBeVisible()
+    await expect(statistics.getByText('Coverage: 78.5%')).toBeVisible()
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      statistics.getByRole('button', { name: 'Download' }).first().click(),
+    ])
+    expect(download.suggestedFilename()).toBe('Ring 1_alignment.txt')
+    const downloadPath = await download.path()
+    expect(downloadPath).not.toBeNull()
+    const alignmentText = await fs.readFile(downloadPath!, 'utf8')
+    expect(alignmentText).toMatch(/^#query\tsubject\t%identity\talignment_length/)
+    expect(alignmentText.split('\n').length).toBeGreaterThan(100)
   })
 
   test('previews a GitHub session URL as a read-only result', async ({ page }) => {
@@ -133,10 +216,10 @@ test.describe('BRIGX e2e — circular genome plot', () => {
       path: EXAMPLE_SESSION,
       contentType: 'application/json',
     }))
-    await page.goto(`/preview?url=${encodeURIComponent(GITHUB_SESSION_URL)}`)
+    await page.goto(`/viewer?url=${encodeURIComponent(GITHUB_SESSION_URL)}`)
 
     await expect(page.getByRole('heading', { name: 'BRIGX Example' })).toBeVisible()
-    await expect(page.getByText('Loaded from a public GitHub session · read-only preview')).toBeVisible()
+    await expect(page.getByText('Loaded from a public GitHub session · read-only viewer')).toBeVisible()
     await expect(page.getByRole('region', { name: 'Read-only interactive genome comparison' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Edit session' })).toHaveAttribute(
       'href',
@@ -156,7 +239,8 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByPlaceholder('Plot title...')).toHaveValue('BRIGX Example')
     await expect(page.getByText('Ring 1', { exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Preview result' })).toBeEnabled()
+    await expect(page.getByRole('button', { name: 'Preview result' })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Viewer' })).toBeVisible()
 
     const plotArea = page.getByTestId('plot-area')
     await plotArea.scrollIntoViewIfNeeded()
@@ -246,8 +330,13 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     page.on('pageerror', error => pageErrors.push(error))
 
     await page.getByRole('button', { name: 'Add New Ring' }).click()
+    await page.getByRole('button', { name: 'Float panel' }).click()
     await page.getByRole('button', { name: 'Custom Ring Overlay' }).click()
-    await expect(page.getByRole('heading', { name: 'Annotations for Ring 1' })).toBeVisible()
+    const annotationDialog = page.getByRole('dialog', { name: 'Annotations for Ring 1' })
+    await expect(annotationDialog).toBeVisible()
+    const modalLayer = await annotationDialog.evaluate(element => Number(getComputedStyle(element).zIndex))
+    const floatingPanelLayer = await page.getByTestId('rings-panel').evaluate(element => Number(getComputedStyle(element).zIndex))
+    expect(modalLayer).toBeGreaterThan(floatingPanelLayer)
     await page.getByRole('button', { name: 'Add New', exact: true }).click()
 
     const firstLabelCell = page.getByRole('textbox', { name: 'Label row 1' })

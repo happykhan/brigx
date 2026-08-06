@@ -12,6 +12,8 @@
   --brigx-rule-strong: color-mix(in srgb, var(--gx-text) 34%, transparent);
   --brigx-measure: 80rem;
   --brigx-text-measure: 44rem;
+  --brigx-layer-floating-panel: 9000;
+  --brigx-layer-modal: 10000;
 }
 
 html {
@@ -226,6 +228,11 @@ input:focus-visible {
 
 .publication-viewer > div {
   height: 100%;
+}
+
+.publication-statistics {
+  max-width: 90rem;
+  margin: 0 auto;
 }
 
 .publication-message {
@@ -789,16 +796,11 @@ input:focus-visible {
 
 .browser-session-inner {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   min-height: 2.5rem;
   font-family: var(--gx-font-mono);
   font-size: 0.72rem;
-}
-
-.browser-session-inner > span {
-  color: var(--gx-text-muted);
-  text-transform: uppercase;
 }
 
 .browser-session-inner > div {
@@ -833,6 +835,119 @@ input:focus-visible {
   grid-template-columns: minmax(19rem, 0.92fr) minmax(0, 2.08fr);
   gap: 2rem;
   align-items: start;
+}
+
+.rings-panel {
+  position: relative;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.rings-panel.is-floating {
+  position: fixed;
+  z-index: var(--brigx-layer-floating-panel);
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  overflow: hidden;
+  box-shadow: 0 24px 64px color-mix(in srgb, #000 34%, transparent);
+}
+
+.rings-panel-scroll-area {
+  height: 100%;
+  padding-right: 0.35rem;
+  padding-bottom: 1.75rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.annotation-editor-backdrop {
+  z-index: var(--brigx-layer-modal);
+}
+
+.rings-panel.is-minimised {
+  overflow: hidden;
+}
+
+.ring-configuration-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ring-configuration-header.is-draggable {
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+.ring-configuration-header-actions,
+.rings-panel-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.rings-panel-controls {
+  padding-right: 0.2rem;
+  border-right: 1px solid var(--gx-border);
+}
+
+.rings-panel-controls button {
+  min-height: 1.85rem;
+  padding-inline: 0.55rem;
+  color: var(--gx-text-muted);
+  background: color-mix(in srgb, var(--gx-bg) 75%, transparent);
+  border: 1px solid var(--gx-border);
+  border-radius: var(--gx-radius-sm);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.rings-panel-controls button:hover,
+.rings-panel-controls button:focus-visible {
+  color: var(--gx-accent);
+  border-color: var(--gx-accent);
+}
+
+.rings-panel-resize-handle {
+  position: absolute;
+  right: 0.25rem;
+  bottom: 0.25rem;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  background: linear-gradient(135deg, transparent 45%, var(--gx-text-muted) 46% 54%, transparent 55% 64%, var(--gx-text-muted) 65% 73%, transparent 74%);
+  border: 0;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.rings-panel-restore {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@container (max-width: 560px) {
+  .ring-configuration-header,
+  .ring-editor-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ring-configuration-header-actions {
+    justify-content: space-between;
+  }
+
+  .ring-editor-card-actions {
+    align-self: flex-end;
+  }
+
+  .ring-editor-fields {
+    grid-template-columns: 1fr;
+  }
 }
 
 .ring-editor-shell {
@@ -1229,6 +1344,14 @@ input:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.annotation-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--gx-bg-alt);
+  box-shadow: inset 0 -1px 0 var(--gx-border);
 }
 
 @media (max-width: 520px) {

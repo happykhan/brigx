@@ -51,7 +51,7 @@ export default function ReferenceInput({
           />
         </div>
         <p className="text-xs mt-2" style={{ color: 'var(--gx-text-muted)' }}>
-          GenBank and GBFF CDS annotations are displayed automatically. Multi-FASTA references are joined with spacers.
+          Multi-FASTA references are joined with spacers.
         </p>
       </div>
     </div>

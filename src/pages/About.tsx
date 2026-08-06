@@ -104,6 +104,10 @@ export default function AboutPage() {
               </p>
 
               <p className="mb-4">
+                BRIGX was developed in my own time, and I cover the costs of hosting this server. So, in a way there is a conflict of interest because the funders (me) had a major role in the design and development of this work.
+              </p>
+              
+              <p className="mb-4">
                 A desktop version is possible, but applications need to be signed before we can distribute them properly.
                 Apple charges US$99 a year, and Windows signing costs about US$10 a month.
               </p>

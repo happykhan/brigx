@@ -545,6 +545,67 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByRole('button', { name: 'Expand plot' })).toBeVisible()
   })
 
+  test('PNG export matches the live canvas after moving a legend', async ({ page }) => {
+    await page.goto('/app')
+    await page.getByLabel('Reference genome file').setInputFiles(REFERENCE)
+    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 30_000 })
+
+    const plotArea = page.getByTestId('plot-area')
+    await plotArea.scrollIntoViewIfNeeded()
+    const canvas = plotArea.locator('canvas')
+    const canvasBox = await canvas.boundingBox()
+    expect(canvasBox).not.toBeNull()
+
+    // Move the GC legend well away from its default corner, then zoom the map.
+    const scale = canvasBox!.width / 1000
+    const legendX = canvasBox!.x + 60 * scale
+    const legendY = canvasBox!.y + 45 * scale
+    await page.mouse.move(legendX, legendY)
+    await page.mouse.down()
+    await page.mouse.move(legendX + 360 * scale, legendY + 260 * scale, { steps: 8 })
+    await page.mouse.up()
+    await page.mouse.move(canvasBox!.x + canvasBox!.width / 2, canvasBox!.y + canvasBox!.height / 2)
+    await page.mouse.wheel(0, 100)
+    await page.mouse.wheel(0, 100)
+    await expect(page.getByTestId('plot-zoom')).toHaveText('81%')
+
+    // Observe the pixels handed to the PNG encoder and compare them with the
+    // live canvas rendered to the same 1200 x 1200 output dimensions.
+    await page.evaluate(() => {
+      const originalToBlob = HTMLCanvasElement.prototype.toBlob
+      HTMLCanvasElement.prototype.toBlob = function (callback, type, quality) {
+        if (this.width === 1200 && this.height === 1200) {
+          const source = document.querySelector<HTMLCanvasElement>('[data-testid="plot-area"] canvas')
+          const expected = document.createElement('canvas')
+          expected.width = 1200
+          expected.height = 1200
+          const expectedContext = expected.getContext('2d')!
+          expectedContext.fillStyle = 'white'
+          expectedContext.fillRect(0, 0, expected.width, expected.height)
+          expectedContext.drawImage(source!, 0, 0, expected.width, expected.height)
+
+          const expectedPixels = expectedContext.getImageData(0, 0, 1200, 1200).data
+          const actualPixels = this.getContext('2d')!.getImageData(0, 0, 1200, 1200).data
+          let matches = true
+          for (let index = 0; index < expectedPixels.length; index += 1) {
+            if (expectedPixels[index] !== actualPixels[index]) {
+              matches = false
+              break
+            }
+          }
+          document.body.dataset.pngExportMatchesCanvas = String(matches)
+        }
+        return originalToBlob.call(this, callback, type, quality)
+      }
+    })
+
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'PNG', exact: true }).click()
+    const download = await downloadPromise
+    expect(download.suggestedFilename()).toMatch(/^brig-plot-\d+\.png$/)
+    await expect(page.locator('body')).toHaveAttribute('data-png-export-matches-canvas', 'true')
+  })
+
   test('legend and zoom resets are separate controls', async ({ page }) => {
     await page.goto('/app')
     await page.getByLabel('Reference genome file').setInputFiles(REFERENCE)

@@ -11,6 +11,7 @@ interface CircularPlotProps {
   imageProperties: ImagePropertiesConfig;
   onViewStateChange?: (state: PlotViewState) => void;
   squarePlot?: boolean;
+  centreViewSignal?: number;
 }
 
 interface TooltipInfo extends PlotTooltip {
@@ -18,7 +19,7 @@ interface TooltipInfo extends PlotTooltip {
   y: number;
 }
 
-export default function CircularPlot({ data, imageProperties, onViewStateChange, squarePlot = false }: CircularPlotProps) {
+export default function CircularPlot({ data, imageProperties, onViewStateChange, squarePlot = false, centreViewSignal = 0 }: CircularPlotProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<CanvasPlotRenderer | null>(null);
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
@@ -40,6 +41,7 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange,
   panRef.current = pan;
 
   const onViewStateChangeRef = useRef(onViewStateChange);
+  const previousCentreViewSignal = useRef(centreViewSignal);
   onViewStateChangeRef.current = onViewStateChange;
 
   /** Emit current view state to parent (for SVG export). */
@@ -129,6 +131,15 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange,
     }
     emitViewState();
   }, [zoom, pan, emitViewState]);
+
+  // A fullscreen transition should not preserve a plot dragged partly off-canvas.
+  // Keep the user's zoom and legend placement, but centre the circular map.
+  useEffect(() => {
+    if (previousCentreViewSignal.current === centreViewSignal) return;
+    previousCentreViewSignal.current = centreViewSignal;
+    setPan({ x: 0, y: 0 });
+    setTooltip(null);
+  }, [centreViewSignal]);
 
   const getCanvasCoords = (e: React.MouseEvent) => {
     const canvas = canvasRef.current;
@@ -274,11 +285,13 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange,
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
         onWheel={handleWheel}
-        style={{ cursor: draggingLegend ? 'move' : isDragging ? 'grabbing' : 'grab', background: 'white' }}
+        data-plot-pan-x={Math.round(pan.x)}
+        data-plot-pan-y={Math.round(pan.y)}
+        style={{ cursor: draggingLegend ? 'move' : isDragging ? 'grabbing' : 'grab', background: 'var(--gx-bg-alt)' }}
       >
         <canvas
           ref={canvasRef}
-          style={{ maxWidth: '100%', maxHeight: '100%' }}
+          style={{ display: 'block', maxWidth: '100%', maxHeight: '100%', background: 'white', boxShadow: '0 0 0 1px var(--gx-border)' }}
         />
         {tooltip && tooltip.x != null && tooltip.y != null && (
           <div

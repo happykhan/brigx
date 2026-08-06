@@ -1,6 +1,6 @@
 
 
-import { useState } from 'react';
+import { useState, type PointerEventHandler, type ReactNode } from 'react';
 import type { RingConfig, RingData } from '@/lib/types';
 
 /** Small controlled hex input that syncs with external colour state on blur / valid input. */
@@ -46,6 +46,13 @@ interface RingConfigurationProps {
   setRings: (rings: RingConfig[]) => void;
   onEditAnnotations?: (ringId: string) => void;
   ringDataList?: RingData[]; // Computed ring data (for graph stats display)
+  panelControls?: ReactNode;
+  panelMinimised?: boolean;
+  panelFloating?: boolean;
+  onPanelHeaderPointerDown?: PointerEventHandler<HTMLDivElement>;
+  onPanelHeaderPointerMove?: PointerEventHandler<HTMLDivElement>;
+  onPanelHeaderPointerUp?: PointerEventHandler<HTMLDivElement>;
+  onPanelHeaderPointerCancel?: PointerEventHandler<HTMLDivElement>;
 }
 
 const PRESET_COLORS = [
@@ -53,7 +60,19 @@ const PRESET_COLORS = [
   '#1abc9c', '#e67e22', '#34495e', '#16a085', '#c0392b'
 ];
 
-export default function RingConfiguration({ rings, setRings, onEditAnnotations, ringDataList }: RingConfigurationProps) {
+export default function RingConfiguration({
+  rings,
+  setRings,
+  onEditAnnotations,
+  ringDataList,
+  panelControls,
+  panelMinimised = false,
+  panelFloating = false,
+  onPanelHeaderPointerDown,
+  onPanelHeaderPointerMove,
+  onPanelHeaderPointerUp,
+  onPanelHeaderPointerCancel,
+}: RingConfigurationProps) {
   const [draggedRingId, setDraggedRingId] = useState<string | null>(null);
   const [dragOverRingId, setDragOverRingId] = useState<string | null>(null);
   const [collapsedRingIds, setCollapsedRingIds] = useState<Set<string>>(() => new Set());
@@ -125,25 +144,42 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations, 
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap justify-between items-center gap-2">
+      <div
+        className={`ring-configuration-header${panelFloating ? ' is-draggable' : ''}`}
+        onPointerDown={onPanelHeaderPointerDown}
+        onPointerMove={onPanelHeaderPointerMove}
+        onPointerUp={onPanelHeaderPointerUp}
+        onPointerCancel={onPanelHeaderPointerCancel}
+      >
         <h3 className="text-sm font-semibold" style={{ color: 'var(--gx-text)' }}>Ring Configuration</h3>
-        <button
-          type="button"
-          onClick={addNewRing}
-          className="btn-secondary text-xs px-3 py-1"
-        >
-          + Add New Ring
-        </button>
+        <div className="ring-configuration-header-actions">
+          {panelControls}
+          {!panelMinimised && (
+            <button
+              type="button"
+              onClick={addNewRing}
+              className="btn-secondary text-xs px-3 py-1"
+            >
+              + Add New Ring
+            </button>
+          )}
+        </div>
       </div>
 
-      {rings.length === 0 && (
+      {!panelMinimised && (
+        <p className="text-xs" style={{ color: 'var(--gx-text-muted)' }}>
+          Each ring can contain sequence files, graph data or a custom feature overlay. Ring order runs from the inside out.
+        </p>
+      )}
+
+      {!panelMinimised && rings.length === 0 && (
         <div className="text-center py-8 rounded-lg" style={{ color: 'var(--gx-text-muted)', border: '2px dashed var(--gx-border)' }}>
           <p className="mb-2">No rings configured</p>
           <p className="text-sm">Click &quot;Add New Ring&quot; to start</p>
         </div>
       )}
 
-      <div className="space-y-3 min-w-0">
+      {!panelMinimised && <div className="space-y-3 min-w-0">
         {rings.map((ring) => (
           (() => {
             const isCollapsed = collapsedRingIds.has(ring.id);
@@ -411,7 +447,7 @@ export default function RingConfiguration({ rings, setRings, onEditAnnotations, 
             );
           })()
         ))}
-      </div>
+      </div>}
     </div>
   );
 }

@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 - Bakta `.gbff` and GFF3 feature import support.
-- Reference GenBank CDS annotations in both the canvas preview and SVG export.
+- A desktop floating Ring Configuration panel with drag, resize, minimise, dock, close and session-persisted dimensions.
 - A plot centre control and correctly scaled legend dragging.
 - Direct HEX colour entry for comparison rings.
 - Explanatory average-identity tooltip in the statistics panel.
@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Regression coverage for GFF3, file access, editable SVG output, and annotation editing/paste/deletion.
 
 ### Changed
+- Replaced the temporary editor preview action with a top-level read-only **Viewer** at `/viewer` for public URLs and local result/session files, including the result statistics and saved BLAST-output downloads.
 - Settings and output panels now remain usable together on laptop screens.
 - Annotation editing now preserves manual edits and spreadsheet paste, with reliable row deletion and reset.
 - SVG and PNG exports preserve the preview zoom, pan, and dragged legend positions.
@@ -25,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Production DOMPurify is pinned to the patched release.
 
 ### Removed
+- Automatic display of CDS annotations embedded in GenBank and GBFF reference files; annotations are now added explicitly as custom ring overlays.
 - `@biowasm/aioli` dependency — unused since BRIGx ships its own custom WASM build.
 
 ### Moved

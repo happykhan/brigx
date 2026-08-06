@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import CircularPlot from '@/components/CircularPlot';
+import StatisticsPanel from '@/components/StatisticsPanel';
 import {
   resultSnapshotFilename,
   type ResultSnapshot,
@@ -7,7 +9,7 @@ import {
 
 interface ResultViewerProps {
   snapshot: ResultSnapshot;
-  mode: 'preview' | 'publication' | 'file' | 'remote';
+  mode: 'publication' | 'file' | 'remote';
   onOpenFile?: () => void;
   editUrl?: string;
 }
@@ -25,18 +27,14 @@ function downloadSnapshot(snapshot: ResultSnapshot) {
 export default function ResultViewer({ snapshot, mode, onOpenFile, editUrl }: ResultViewerProps) {
   return (
     <main className="publication-page">
+      <Toaster position="bottom-right" />
       <header className="publication-header">
         <div>
-          <span className="product-kicker">
-            {mode === 'publication' ? 'BRIGX publication' : 'BRIGX read-only result'}
-          </span>
+          {mode === 'publication' && <span className="product-kicker">BRIGX publication</span>}
           <h1>{snapshot.title}</h1>
           {snapshot.description && <p>{snapshot.description}</p>}
-          {mode === 'preview' && (
-            <p className="publication-note">Local preview · available in this browser for 24 hours · this URL is not shareable</p>
-          )}
           {mode === 'remote' && (
-            <p className="publication-note">Loaded from a public GitHub session · read-only preview</p>
+            <p className="publication-note">Loaded from a public GitHub session · read-only viewer</p>
           )}
         </div>
         <div className="publication-actions">
@@ -51,6 +49,9 @@ export default function ResultViewer({ snapshot, mode, onOpenFile, editUrl }: Re
       </header>
       <section className="publication-viewer" aria-label="Read-only interactive genome comparison">
         <CircularPlot data={snapshot.plot} imageProperties={snapshot.imageConfig} />
+      </section>
+      <section className="publication-statistics" aria-label="Comparison statistics">
+        <StatisticsPanel plotData={snapshot.plot} />
       </section>
     </main>
   );

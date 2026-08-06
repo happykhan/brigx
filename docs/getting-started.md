@@ -6,7 +6,6 @@ This walkthrough produces a basic whole-genome comparison. No installation or se
 
 Open the BRIGX workspace and choose a reference file in **Reference Genome**. FASTA, GenBank and GBFF files are accepted, including gzipped variants.
 
-- GenBank or GBFF CDS features are displayed automatically.
 - Multi-FASTA records are joined into one circular coordinate system.
 - GC content and GC skew are calculated from the reference.
 
@@ -20,6 +19,8 @@ In **Ring Configuration**, select **Add New Ring**.
 4. Leave the upper and lower identity thresholds at their defaults for the first run.
 
 Several files in one ring are treated as one combined query. Create separate rings when you want separate legend entries or colours.
+
+On desktop, select **Float panel** beside **Ring Configuration** to keep the controls over the workspace while inspecting the plot. Drag its header to move it, use the bottom-right handle to resize it, or select **Dock** to return it to the page. The panel remains docked on small screens.
 
 ## 3. Run the alignment
 
@@ -38,7 +39,6 @@ Select **Run Alignments**. Progress and diagnostic messages appear in the debug 
 - **PNG** creates a raster image.
 - **Data** exports the computed plot data as JSON.
 - **Save session** stores an editable BRIGX session, including the result when available.
-- **Preview result** opens a temporary read-only view in the same browser.
+- **Viewer** in the top navigation opens a read-only result or session from a local file or public GitHub URL.
 
-!!! warning
-    A local preview URL is temporary and is not a shareable publication link. See [Sessions and sharing](reference/sessions-and-sharing.md) for public GitHub-hosted sessions.
+See [Sessions and sharing](reference/sessions-and-sharing.md) for public GitHub-hosted sessions.

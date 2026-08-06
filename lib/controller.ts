@@ -66,7 +66,7 @@ export class BRIGController {
   private parserWorker?: Worker;
   private alignmentWorkers: Worker[] = [];
   private progressCallback?: (update: ProgressUpdate) => void;
-  private alignmentCache: Map<string, AlignmentResult> = new Map();
+  private alignmentCache: Map<string, { result: AlignmentResult; rawOutput: string }> = new Map();
 
   async initialize(): Promise<void> {
     console.log('[Controller] Starting initialization...');
@@ -532,8 +532,7 @@ export class BRIGController {
 
           if (!params.forceAlignment && this.alignmentCache.has(cacheKey)) {
             console.log(`[Controller] Using cached alignment for ${query.name}`);
-            const cachedResult = this.alignmentCache.get(cacheKey)!;
-            result = { result: cachedResult, rawOutput: '' };
+            result = this.alignmentCache.get(cacheKey)!;
           } else {
             console.log(`[Controller] Aligning ${query.name} (${query.length} bp)`);
             try {
@@ -550,7 +549,7 @@ export class BRIGController {
               const message = error instanceof Error ? error.message : String(error);
               throw new Error(`Alignment failed for ${query.name}: ${message}`);
             }
-            this.alignmentCache.set(cacheKey, result.result);
+            this.alignmentCache.set(cacheKey, result);
           }
 
           alignmentResults[ringIndex] = result;

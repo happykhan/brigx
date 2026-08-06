@@ -1,7 +1,7 @@
 {
     "name": "brig-web",
     "productName": "BRIGX",
-    "version": "0.7.0",
+    "version": "0.9.5",
     "description": "Free, local-first circular genome comparison for the web",
     "private": true,
     "type": "module",

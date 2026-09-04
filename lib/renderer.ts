@@ -424,7 +424,7 @@ export class CircularPlotRenderer {
       const radius = layout.radius;
 
       // Render as graph ring if it has graph data, otherwise as alignment ring
-      if (ring.graphPoints && ring.graphPoints.length > 0) {
+      if (layout.type === 'graph') {
         this.renderGraphRing(mainGroup, cx, cy, track);
       } else {
         this.renderQueryRing(mainGroup, cx, cy, track);

@@ -8,6 +8,7 @@ import type { ImagePropertiesConfig } from './ImageProperties';
 
 interface ExportPanelProps {
   plotData: CircularPlotData;
+  displayedPlotData: CircularPlotData;
   imageProperties: ImagePropertiesConfig;
   viewState?: PlotViewState | null;
   plotCanvasRef?: RefObject<HTMLCanvasElement | null>;
@@ -72,10 +73,10 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
   });
 }
 
-export default function ExportPanel({ plotData, imageProperties, viewState, plotCanvasRef }: ExportPanelProps) {
+export default function ExportPanel({ plotData, displayedPlotData, imageProperties, viewState, plotCanvasRef }: ExportPanelProps) {
   const [isExporting, setIsExporting] = useState(false);
   const exportSVG = () => {
-    const svgString = renderPlotSVG(plotData, imageProperties, viewState);
+    const svgString = renderPlotSVG(displayedPlotData, imageProperties, viewState);
     const blob = new Blob([svgString], { type: 'image/svg+xml' });
     downloadBlob(blob, `brig-plot-${Date.now()}.svg`);
     toast.success('SVG exported successfully!');

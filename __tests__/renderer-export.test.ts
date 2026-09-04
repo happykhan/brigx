@@ -89,6 +89,12 @@ describe('editable SVG export', () => {
 
     expect(svg.getAttribute('xmlns:inkscape')).toBe('http://www.inkscape.org/namespaces/inkscape');
     expect(svg.querySelector('#defs')?.querySelectorAll('linearGradient').length).toBeGreaterThan(0);
+    expect(svg.querySelector('#defs #gc-content-grad')).not.toBeNull();
+    expect(svg.querySelector('#defs #gc-skew-grad')).not.toBeNull();
+    expect(svg.querySelector('#defs #grad-ring-1')).not.toBeNull();
+    expect(svg.querySelector('#gc-legend')?.textContent).toContain('GC Content');
+    expect(svg.querySelector('#gc-legend')?.textContent).toContain('GC Skew');
+    expect(svg.querySelector('#ring-legend')?.textContent).toContain('Query One');
     expect(svg.querySelector('#ring-ring-1')?.getAttribute('inkscape:label')).toBe('Ring: Query One');
     expect(svg.querySelector('#annotations-ring-1')?.getAttribute('inkscape:label')).toBe('Annotations: Query One');
     expect(svg.querySelector('#reference-annotations')?.textContent).toContain('reference-gene');

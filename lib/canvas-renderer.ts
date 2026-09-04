@@ -242,7 +242,7 @@ export class CanvasPlotRenderer {
       const ringWidth = layout.width;
       const radius = layout.radius;
 
-      if (ring.graphPoints && ring.graphPoints.length > 0) {
+      if (layout.type === 'graph') {
         this.drawGraphRing(ctx, cx, cy, layout, track.graphArcs);
       } else {
         this.drawQueryRing(ctx, cx, cy, track.alignmentArcs);

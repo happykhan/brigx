@@ -18,6 +18,7 @@ import ProductFooter from '@/components/ProductFooter';
 import ProductNav from '@/components/ProductNav';
 import { useBRIGController } from '@/hooks/useBRIGController';
 import { formatVisibleConsoleLine, isUsefulConsoleLine } from '@/hooks/useConsoleCapture';
+import { selectDisplayedPlotData } from '@/lib/plotScene';
 import type { PlotViewState } from '@/lib/types';
 
 const AnnotationEditor = lazy(() => import('@/components/AnnotationEditor'));
@@ -62,14 +63,7 @@ export default function Home() {
   }, []);
   const displayedPlotData = useMemo(() => {
     if (!plotData) return null;
-    return {
-      ...plotData,
-      reference: {
-        ...plotData.reference,
-        gcContent: params.showGCContent !== false ? plotData.reference.gcContent : undefined,
-        gcSkew: params.showGCSkew !== false ? plotData.reference.gcSkew : undefined,
-      },
-    };
+    return selectDisplayedPlotData(plotData, params);
   }, [plotData, params.showGCContent, params.showGCSkew]);
   const visibleConsoleLogs = useMemo(
     () => consoleLogs.filter(isUsefulConsoleLine).map(formatVisibleConsoleLine),

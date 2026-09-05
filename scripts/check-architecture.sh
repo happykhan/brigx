@@ -22,4 +22,21 @@ if rg -n "from[[:space:]]+[\"'][^\"']*renderer[\"']" lib/canvas-renderer.ts; the
   failed=1
 fi
 
+for renderer in lib/canvas-renderer.ts lib/renderer.ts; do
+  if ! rg -q "from './plotScene'" "$renderer"; then
+    echo "Architecture check: $renderer must consume the shared plot scene."
+    failed=1
+  fi
+done
+
+if rg -n "(calculateRingLayout|positionToAngle|getColorIntensity|hexToRGB)" lib/canvas-renderer.ts lib/renderer.ts; then
+  echo "Architecture check: renderer backends must not recalculate shared plot geometry or colours."
+  failed=1
+fi
+
+if rg -n "data\.(reference|rings)" lib/canvas-renderer.ts lib/renderer.ts; then
+  echo "Architecture check: renderer backends must use scene visibility, not raw plot data."
+  failed=1
+fi
+
 exit "$failed"

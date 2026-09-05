@@ -1,10 +1,10 @@
-import type { RingData } from '../types';
-import { hexToRGB } from '../geometry';
+import {
+  LEGEND_BAR_HEIGHT,
+  LEGEND_BAR_WIDTH,
+  type LegendScene,
+} from './legendLayout';
 import { roundedRectPath } from './canvasPrimitives';
-import type { LegendBounds, Point, RenderConfig } from './types';
-
-const BAR_WIDTH = 120;
-const BAR_HEIGHT = 10;
+import type { LegendBounds } from './types';
 
 function drawTitle(
   context: CanvasRenderingContext2D,
@@ -20,33 +20,6 @@ function drawTitle(
   context.textBaseline = 'alphabetic';
   context.fillText(title, x, y);
   context.restore();
-}
-
-function drawTicks(
-  context: CanvasRenderingContext2D,
-  ticks: ReadonlyArray<{ label: string; x: number }>,
-  y: number,
-  barHeight: number,
-  fontSize: number,
-): void {
-  for (const tick of ticks) {
-    context.save();
-    context.strokeStyle = '#666';
-    context.lineWidth = 1;
-    context.beginPath();
-    context.moveTo(tick.x, y);
-    context.lineTo(tick.x, y + barHeight + 3);
-    context.stroke();
-    context.restore();
-
-    context.save();
-    context.font = `${fontSize - 3}px sans-serif`;
-    context.fillStyle = '#666';
-    context.textAlign = 'center';
-    context.textBaseline = 'alphabetic';
-    context.fillText(tick.label, tick.x, y + barHeight + fontSize);
-    context.restore();
-  }
 }
 
 function fillRoundedRect(
@@ -70,91 +43,71 @@ function fillRoundedRect(
   context.restore();
 }
 
-export function drawCanvasGCLegend(
+export function drawCanvasLegend(
   context: CanvasRenderingContext2D,
-  config: RenderConfig,
-  position: Point | null,
-  hasGCContent: boolean,
-  hasGCSkew: boolean,
+  scene: LegendScene,
 ): LegendBounds {
-  const x = position?.x ?? 20;
-  const startY = position?.y ?? 20;
-  const fontSize = config.legendFontSize;
-  let y = startY + fontSize;
+  for (const section of scene.sections) {
+    drawTitle(context, section.title, section.titleX, section.titleY, scene.fontSize);
 
-  const sections = [
-    hasGCContent && {
-      title: 'GC Content',
-      colors: ['rgb(255, 55, 50)', 'rgb(55, 255, 50)'],
-      ticks: ['0%', '50%', '100%'],
-    },
-    hasGCSkew && {
-      title: 'GC Skew',
-      colors: ['#a855f7', '#22c55e'],
-      ticks: ['-1', '0', '+1'],
-    },
-  ].filter((section): section is { title: string; colors: string[]; ticks: string[] } => Boolean(section));
-
-  for (const section of sections) {
-    drawTitle(context, section.title, x, y, fontSize);
-    y += fontSize + 2;
-    const gradient = context.createLinearGradient(x, y, x + BAR_WIDTH, y);
-    gradient.addColorStop(0, section.colors[0]);
-    gradient.addColorStop(1, section.colors[1]);
-    fillRoundedRect(context, x, y, BAR_WIDTH, BAR_HEIGHT, gradient, true);
-    drawTicks(context, [
-      { label: section.ticks[0], x },
-      { label: section.ticks[1], x: x + BAR_WIDTH / 2 },
-      { label: section.ticks[2], x: x + BAR_WIDTH },
-    ], y, BAR_HEIGHT, fontSize);
-    y += BAR_HEIGHT + fontSize * 2 + 6;
-  }
-
-  return {
-    x: x - 5,
-    y: startY,
-    width: BAR_WIDTH + 10,
-    height: y - startY,
-  };
-}
-
-export function drawCanvasRingLegend(
-  context: CanvasRenderingContext2D,
-  config: RenderConfig,
-  position: Point | null,
-  rings: readonly RingData[],
-): LegendBounds {
-  const x = position?.x ?? config.width - 200;
-  const startY = position?.y ?? 20;
-  const fontSize = config.legendFontSize;
-  let y = startY + fontSize;
-
-  for (const ring of rings.filter(candidate => candidate.visible)) {
-    const hasHits = ring.hits.length > 0;
-    if (!hasHits) {
-      fillRoundedRect(context, x, y - fontSize + 3, 12, fontSize, ring.color);
-      drawTitle(context, ring.queryName, x + 16, y, fontSize);
-      y += fontSize * 2 + 2;
+    if (section.kind === 'swatch' && section.swatch) {
+      fillRoundedRect(
+        context,
+        section.swatch.x,
+        section.swatch.y,
+        section.swatch.width,
+        section.swatch.height,
+        section.swatch.fill,
+      );
       continue;
     }
 
-    drawTitle(context, ring.queryName, x, y, fontSize);
-    y += fontSize + 2;
-    const upper = ring.upperThreshold ?? config.maxIdentity;
-    const lower = ring.lowerThreshold ?? config.minIdentity;
-    const { r, g, b } = hexToRGB(ring.color);
-    const gradient = context.createLinearGradient(x, 0, x + BAR_WIDTH, 0);
-    gradient.addColorStop(0, `rgb(${Math.round(255 + (r - 255) * 0.15)}, ${Math.round(255 + (g - 255) * 0.15)}, ${Math.round(255 + (b - 255) * 0.15)})`);
-    gradient.addColorStop(1, ring.color);
-    const barY = y - BAR_HEIGHT + 2;
-    fillRoundedRect(context, x, barY, BAR_WIDTH, BAR_HEIGHT, gradient, true);
-    drawTicks(context, [
-      { label: `${lower}%`, x },
-      { label: `${Math.round((upper + lower) / 2)}%`, x: x + BAR_WIDTH / 2 },
-      { label: `${upper}%`, x: x + BAR_WIDTH },
-    ], barY, BAR_HEIGHT - 2, fontSize);
-    y += fontSize + BAR_HEIGHT + 4 + fontSize;
+    if (
+      section.kind !== 'gradient'
+      || !section.colors
+      || section.barY === undefined
+      || !section.ticks
+      || section.tickBottom === undefined
+      || section.labelY === undefined
+    ) continue;
+
+    const gradient = context.createLinearGradient(
+      scene.x,
+      section.barY,
+      scene.x + LEGEND_BAR_WIDTH,
+      section.barY,
+    );
+    gradient.addColorStop(0, section.colors[0]);
+    gradient.addColorStop(1, section.colors[1]);
+    fillRoundedRect(
+      context,
+      scene.x,
+      section.barY,
+      LEGEND_BAR_WIDTH,
+      LEGEND_BAR_HEIGHT,
+      gradient,
+      true,
+    );
+
+    for (const tick of section.ticks) {
+      context.save();
+      context.strokeStyle = '#666';
+      context.lineWidth = 1;
+      context.beginPath();
+      context.moveTo(tick.x, section.barY);
+      context.lineTo(tick.x, section.tickBottom);
+      context.stroke();
+      context.restore();
+
+      context.save();
+      context.font = `${scene.fontSize - 3}px sans-serif`;
+      context.fillStyle = '#666';
+      context.textAlign = 'center';
+      context.textBaseline = 'alphabetic';
+      context.fillText(tick.label, tick.x, section.labelY);
+      context.restore();
+    }
   }
 
-  return { x: x - 5, y: startY, width: 200, height: y - startY + 5 };
+  return scene.bounds;
 }

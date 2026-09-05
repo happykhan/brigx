@@ -7,7 +7,7 @@ BRIGX is a browser-based circular genome comparison tool. The hosted web applica
 | Surface | Route | Responsibility |
 |---|---|---|
 | Product website | `/` | Explain BRIGX and direct people to the web application. |
-| Web application | `/app` | Run the complete local-first scientific workflow in a browser. |
+| Web application | `/app` | Run the complete genome comparison workflow in a browser without uploading sequence data. |
 | Desktop status | `/download` | State only that a desktop edition is coming soon. |
 | About | `/about` | Record privacy, citation, licence, provenance, and third-party notices. |
 

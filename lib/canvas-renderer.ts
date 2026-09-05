@@ -1,12 +1,18 @@
 // Canvas 2D renderer for circular genome plot (display only; SVG renderer kept for export)
 
-import type { CircularPlotData, RingData, Annotation, ContigBoundary } from './types';
-import { collectReferenceAnnotations } from './referenceAnnotations';
+import type { CircularPlotData, Annotation } from './types';
 import type { LegendBounds, PlotTooltip, RenderConfig } from './rendering/types';
-import { positionToAngle, hexToRGB, getColorIntensity, calculateRingLayout } from './geometry';
+import {
+  buildPlotScene,
+  type AlignmentArcScene,
+  type ContigArcScene,
+  type GraphArcScene,
+  type MetricRingScene,
+  type PlotScene,
+} from './plotScene';
 import { drawCanvasAnnotations } from './rendering/canvasAnnotations';
 import { drawAnnularArc, drawCircle } from './rendering/canvasPrimitives';
-import { drawCanvasGCLegend, drawCanvasRingLegend } from './rendering/canvasLegends';
+import { drawCanvasLegend } from './rendering/canvasLegends';
 
 interface HitRegion {
   innerR: number;
@@ -186,11 +192,18 @@ export class CanvasPlotRenderer {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const w = this.config.width;
-    const h = this.config.height;
-    const cx = w / 2;
-    const cy = h / 2;
-    const refLength = data.reference.length;
+    const scene = buildPlotScene(data, this.config, {
+      zoom,
+      panX,
+      panY,
+      gcLegendPos: this.gcLegendPos,
+      ringLegendPos: this.ringLegendPos,
+    });
+    const w = scene.width;
+    const h = scene.height;
+    const cx = scene.centerX;
+    const cy = scene.centerY;
+    const refLength = scene.referenceLength;
 
     // Clear and fill white background
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -207,71 +220,46 @@ export class CanvasPlotRenderer {
     drawCircle(ctx, cx, cy, this.config.innerRadius, '#333', 2);
 
     // Reference features from GenBank/GBFF or a companion annotation file.
-    const referenceAnnotations = collectReferenceAnnotations(
-      data.reference.features,
-      data.reference.annotations,
-    );
-    if (referenceAnnotations.length > 0) {
+    if (scene.referenceAnnotations.length > 0) {
       const featureInner = Math.max(10, this.config.innerRadius - 30);
       const featureOuter = this.config.innerRadius;
-      this.drawAnnotations(ctx, cx, cy, refLength, referenceAnnotations, featureInner, featureOuter, true, true);
+      this.drawAnnotations(ctx, cx, cy, refLength, scene.referenceAnnotations, featureInner, featureOuter, true, true);
     }
 
-    // --- Ring layout ---
-    const layouts = calculateRingLayout(
-      {
-        innerRadius: this.config.innerRadius,
-        ringWidth: this.config.ringWidth,
-        gcRingWidth: this.config.gcRingWidth,
-        ringSpacing: this.config.ringSpacing,
-      },
-      {
-        hasGCContent: !!data.reference.gcContent,
-        hasGCSkew: !!data.reference.gcSkew,
-        rings: data.rings || [],
-        hasContigs: !!(data.reference.contigs && data.reference.contigs.length > 1),
-      }
-    );
-
     // GC Content ring
-    if (data.reference.gcContent) {
-      const layout = layouts.find(l => l.type === 'gc-content')!;
-      this.drawGCRing(ctx, cx, cy, refLength, data.reference.gcContent, layout.radius);
+    if (scene.gcContent) {
+      this.drawMetricRing(ctx, cx, cy, scene.gcContent);
     }
 
     // GC Skew ring
-    if (data.reference.gcSkew) {
-      const layout = layouts.find(l => l.type === 'gc-skew')!;
-      this.drawGCSkewRing(ctx, cx, cy, refLength, data.reference.gcSkew, layout.radius);
+    if (scene.gcSkew) {
+      this.drawMetricRing(ctx, cx, cy, scene.gcSkew);
     }
 
     // Query rings (alignment + graph)
-    const visibleRings = (data.rings || []).filter(r => r.visible);
-    for (const ring of visibleRings) {
-      const layout = layouts.find(l => l.queryId === ring.queryId);
-      if (!layout) continue;
+    for (const track of scene.rings) {
+      const { ring, layout, annotations } = track;
       const ringWidth = layout.width;
       const radius = layout.radius;
 
-      if (ring.graphPoints && ring.graphPoints.length > 0) {
-        this.drawGraphRing(ctx, cx, cy, refLength, ring, radius, ringWidth);
+      if (layout.type === 'graph') {
+        this.drawGraphRing(ctx, cx, cy, layout, track.graphArcs);
       } else {
-        this.drawQueryRing(ctx, cx, cy, refLength, ring, radius, ringWidth);
+        this.drawQueryRing(ctx, cx, cy, track.alignmentArcs);
       }
 
-      if (ring.annotations && ring.annotations.length > 0) {
-        this.drawAnnotations(ctx, cx, cy, refLength, ring.annotations, radius, radius + ringWidth, ring.showLabels !== false);
+      if (annotations.length > 0) {
+        this.drawAnnotations(ctx, cx, cy, refLength, annotations, radius, radius + ringWidth, ring.showLabels !== false);
       }
     }
 
     // Contig boundaries
-    if (data.reference.contigs && data.reference.contigs.length > 1) {
-      const layout = layouts.find(l => l.type === 'contig')!;
-      this.drawContigBoundaries(ctx, cx, cy, refLength, data.reference.contigs, layout.radius, layout.width);
+    if (scene.contigs.length > 0 && scene.contigLayout) {
+      this.drawContigBoundaries(ctx, cx, cy, scene.contigArcs);
     }
 
     // Scale markers
-    this.drawScaleMarkers(ctx, cx, cy, refLength);
+    this.drawScaleMarkers(ctx, scene.scaleMarkers);
 
     // Title
     this.drawTitle(ctx, cx, cy, refLength);
@@ -280,14 +268,8 @@ export class CanvasPlotRenderer {
     ctx.restore();
 
     // Legends remain fixed while the map is panned or zoomed.
-    if (this.config.showLegend !== false) {
-      if (data.reference.gcContent || data.reference.gcSkew) {
-        this.drawGCLegend(ctx, !!data.reference.gcContent, !!data.reference.gcSkew);
-      }
-      if (visibleRings.length > 0) {
-        this.drawRingLegend(ctx, visibleRings);
-      }
-    }
+    this.gcLegendBounds = scene.gcLegend ? drawCanvasLegend(ctx, scene.gcLegend) : null;
+    this.ringLegendBounds = scene.ringLegend ? drawCanvasLegend(ctx, scene.ringLegend) : null;
 
   }
 
@@ -297,111 +279,28 @@ export class CanvasPlotRenderer {
 
   // ------- GC Content Ring -------
 
-  private drawGCRing(
+  private drawMetricRing(
     ctx: CanvasRenderingContext2D,
     cx: number, cy: number,
-    refLength: number,
-    gcContent: number[],
-    ringRadius: number
+    scene: MetricRingScene,
   ): void {
-    const ringWidth = this.config.gcRingWidth;
-    const baseRadius = ringRadius + ringWidth / 2;
-    const maxBarHeight = ringWidth / 2;
-    const windowSize = refLength / gcContent.length;
+    drawCircle(ctx, cx, cy, scene.layout.radius, '#ccc', 1);
+    drawCircle(ctx, cx, cy, scene.layout.radius + scene.layout.width, '#ccc', 1);
+    drawCircle(ctx, cx, cy, scene.baseRadius, '#999', 1, [3, 3]);
 
-    // 95th percentile scaling
-    const deviations = gcContent.map(gc => Math.abs(gc - 0.5)).sort((a, b) => a - b);
-    const p95 = deviations[Math.floor(deviations.length * 0.95)] || 0.1;
-    const scaleFactor = p95 > 0 ? 0.5 / p95 : 1;
-
-    // Ring boundaries
-    drawCircle(ctx, cx, cy, ringRadius, '#ccc', 1);
-    drawCircle(ctx, cx, cy, ringRadius + ringWidth, '#ccc', 1);
-    // Baseline (dashed)
-    drawCircle(ctx, cx, cy, baseRadius, '#999', 1, [3, 3]);
-
-    for (let i = 0; i < gcContent.length; i++) {
-      const gc = gcContent[i];
-      const start = i * windowSize;
-      const end = (i + 1) * windowSize;
-      const startAngle = positionToAngle(start, refLength);
-      const endAngle = positionToAngle(end, refLength);
-
-      const deviation = gc - 0.5;
-      const barHeight = Math.min(maxBarHeight, Math.abs(deviation) * scaleFactor * maxBarHeight);
-
-      let innerR: number, outerR: number;
-      if (deviation >= 0) {
-        innerR = baseRadius;
-        outerR = baseRadius + barHeight;
-      } else {
-        innerR = baseRadius - barHeight;
-        outerR = baseRadius;
-      }
-
-      const r = Math.floor((1 - gc) * 200 + 55);
-      const g = Math.floor(gc * 200 + 55);
-      const b = 50;
-
-      drawAnnularArc(ctx, cx, cy, innerR, outerR, startAngle, endAngle, `rgb(${r}, ${g}, ${b})`, 0.8);
-      this.addHitRegion(innerR, outerR, startAngle, endAngle, {
-        type: 'gc-content',
-        gc: (gc * 100).toFixed(1),
-        position: Math.floor(start),
-        windowSize: Math.floor(windowSize),
-      });
-    }
-  }
-
-  // ------- GC Skew Ring -------
-
-  private drawGCSkewRing(
-    ctx: CanvasRenderingContext2D,
-    cx: number, cy: number,
-    refLength: number,
-    gcSkew: number[],
-    ringRadius: number
-  ): void {
-    const ringWidth = this.config.gcRingWidth;
-    const baseRadius = ringRadius + ringWidth / 2;
-    const maxBarHeight = ringWidth / 2;
-    const windowSize = refLength / gcSkew.length;
-
-    const skewAbs = gcSkew.map(Math.abs).sort((a, b) => a - b);
-    const p95Skew = skewAbs[Math.floor(skewAbs.length * 0.95)] || 0.1;
-    const scaleFactor = p95Skew > 0 ? 1 / p95Skew : 1;
-
-    drawCircle(ctx, cx, cy, ringRadius, '#ccc', 1);
-    drawCircle(ctx, cx, cy, ringRadius + ringWidth, '#ccc', 1);
-    drawCircle(ctx, cx, cy, baseRadius, '#999', 1, [3, 3]);
-
-    for (let i = 0; i < gcSkew.length; i++) {
-      const skew = gcSkew[i];
-      const start = i * windowSize;
-      const end = (i + 1) * windowSize;
-      const startAngle = positionToAngle(start, refLength);
-      const endAngle = positionToAngle(end, refLength);
-
-      const barHeight = Math.min(maxBarHeight, Math.abs(skew) * scaleFactor * maxBarHeight);
-      let innerR: number, outerR: number, color: string;
-
-      if (skew >= 0) {
-        innerR = baseRadius;
-        outerR = baseRadius + barHeight;
-        color = '#22c55e';
-      } else {
-        innerR = baseRadius - barHeight;
-        outerR = baseRadius;
-        color = '#a855f7';
-      }
-
-      drawAnnularArc(ctx, cx, cy, innerR, outerR, startAngle, endAngle, color, 0.8);
-      this.addHitRegion(innerR, outerR, startAngle, endAngle, {
-        type: 'gc-skew',
-        skew: skew.toFixed(3),
-        position: Math.floor(start),
-        windowSize: Math.floor(windowSize),
-      });
+    for (const arc of scene.arcs) {
+      drawAnnularArc(
+        ctx,
+        cx,
+        cy,
+        arc.innerRadius,
+        arc.outerRadius,
+        arc.startAngle,
+        arc.endAngle,
+        arc.fill,
+        arc.opacity,
+      );
+      this.addHitRegion(arc.innerRadius, arc.outerRadius, arc.startAngle, arc.endAngle, arc.tooltip);
     }
   }
 
@@ -410,44 +309,11 @@ export class CanvasPlotRenderer {
   private drawQueryRing(
     ctx: CanvasRenderingContext2D,
     cx: number, cy: number,
-    refLength: number,
-    ring: RingData,
-    radius: number,
-    ringWidth: number
+    arcs: readonly AlignmentArcScene[],
   ): void {
-    if (!ring.hits || ring.hits.length === 0) return;
-
-    // Sort hits largest first (smallest drawn last, on top)
-    const sortedHits = [...ring.hits].sort((a, b) => (b.refEnd - b.refStart) - (a.refEnd - a.refStart));
-
-    const drawnRegions: Array<{ start: number; end: number }> = [];
-
-    for (const hit of sortedHits) {
-      const isOccluded = drawnRegions.some(region => hit.refStart >= region.start && hit.refEnd <= region.end);
-      if (isOccluded) continue;
-
-      const startAngle = positionToAngle(hit.refStart, refLength);
-      const endAngle = positionToAngle(hit.refEnd, refLength);
-
-      const color = getColorIntensity(
-        ring.color,
-        hit.percentIdentity,
-        ring.lowerThreshold ?? this.config.minIdentity,
-        ring.upperThreshold ?? 100
-      );
-
-      drawAnnularArc(ctx, cx, cy, radius, radius + ringWidth, startAngle, endAngle, color);
-
-      this.addHitRegion(radius, radius + ringWidth, startAngle, endAngle, {
-        type: 'alignment',
-        queryName: ring.queryName,
-        start: hit.refStart,
-        end: hit.refEnd,
-        identity: hit.percentIdentity,
-        coverage: 1.0,
-      });
-
-      drawnRegions.push({ start: hit.refStart, end: hit.refEnd });
+    for (const arc of arcs) {
+      drawAnnularArc(ctx, cx, cy, arc.innerRadius, arc.outerRadius, arc.startAngle, arc.endAngle, arc.fill);
+      this.addHitRegion(arc.innerRadius, arc.outerRadius, arc.startAngle, arc.endAngle, arc.tooltip);
     }
   }
 
@@ -456,38 +322,16 @@ export class CanvasPlotRenderer {
   private drawGraphRing(
     ctx: CanvasRenderingContext2D,
     cx: number, cy: number,
-    refLength: number,
-    ring: RingData,
-    radius: number,
-    ringWidth: number
+    layout: PlotScene['rings'][number]['layout'],
+    arcs: readonly GraphArcScene[],
   ): void {
-    const points = ring.graphPoints!;
-    const capValue = ring.graphMaxCap || ring.graphMaxValue || 1;
-    const { r: cr, g: cg, b: cb } = hexToRGB(ring.color);
-
     // Ring boundaries
-    drawCircle(ctx, cx, cy, radius, '#ccc', 0.5);
-    drawCircle(ctx, cx, cy, radius + ringWidth, '#ccc', 0.5);
+    drawCircle(ctx, cx, cy, layout.radius, '#ccc', 0.5);
+    drawCircle(ctx, cx, cy, layout.radius + layout.width, '#ccc', 0.5);
 
-    for (const point of points) {
-      if (point.value <= 0) continue;
-
-      const startAngle = positionToAngle(point.start, refLength);
-      const endAngle = positionToAngle(point.end, refLength);
-      const isOverCap = ring.graphMaxCap != null && point.value > capValue;
-      const fraction = Math.min(1, point.value / capValue);
-      const barHeight = fraction * ringWidth;
-
-      const fill = isOverCap ? 'rgb(30, 100, 220)' : `rgb(${cr}, ${cg}, ${cb})`;
-      drawAnnularArc(ctx, cx, cy, radius, radius + barHeight, startAngle, endAngle, fill, 0.8);
-
-      this.addHitRegion(radius, radius + barHeight, startAngle, endAngle, {
-        type: 'graph',
-        queryName: ring.queryName,
-        start: point.start,
-        end: point.end,
-        value: point.value.toFixed(2),
-      });
+    for (const arc of arcs) {
+      drawAnnularArc(ctx, cx, cy, arc.innerRadius, arc.outerRadius, arc.startAngle, arc.endAngle, arc.fill, arc.opacity);
+      this.addHitRegion(arc.innerRadius, arc.outerRadius, arc.startAngle, arc.endAngle, arc.tooltip);
     }
   }
 
@@ -496,45 +340,19 @@ export class CanvasPlotRenderer {
   private drawContigBoundaries(
     ctx: CanvasRenderingContext2D,
     cx: number, cy: number,
-    refLength: number,
-    contigs: ContigBoundary[],
-    radius: number,
-    ringWidth: number
+    arcs: readonly ContigArcScene[],
   ): void {
-    const colors = ['#ef4444', '#3b82f6'];
+    for (const arc of arcs) {
+      drawAnnularArc(ctx, cx, cy, arc.innerRadius, arc.outerRadius, arc.startAngle, arc.endAngle, arc.fill, arc.opacity);
+      this.addHitRegion(arc.innerRadius, arc.outerRadius, arc.startAngle, arc.endAngle, arc.tooltip);
 
-    for (const contig of contigs) {
-      const startAngle = positionToAngle(contig.start, refLength);
-      const endAngle = positionToAngle(contig.end, refLength);
-      const color = colors[contig.index % 2];
-
-      drawAnnularArc(ctx, cx, cy, radius, radius + ringWidth, startAngle, endAngle, color, 0.6);
-
-      this.addHitRegion(radius, radius + ringWidth, startAngle, endAngle, {
-        type: 'contig',
-        name: contig.name,
-        start: contig.start,
-        end: contig.end,
-        length: contig.end - contig.start,
-      });
-
-      // Contig label
-      const midAngle = (startAngle + endAngle) / 2;
-      const labelRadius = radius + ringWidth + 8;
-      const arcSpan = contig.end - contig.start;
-
-      if (arcSpan / refLength > 0.02) {
-        const lx = cx + labelRadius * Math.cos(midAngle);
-        const ly = cy + labelRadius * Math.sin(midAngle);
-        const fontSize = Math.max(7, this.config.scaleFontSize - 2);
-        const displayName = contig.name.length > 15 ? contig.name.substring(0, 12) + '...' : contig.name;
-
+      if (arc.label) {
         ctx.save();
-        ctx.font = `bold ${fontSize}px sans-serif`;
-        ctx.fillStyle = color;
+        ctx.font = `bold ${arc.label.fontSize}px sans-serif`;
+        ctx.fillStyle = arc.fill;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(displayName, lx, ly);
+        ctx.fillText(arc.label.text, arc.label.x, arc.label.y);
         ctx.restore();
       }
     }
@@ -547,7 +365,7 @@ export class CanvasPlotRenderer {
     centerX: number,
     centerY: number,
     referenceLength: number,
-    annotations: Annotation[],
+    annotations: readonly Annotation[],
     innerRadius: number,
     outerRadius: number,
     showLabels: boolean,
@@ -574,44 +392,24 @@ export class CanvasPlotRenderer {
 
   private drawScaleMarkers(
     ctx: CanvasRenderingContext2D,
-    cx: number, cy: number,
-    refLength: number
+    markers: PlotScene['scaleMarkers'],
   ): void {
-    const numMarkers = 12;
-    const markerRadius = this.config.innerRadius;
-
-    for (let i = 0; i < numMarkers; i++) {
-      const angle = (i / numMarkers) * 2 * Math.PI - Math.PI / 2;
-      const position = Math.floor((i / numMarkers) * refLength);
-
-      const is3or9 = (i === 3 || i === 9);
-      const tickLength = is3or9 ? 8 : 18;
-
-      const x1 = cx + (markerRadius - tickLength) * Math.cos(angle);
-      const y1 = cy + (markerRadius - tickLength) * Math.sin(angle);
-      const x2 = cx + (markerRadius + 3) * Math.cos(angle);
-      const y2 = cy + (markerRadius + 3) * Math.sin(angle);
-
+    for (const marker of markers) {
       ctx.save();
       ctx.strokeStyle = '#666';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
+      ctx.moveTo(marker.line.x1, marker.line.y1);
+      ctx.lineTo(marker.line.x2, marker.line.y2);
       ctx.stroke();
       ctx.restore();
-
-      // Label
-      const labelRadius = markerRadius - 30;
-      const tx = cx + labelRadius * Math.cos(angle);
-      const ty = cy + labelRadius * Math.sin(angle);
 
       ctx.save();
       ctx.font = `${this.config.scaleFontSize}px sans-serif`;
       ctx.fillStyle = '#333';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`${(position / 1000).toFixed(0)}kb`, tx, ty);
+      ctx.fillText(marker.label.text, marker.label.x, marker.label.y);
       ctx.restore();
     }
   }
@@ -642,28 +440,4 @@ export class CanvasPlotRenderer {
     ctx.restore();
   }
 
-  // ------- GC Legend (top-left) -------
-
-  private drawGCLegend(
-    context: CanvasRenderingContext2D,
-    hasGCContent: boolean,
-    hasGCSkew: boolean,
-  ): void {
-    this.gcLegendBounds = drawCanvasGCLegend(
-      context,
-      this.config,
-      this.gcLegendPos,
-      hasGCContent,
-      hasGCSkew,
-    );
-  }
-
-  private drawRingLegend(context: CanvasRenderingContext2D, rings: RingData[]): void {
-    this.ringLegendBounds = drawCanvasRingLegend(
-      context,
-      this.config,
-      this.ringLegendPos,
-      rings,
-    );
-  }
 }

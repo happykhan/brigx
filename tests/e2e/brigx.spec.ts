@@ -589,6 +589,27 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     const svg = await fs.readFile(downloadedPath!, 'utf8')
     expect(svg).not.toContain('id="gc-content-ring"')
     expect(svg).toContain('id="gc-skew-ring"')
+
+    const sessionDownloadPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Save session' }).click()
+    const sessionDownload = await sessionDownloadPromise
+    const sessionPath = await sessionDownload.path()
+    expect(sessionPath).not.toBeNull()
+    const session = JSON.parse(await fs.readFile(sessionPath!, 'utf8'))
+    expect(session.params.showGCContent).toBe(false)
+    expect(session.result.plot.reference.gcContent.length).toBeGreaterThan(0)
+
+    await page.getByLabel('Load session').setInputFiles(sessionPath!)
+    await expect(page.getByText('Session and saved result loaded.')).toBeVisible()
+    await expect(page.getByLabel('GC Content')).not.toBeChecked()
+    await page.getByLabel('GC Content').check()
+
+    const restoredDownloadPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'SVG', exact: true }).click()
+    const restoredDownload = await restoredDownloadPromise
+    const restoredPath = await restoredDownload.path()
+    expect(restoredPath).not.toBeNull()
+    expect(await fs.readFile(restoredPath!, 'utf8')).toContain('id="gc-content-ring"')
   })
 
   test('PNG export matches the live canvas after moving a legend', async ({ page }) => {

@@ -310,14 +310,7 @@ export function useBRIGController() {
       params,
       imageProperties,
       referenceAnnotations,
-      plotData ? {
-        ...plotData,
-        reference: {
-          ...plotData.reference,
-          gcContent: params.showGCContent !== false ? plotData.reference.gcContent : undefined,
-          gcSkew: params.showGCSkew !== false ? plotData.reference.gcSkew : undefined,
-        },
-      } : null,
+      plotData,
     );
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);

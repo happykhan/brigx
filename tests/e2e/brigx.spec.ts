@@ -574,6 +574,23 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await expect(page.getByRole('button', { name: 'Expand plot' })).toBeVisible()
   })
 
+  test('SVG export matches disabled GC ring controls', async ({ page }) => {
+    await page.goto('/app')
+    await page.getByLabel('Reference genome file').setInputFiles(REFERENCE)
+    await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible({ timeout: 30_000 })
+
+    await page.getByLabel('GC Content').uncheck()
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'SVG', exact: true }).click()
+    const download = await downloadPromise
+    const downloadedPath = await download.path()
+    expect(downloadedPath).not.toBeNull()
+
+    const svg = await fs.readFile(downloadedPath!, 'utf8')
+    expect(svg).not.toContain('id="gc-content-ring"')
+    expect(svg).toContain('id="gc-skew-ring"')
+  })
+
   test('PNG export matches the live canvas after moving a legend', async ({ page }) => {
     await page.goto('/app')
     await page.getByLabel('Reference genome file').setInputFiles(REFERENCE)

@@ -8,7 +8,6 @@ on:
     branches:
       - master
     paths-ignore:
-      - 'package.json'
       - '*.md'
 
 jobs:
@@ -31,26 +30,8 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Type-check
-        run: pixi run npx tsc --noEmit
-
-      - name: Lint
-        run: pixi run npm run lint
-
-      - name: Architecture guardrails
-        run: pixi run npm run quality:architecture
-
-      - name: Licence policy
-        run: pixi run npm run quality:licenses
-
-      - name: Runtime and build dependency audit
-        run: pixi run npm run quality:security
-
-      - name: Unit tests
-        run: pixi run npm test
-
-      - name: Production build
-        run: pixi run npm run build
+      - name: Run core CI checks
+        run: pixi run npm run verify:ci:core
 
   browser:
     name: Browser end-to-end tests
@@ -70,4 +51,4 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Browser tests
-        run: npm run test:e2e
+        run: npm run verify:ci:browser

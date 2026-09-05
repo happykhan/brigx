@@ -12,12 +12,12 @@ while IFS= read -r source_file; do
   fi
 done < <(find components hooks lib src workers -type f \( -name '*.ts' -o -name '*.tsx' \) -print | sort)
 
-if rg -n "(from[[:space:]]+|import\()[\"'][^\"']*workers/" components hooks lib src; then
+if grep -R -n -E "(from[[:space:]]+|import\()[\"'][^\"']*workers/" components hooks lib src; then
   echo "Architecture check: UI/domain modules must not import Web Worker entry modules."
   failed=1
 fi
 
-if rg -n "from[[:space:]]+[\"'][^\"']*renderer[\"']" lib/canvas-renderer.ts; then
+if grep -n -E "from[[:space:]]+[\"'][^\"']*renderer[\"']" lib/canvas-renderer.ts; then
   echo "Architecture check: canvas rendering must use shared rendering contracts, not SVG renderer internals."
   failed=1
 fi

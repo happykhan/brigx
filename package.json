@@ -19,8 +19,11 @@
         "dev": "vite",
         "build": "tsc -b && vite build",
         "start": "vite preview",
+        "typecheck": "tsc --noEmit",
         "lint": "eslint .",
+        "quality:runtime": "node scripts/check-runtime.mjs",
         "quality:architecture": "bash scripts/check-architecture.sh",
+        "quality:portability": "node scripts/check-ci-portability.mjs",
         "quality:licenses": "node scripts/check-licenses.mjs",
         "quality:security": "node scripts/check-security.mjs",
         "test": "vitest run",
@@ -30,7 +33,12 @@
         "test:coverage": "vitest run --coverage",
         "test:e2e": "playwright test",
         "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
-        "verify": "npm run lint && npm run quality:architecture && npm run quality:licenses && npm run quality:security && npm test && npm run build && npm run test:e2e && npm run test:e2e:dev"
+        "verify:ci:core": "npm run quality:runtime && npm run typecheck && npm run lint && npm run quality:architecture && npm run quality:portability && npm run quality:licenses && npm run quality:security && npm test && npm run build",
+        "verify:ci:browser": "npm run test:e2e",
+        "verify:ci": "npm run verify:ci:core && npm run verify:ci:browser",
+        "verify": "npm run verify:ci && npm run test:e2e:dev",
+        "hooks:install": "node scripts/install-git-hooks.mjs",
+        "prepare": "npm run hooks:install"
     },
     "dependencies": {
         "@genomicx/ui": "0.9.1",

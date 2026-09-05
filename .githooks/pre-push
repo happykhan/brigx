@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+set -eu
+
+echo "Running BRIGX pre-CI checks before push..."
+npm run verify:ci

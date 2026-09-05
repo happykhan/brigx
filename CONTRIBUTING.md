@@ -20,8 +20,13 @@ Thank you for your interest in contributing to BRIGx — a browser-based tool fo
 2. **Install dependencies**
 
    ```bash
-   npm install
+   nvm use
+   npm ci
+   npx playwright install chromium
    ```
+
+   `npm ci` also installs the repository's pre-push hook. The hook runs the
+   same checks as GitHub CI and cancels the push if any of them fail.
 
 3. **Start the development server**
 
@@ -30,6 +35,25 @@ Thank you for your interest in contributing to BRIGx — a browser-based tool fo
    ```
 
    The app will be available at [http://localhost:3000](http://localhost:3000). Changes to source files are reflected immediately via hot reload.
+
+## Checking a Change Before CI
+
+Run the exact checks used by GitHub CI:
+
+```bash
+npm run verify:ci
+```
+
+This includes type-checking, linting, architecture and licence policies, the
+dependency security audit, unit tests, the production build, and production
+browser tests. `npm run verify` additionally exercises the development server.
+
+The pre-push hook runs `npm run verify:ci` automatically. If hooks were disabled
+or this checkout predates the hook, restore it with:
+
+```bash
+npm run hooks:install
+```
 
 ## Running Tests
 
@@ -43,7 +67,7 @@ To run tests in watch mode (re-runs on file changes):
 npm run test:watch
 ```
 
-Tests live in `__tests__/` and use Jest with `jest-environment-jsdom`.
+Tests live in `__tests__/` and use Vitest with jsdom.
 
 ## Linting
 
@@ -51,7 +75,7 @@ Tests live in `__tests__/` and use Jest with `jest-environment-jsdom`.
 npm run lint
 ```
 
-Please ensure there are no new lint errors before opening a PR. Lint warnings for `@typescript-eslint/no-explicit-any` are acceptable in the short term but should be addressed progressively.
+Please ensure there are no new lint errors before opening a PR.
 
 ## Building
 
@@ -59,11 +83,11 @@ Please ensure there are no new lint errors before opening a PR. Lint warnings fo
 npm run build
 ```
 
-BRIGx uses `next build` with static export (`output: 'export'`). The built output is placed in `out/`. Always verify the build succeeds before submitting a PR.
+BRIGX uses Vite. The built output is placed in `out/`. Always verify the build succeeds before submitting a PR.
 
 ## Pull Request Process
 
-1. Create a feature branch from `main`:
+1. Create a feature branch from `master`:
 
    ```bash
    git checkout -b feat/my-feature
@@ -75,7 +99,7 @@ BRIGx uses `next build` with static export (`output: 'export'`). The built outpu
 
 4. Verify the production build succeeds (`npm run build`).
 
-5. Open a pull request against `main` on GitHub. Fill in the PR template with:
+5. Open a pull request against `master` on GitHub. Fill in the PR template with:
    - A clear description of what changed and why
    - Any relevant issue numbers (e.g. `Closes #42`)
    - Notes on manual testing performed

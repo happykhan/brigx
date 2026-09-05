@@ -14,7 +14,8 @@ test.describe('BRIGX e2e — circular genome plot', () => {
   test('landing page explains the web product', async ({ page }) => {
     await page.goto('/')
 
-    await expect(page.getByText('v0.9.5', { exact: true })).toBeVisible()
+    await expect(page).toHaveTitle('BRIGX — Circular genome comparison in your browser')
+    await expect(page.getByText('v0.9.6', { exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Circular genome comparison for microbial genomics' })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Interactive read-only E. coli comparison' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Zoom in (or scroll up)' })).toBeVisible()

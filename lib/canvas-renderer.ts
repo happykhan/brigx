@@ -22,6 +22,30 @@ interface HitRegion {
   tooltip: PlotTooltip;
 }
 
+function findHitRegion(regions: readonly HitRegion[], r: number, angle: number): PlotTooltip | null {
+  for (let i = regions.length - 1; i >= 0; i--) {
+    const hr = regions[i];
+    if (r < hr.innerR || r > hr.outerR) continue;
+
+    // Normalise angles for comparison
+    let s = hr.startAngle;
+    let e = hr.endAngle;
+    let a = angle;
+    // Bring all into 0..2PI
+    while (s < 0) s += 2 * Math.PI;
+    while (e < 0) e += 2 * Math.PI;
+    while (a < 0) a += 2 * Math.PI;
+
+    // Handle wrap-around
+    if (s <= e) {
+      if (a >= s && a <= e) return hr.tooltip;
+    } else {
+      if (a >= s || a <= e) return hr.tooltip;
+    }
+  }
+  return null;
+}
+
 // ----- Cached geometry for efficient redraw -----
 interface CachedScene {
   data: CircularPlotData;
@@ -33,8 +57,11 @@ interface CachedScene {
 export class CanvasPlotRenderer {
   private config: RenderConfig;
   private hitRegions: HitRegion[] = [];
+  private annotationHitRegions: HitRegion[] = [];
   private cachedScene: CachedScene | null = null;
   private canvas: HTMLCanvasElement | null = null;
+  private gapTracks: PlotScene['rings'] = [];
+  private referenceLength = 0;
 
   // Draggable legend positions (null = use default)
   private gcLegendPos: { x: number; y: number } | null = null;
@@ -79,6 +106,7 @@ export class CanvasPlotRenderer {
 
     this.cachedScene = { data, config: { ...this.config }, width: canvas.width, height: canvas.height };
     this.hitRegions = [];
+    this.annotationHitRegions = [];
     this.drawScene(canvas, data, zoom, panX, panY, dpr);
   }
 
@@ -89,6 +117,7 @@ export class CanvasPlotRenderer {
     if (!this.canvas || !this.cachedScene) return;
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
     this.hitRegions = [];
+    this.annotationHitRegions = [];
     this.drawScene(this.canvas, this.cachedScene.data, zoom, panX, panY, dpr);
   }
 
@@ -112,28 +141,20 @@ export class CanvasPlotRenderer {
     const r = Math.sqrt(dx * dx + dy * dy);
     const angle = Math.atan2(dy, dx); // -PI..PI
 
-    // Search hit regions (reverse order so topmost drawn elements match first)
-    for (let i = this.hitRegions.length - 1; i >= 0; i--) {
-      const hr = this.hitRegions[i];
-      if (r < hr.innerR || r > hr.outerR) continue;
+    if (this.legendHitTest(canvasX, canvasY, zoom, panX, panY)) return null;
 
-      // Normalise angles for comparison
-      let s = hr.startAngle;
-      let e = hr.endAngle;
-      let a = angle;
-      // Bring all into 0..2PI
-      while (s < 0) s += 2 * Math.PI;
-      while (e < 0) e += 2 * Math.PI;
-      while (a < 0) a += 2 * Math.PI;
-
-      // Handle wrap-around
-      if (s <= e) {
-        if (a >= s && a <= e) return hr.tooltip;
-      } else {
-        if (a >= s || a <= e) return hr.tooltip;
+    // Gaps use cached binary interval lookups before the existing painted-region scan.
+    // Covered positions fall through so alignment/annotation hover precedence is unchanged.
+    const position = (((angle + Math.PI / 2) / (2 * Math.PI) + 1) % 1) * this.referenceLength;
+    for (const track of this.gapTracks) {
+      if (r >= track.layout.radius && r < track.layout.radius + track.layout.width) {
+        const gap = track.gapLookup?.at(position);
+        if (gap) return findHitRegion(this.annotationHitRegions, r, angle) ?? gap;
+        break;
       }
     }
-    return null;
+
+    return findHitRegion(this.hitRegions, r, angle);
   }
 
   /**
@@ -204,6 +225,8 @@ export class CanvasPlotRenderer {
     const cx = scene.centerX;
     const cy = scene.centerY;
     const refLength = scene.referenceLength;
+    this.referenceLength = refLength;
+    this.gapTracks = scene.rings;
 
     // Clear and fill white background
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -383,7 +406,9 @@ export class CanvasPlotRenderer {
       labelInward,
       labelFontSize: this.config.labelFontSize,
       addHitRegion: (startAngle, endAngle, tooltip) => {
-        this.addHitRegion(innerRadius, outerRadius, startAngle, endAngle, tooltip);
+        const region = { innerR: innerRadius, outerR: outerRadius, startAngle, endAngle, tooltip };
+        this.hitRegions.push(region);
+        this.annotationHitRegions.push(region);
       },
     });
   }

@@ -61,6 +61,17 @@ function createRenderer() {
 }
 
 describe('editable SVG export', () => {
+  it('keeps CDS inspection metadata out of painted SVG elements', () => {
+    const render = (data: CircularPlotData) => {
+      const renderer = createRenderer();
+      renderer.render(document.createElement('div'), data);
+      return renderer.exportSVG();
+    };
+    expect(render({ ...plotData, reference: { ...plotData.reference, cds: [{
+      name: 'inspection-only', strand: '+', segments: [{ start: 0, end: 10000 }],
+    }] } })).toBe(render(plotData));
+  });
+
   it('preserves preview transform and dragged legend coordinates', () => {
     const container = document.createElement('div');
     const svg = createRenderer().render(container, plotData, {

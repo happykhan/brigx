@@ -313,7 +313,26 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange,
               boxShadow: 'var(--gx-shadow)',
             }}
           >
-          {tooltip.type === 'gc-content' ? (
+          {tooltip.type === 'gap' ? (
+            <>
+              <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>{tooltip.queryName}</div>
+              <div>Unaligned reference interval</div>
+              <div className="break-words">Reference: {tooltip.name}</div>
+              {tooltip.contigName && <div className="text-xs break-words">Contig: {tooltip.contigName} (merged reference coordinates)</div>}
+              <div>{tooltip.start?.toLocaleString()}–{tooltip.end?.toLocaleString()} ({tooltip.length?.toLocaleString()} bp)</div>
+              <div>Pointer: {tooltip.position?.toLocaleString()} bp</div>
+              <div className="text-xs">Coordinates: 1-based, inclusive</div>
+              <div className="mt-1 text-xs">{tooltip.hasCds ? 'Reference CDS overlapping interval:' : 'Reference CDS annotations unavailable'}</div>
+              {tooltip.hasCds && !tooltip.cds?.length && <div className="text-xs">None</div>}
+              {tooltip.cds?.map((cds, index) => (
+                <div key={index} className="text-xs break-words mt-1">
+                  <strong>{cds.name}</strong>{cds.locusTag && cds.locusTag !== cds.name ? ` (${cds.locusTag})` : ''} ({cds.strand})
+                  {cds.product && cds.product !== cds.name && <div>{cds.product}</div>}
+                </div>
+              ))}
+              {tooltip.moreCds && <div className="text-xs">More CDS overlap this interval</div>}
+            </>
+          ) : tooltip.type === 'gc-content' ? (
             <>
               <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>GC Content</div>
               <div>Position: {tooltip.position?.toLocaleString()}</div>

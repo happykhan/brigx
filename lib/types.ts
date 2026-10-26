@@ -67,6 +67,15 @@ export interface Feature {
   attributes?: Record<string, string>;
 }
 
+/** Reference CDS metadata for inspection only; coordinates are 0-based, half-open. */
+export interface ReferenceCDS {
+  name: string;
+  locusTag?: string;
+  product?: string;
+  strand: '+' | '-';
+  segments: Array<{ start: number; end: number }>;
+}
+
 // Custom annotations for rings
 export type AnnotationShape = 'arrow-forward' | 'arrow-reverse' | 'block' | 'arc' | 'hidden';
 
@@ -110,6 +119,7 @@ export interface CircularPlotData {
     gcContent?: number[];
     gcSkew?: number[];
     features?: Feature[];
+    cds?: ReferenceCDS[];
     /** Optional companion annotations, such as Bakta GFF3 features for a FASTA reference. */
     annotations?: Annotation[];
     contigs?: ContigBoundary[]; // Contig boundaries for multi-FASTA reference
@@ -137,6 +147,7 @@ export interface ParsedGenome {
   length: number;
   gcContent: number;
   isCircular: boolean;
+  cds?: ReferenceCDS[];
   contigs?: Array<{ name: string; sequence: string }>;
 }
 

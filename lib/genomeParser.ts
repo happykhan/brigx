@@ -1,4 +1,5 @@
 import pako from 'pako';
+import { parseReferenceCds } from './referenceCds';
 import { readFileArrayBuffer } from './fileAccess';
 import type { ParsedGenome } from './types';
 
@@ -66,7 +67,9 @@ export async function parseGenBank(text: string): Promise<ParsedGenome[]> {
 
     const sequence = origin.replace(/[^a-zA-Z]/g, '').toUpperCase();
     if (!sequence) continue;
-    genomes.push(parsedGenome(name, sequence, /circular/i.test(record.split('\n')[0])));
+    const genome = parsedGenome(name, sequence, /circular/i.test(record.split('\n')[0]));
+    genome.cds = parseReferenceCds(record, sequence.length);
+    genomes.push(genome);
   }
   return genomes;
 }

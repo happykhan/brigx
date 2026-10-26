@@ -1,3 +1,4 @@
+import { offsetReferenceCds } from './referenceCds';
 // Application Controller - Orchestrates the entire pipeline
 import type {
   ParsedGenome,
@@ -354,7 +355,8 @@ export class BRIGController {
           sequence: mergedSeq,
           length: mergedSeq.length,
           gcContent: 0,
-          isCircular: false
+          isCircular: false,
+          cds: referenceGenomes.flatMap((genome, index) => offsetReferenceCds(genome.cds ?? [], contigBoundaries![index].start)),
         };
         console.log(`[Controller] Multi-FASTA reference: ${referenceGenomes.length} contigs merged (spacer: ${spacerSize}bp), total: ${reference.length} bp`);
       } else {
@@ -384,6 +386,7 @@ export class BRIGController {
               length: reference.length,
               gcContent,
               gcSkew,
+              cds: reference.cds,
               contigs: contigBoundaries
             },
             rings: [], // Empty rings array initially
@@ -627,6 +630,7 @@ export class BRIGController {
                 length: reference.length,
                 gcContent,
                 gcSkew,
+                cds: reference.cds,
                 contigs: contigBoundaries
               },
               rings: [...ringDataArray], // Send all rings processed so far
@@ -649,6 +653,7 @@ export class BRIGController {
           length: reference.length,
           gcContent,
           gcSkew,
+          cds: reference.cds,
           contigs: contigBoundaries
         },
         rings: ringDataArray,

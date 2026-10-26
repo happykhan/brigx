@@ -6,6 +6,7 @@ import {
   type RingLayout,
 } from './geometry';
 import { collectReferenceAnnotations } from './referenceAnnotations';
+import { createGapLookup, type GapLookup } from './gapLookup';
 import type {
   Annotation,
   CircularPlotData,
@@ -67,6 +68,7 @@ export interface PlotRingScene {
   annotations: readonly Annotation[];
   alignmentArcs: readonly AlignmentArcScene[];
   graphArcs: readonly GraphArcScene[];
+  gapLookup: GapLookup | null;
 }
 
 export interface PlotScene {
@@ -374,6 +376,7 @@ export function buildPlotScene(
         ring,
         layout,
         annotations: ring.annotations ?? [],
+        gapLookup: layout.type === 'alignment' ? createGapLookup(ring, data.reference) : null,
         alignmentArcs: layout.type === 'alignment'
           ? buildAlignmentArcs(ring, layout, referenceLength, config)
           : [],

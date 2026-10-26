@@ -1,3 +1,5 @@
+import type { ReferenceCDS } from '../types';
+
 export interface RenderConfig {
   width: number;
   height: number;
@@ -33,6 +35,10 @@ export interface PlotTooltip {
   strand?: string;
   x?: number;
   y?: number;
+  cds?: ReferenceCDS[];
+  moreCds?: boolean;
+  hasCds?: boolean;
+  contigName?: string;
 }
 
 export type TooltipCallback = (info: PlotTooltip | null) => void;

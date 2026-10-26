@@ -5,6 +5,7 @@ import type { CircularPlotData, PlotViewState } from '@/lib/types';
 import type { ImagePropertiesConfig } from './ImageProperties';
 import { CanvasPlotRenderer } from '@/lib/canvas-renderer';
 import type { PlotTooltip } from '@/lib/rendering/types';
+import PlotTooltipContent from './PlotTooltipContent';
 
 interface CircularPlotProps {
   data: CircularPlotData;
@@ -313,83 +314,7 @@ export default function CircularPlot({ data, imageProperties, onViewStateChange,
               boxShadow: 'var(--gx-shadow)',
             }}
           >
-          {tooltip.type === 'gap' ? (
-            <>
-              <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>{tooltip.queryName}</div>
-              <div>Unaligned reference interval</div>
-              <div className="break-words">Reference: {tooltip.name}</div>
-              {tooltip.contigName && <div className="text-xs break-words">Contig: {tooltip.contigName} (merged reference coordinates)</div>}
-              <div>{tooltip.start?.toLocaleString()}–{tooltip.end?.toLocaleString()} ({tooltip.length?.toLocaleString()} bp)</div>
-              <div>Pointer: {tooltip.position?.toLocaleString()} bp</div>
-              <div className="text-xs">Coordinates: 1-based, inclusive</div>
-              <div className="mt-1 text-xs">{tooltip.hasCds ? 'Reference CDS overlapping interval:' : 'Reference CDS annotations unavailable'}</div>
-              {tooltip.hasCds && !tooltip.cds?.length && <div className="text-xs">None</div>}
-              {tooltip.cds?.map((cds, index) => (
-                <div key={index} className="text-xs break-words mt-1">
-                  <strong>{cds.name}</strong>{cds.locusTag && cds.locusTag !== cds.name ? ` (${cds.locusTag})` : ''} ({cds.strand})
-                  {cds.product && cds.product !== cds.name && <div>{cds.product}</div>}
-                </div>
-              ))}
-              {tooltip.moreCds && <div className="text-xs">More CDS overlap this interval</div>}
-            </>
-          ) : tooltip.type === 'gc-content' ? (
-            <>
-              <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>GC Content</div>
-              <div>Position: {tooltip.position?.toLocaleString()}</div>
-              <div>Window: {tooltip.windowSize?.toLocaleString()} bp</div>
-              <div>GC: {tooltip.gc}%</div>
-            </>
-          ) : tooltip.type === 'gc-skew' ? (
-            <>
-              <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>GC Skew</div>
-              <div>Position: {tooltip.position?.toLocaleString()}</div>
-              <div>Window: {tooltip.windowSize?.toLocaleString()} bp</div>
-              <div>Skew: {tooltip.skew}</div>
-            </>
-          ) : tooltip.type === 'contig' ? (
-            <>
-              <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>{tooltip.name}</div>
-              {tooltip.start != null && tooltip.end != null && (
-                <div>Position: {tooltip.start.toLocaleString()} - {tooltip.end.toLocaleString()}</div>
-              )}
-              {tooltip.length != null && (
-                <div>Length: {tooltip.length.toLocaleString()} bp</div>
-              )}
-            </>
-          ) : tooltip.type === 'graph' ? (
-            <>
-              <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>{tooltip.queryName}</div>
-              {tooltip.start != null && tooltip.end != null && (
-                <div>Position: {tooltip.start.toLocaleString()} - {tooltip.end.toLocaleString()}</div>
-              )}
-              {tooltip.value != null && (
-                <div>Value: {tooltip.value}</div>
-              )}
-            </>
-          ) : tooltip.type === 'annotation' ? (
-            <>
-              <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>{tooltip.label}</div>
-              {tooltip.start != null && tooltip.end != null && (
-                <div>Position: {tooltip.start.toLocaleString()} - {tooltip.end.toLocaleString()}</div>
-              )}
-              {tooltip.strand && (
-                <div>Strand: {tooltip.strand}</div>
-              )}
-            </>
-          ) : (
-            <>
-              <div className="font-semibold" style={{ color: 'var(--gx-accent)' }}>{tooltip.queryName}</div>
-              {tooltip.start != null && tooltip.end != null && (
-                <div>Position: {tooltip.start.toLocaleString()} - {tooltip.end.toLocaleString()}</div>
-              )}
-              {tooltip.identity != null && (
-                <div>Identity: {tooltip.identity.toFixed(1)}%</div>
-              )}
-              {tooltip.coverage != null && (
-                <div>Coverage: {(tooltip.coverage * 100).toFixed(1)}%</div>
-              )}
-            </>
-          )}
+            <PlotTooltipContent tooltip={tooltip} />
           </div>
         )}
       </div>

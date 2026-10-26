@@ -76,6 +76,21 @@ export interface ReferenceCDS {
   segments: Array<{ start: number; end: number }>;
 }
 
+/** Inspection result in 1-based, inclusive reference coordinates. */
+export interface ReferenceGap {
+  type: 'gap';
+  queryName: string;
+  name: string;
+  contigName?: string;
+  start: number;
+  end: number;
+  length: number;
+  position: number;
+  cds: ReferenceCDS[];
+  moreCds: boolean;
+  hasCds: boolean;
+}
+
 // Custom annotations for rings
 export type AnnotationShape = 'arrow-forward' | 'arrow-reverse' | 'block' | 'arc' | 'hidden';
 

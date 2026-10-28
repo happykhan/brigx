@@ -117,6 +117,7 @@ export function plotStateReducer(state: PlotState, action: PlotStateAction): Plo
       const committed: CircularPlotData = state.committed
         ? {
             ...state.committed,
+            reference: action.data.reference,
             config: action.data.config,
             rings: mergeAlignmentRings(
               state.committed.rings,

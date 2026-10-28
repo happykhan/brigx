@@ -110,3 +110,81 @@ test('gap hover preserves custom overlay precedence and excludes graph tracks', 
   await hoverReference(page, 4900000, 5357923, 322);
   await expect(page.getByTestId('plot-tooltip')).toHaveCount(0);
 });
+
+test('multi-record GenBank reruns keep spacer coordinates, CDS and saved exports consistent', async ({ page, context, baseURL }, testInfo) => {
+  let seed = 287321;
+  const sequence = () => Array.from({ length: 12000 }, () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return 'ACGT'[seed >>> 30];
+  }).join('');
+  const first = sequence();
+  const second = sequence();
+  const record = (name: string, bases: string, gene: string) => `LOCUS       ${name} 12000 bp DNA linear
+FEATURES             Location/Qualifiers
+     CDS             complement(join(5501..5800,6201..6500))
+                     /gene="${gene}"
+ORIGIN
+        1 ${bases}
+//
+`;
+  const externalRequests: string[] = [];
+  const uploads: string[] = [];
+  const errors: string[] = [];
+  context.on('request', request => {
+    const url = new URL(request.url());
+    if (url.protocol.startsWith('http') && url.origin !== new URL(baseURL!).origin) externalRequests.push(request.url());
+    if (request.method() !== 'GET') uploads.push(request.url());
+  });
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/app');
+  await page.getByLabel('Reference genome file').setInputFiles({ name: 'multi.gbk', mimeType: 'text/plain',
+    buffer: Buffer.from(record('first', first, 'first_gene') + record('second', second, 'second_gene')) });
+  await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible();
+  await page.locator('input[type="number"][max="100000"]').fill('100');
+  await page.getByRole('button', { name: 'Add New Ring' }).click();
+  await page.locator('input[type="file"][multiple]').setInputFiles({ name: 'query.fa', mimeType: 'text/plain',
+    buffer: Buffer.from(`>query\n${first.slice(0, 4500)}${first.slice(7500)}${second.slice(0, 4500)}${second.slice(7500)}\n`) });
+  await page.getByRole('button', { name: 'Run Alignments' }).click();
+  await expect(page.getByText('Alignments completed successfully!')).toBeVisible();
+  await expect(page.getByText('Alignments completed successfully!')).toBeHidden();
+
+  const tooltip = page.getByTestId('plot-tooltip');
+  await hoverReference(page, 18100, 24100);
+  await expect(tooltip).toContainText('second_gene');
+  await expect(tooltip).toContainText('Contig: second');
+  await expect(tooltip).toContainText('(-)');
+  await page.screenshot({ path: testInfo.outputPath('multi-record-cds.png') });
+  await hoverReference(page, 12050, 24100);
+  await expect(tooltip).toHaveCount(0);
+
+  const download = async (name: string) => {
+    const next = page.waitForEvent('download');
+    await page.getByRole('button', { name, exact: true }).click();
+    return (await (await next).path())!;
+  };
+  const savedPath = await download('Save session');
+  const session = JSON.parse(await fs.readFile(savedPath, 'utf8'));
+  expect(session.result.plot.reference.length).toBe(24100);
+  expect(session.result.plot.reference.cds[1].segments).toEqual([
+    { start: 17600, end: 17900 }, { start: 18300, end: 18600 },
+  ]);
+  await page.getByLabel('Load session').setInputFiles(savedPath);
+  await hoverReference(page, 18100, 24100);
+  await expect(tooltip).toContainText('second_gene');
+  const canvasPixels = await page.locator('canvas').evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL());
+  const svg = await fs.readFile(await download('SVG'), 'utf8');
+  const png = await fs.readFile(await download('PNG'));
+
+  // Optional inspection metadata must neither change painted output nor break old sessions.
+  delete session.result.plot.reference.cds;
+  await page.getByLabel('Load session').setInputFiles({ name: 'legacy.brigx-session.json', mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(session)) });
+  await hoverReference(page, 18100, 24100);
+  await expect(tooltip).toContainText('Reference CDS annotations unavailable');
+  expect(await page.locator('canvas').evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())).toBe(canvasPixels);
+  expect(await fs.readFile(await download('SVG'), 'utf8')).toBe(svg);
+  expect(await fs.readFile(await download('PNG'))).toEqual(png);
+  expect(externalRequests).toEqual([]);
+  expect(uploads).toEqual([]);
+  expect(errors).toEqual([]);
+});

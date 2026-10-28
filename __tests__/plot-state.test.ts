@@ -112,6 +112,26 @@ describe('plotStateReducer', () => {
     expect(state.committed?.config).toEqual({ minIdentity: 85, minAlignmentLength: 500 });
   });
 
+  it('commits the completed reference coordinates and CDS after changing contig spacers', () => {
+    const baseline = plot([ring('a')]);
+    const completed = plot([ring('a', 4)]);
+    completed.reference = {
+      name: 'reference', length: 1100, gcContent: [0.4, 0.6],
+      contigs: [
+        { name: 'first', start: 0, end: 500, index: 0 },
+        { name: 'second', start: 600, end: 1100, index: 1 },
+      ],
+      cds: [{ name: 'second-gene', strand: '-', segments: [{ start: 700, end: 800 }] }],
+    };
+    const state = plotStateReducer(
+      { committed: baseline, displayed: baseline },
+      { type: 'commit', data: completed, annotationsByRing: {} },
+    );
+
+    expect(state.committed?.reference).toEqual(completed.reference);
+    expect(state.displayed).toBe(state.committed);
+  });
+
   it('updates annotations in both baseline and a distinct partial display', () => {
     const baseline = plot([ring('a')]);
     const partial = plot([ring('a', 2)]);

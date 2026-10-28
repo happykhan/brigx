@@ -7,7 +7,7 @@ import { APP_VERSION } from '@/lib/version';
 import type { BRIGController as BRIGControllerType } from '@/lib/controller';
 import { exportSession, importSession } from '@/lib/session';
 import type { BRIGXSession } from '@/lib/session';
-import { fetchGitHubJson } from '@/lib/remoteJson';
+import { fetchRemoteJson } from '@/lib/remoteJson';
 import { readFileText } from '@/lib/fileAccess';
 import { extractReferenceAnnotationFile } from '@/lib/featureParser';
 import { INITIAL_PLOT_STATE, plotStateReducer } from '@/lib/plotState';
@@ -15,6 +15,7 @@ import type { ImagePropertiesConfig } from '@/components/ImageProperties';
 import { useConsoleCapture } from './useConsoleCapture';
 
 export function useBRIGController() {
+  const [remoteSessionError, setRemoteSessionError] = useState<string | null>(null);
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
   const [rings, setRings] = useState<RingConfig[]>([]);
   const ringsRef = useRef(rings);
@@ -287,6 +288,7 @@ export function useBRIGController() {
   };
 
   const handleReferenceFileChange = (file: File) => {
+    setRemoteSessionError(null);
     referenceGenerationRef.current += 1;
     if (referenceFile) {
       setReferenceAnnotations([]);
@@ -323,6 +325,7 @@ export function useBRIGController() {
   };
 
   const restoreSession = (session: BRIGXSession) => {
+      setRemoteSessionError(null);
       referenceGenerationRef.current += 1;
       controllerRef.current?.cleanup();
       controllerRef.current = null;
@@ -387,15 +390,18 @@ export function useBRIGController() {
   };
 
   const handleLoadSessionUrl = async (url: string) => {
+    setRemoteSessionError(null);
     try {
-      const session = importSession(await fetchGitHubJson(url));
+      const session = importSession(await fetchRemoteJson(url));
       restoreSession(session);
       toast.success(session.result
-        ? 'GitHub session and saved result loaded for editing.'
-        : 'GitHub session loaded. Re-add source files to run alignments.');
+        ? 'Public session and saved result loaded for editing. Re-add source FASTA files to rerun alignments.'
+        : 'Public session loaded. Re-add source files to run alignments.');
       return true;
     } catch (error) {
-      toast.error(`Failed to load GitHub session: ${error instanceof Error ? error.message : String(error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      setRemoteSessionError(message);
+      toast.error(`Failed to load public session: ${message}`);
       return false;
     }
   };
@@ -403,6 +409,7 @@ export function useBRIGController() {
   return {
     // State
     referenceFile,
+    remoteSessionError,
     rings,
     setRings,
     params,

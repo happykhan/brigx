@@ -42,7 +42,7 @@ function samePlotViewState(left: PlotViewState | null, right: PlotViewState) {
 
 export default function Home() {
   const {
-    referenceFile, rings, setRings, params, setParams, progress, plotData,
+    referenceFile, remoteSessionError, rings, setRings, params, setParams, progress, plotData,
     isProcessing, consoleLogs, imageProperties, setImageProperties,
     plotExpanded, setPlotExpanded,
     annotationEditorOpen, setAnnotationEditorOpen, editingRingId, setEditingRingId,
@@ -93,6 +93,17 @@ export default function Home() {
         <main className="browser-workspace">
           <div className="product-width browser-workspace-grid">
               <div className="browser-inspector">
+                {remoteSessionError && sessionUrl && (
+                  <section className="card" role="alert" aria-label="Public session error">
+                    <h2 className="section-title">Could not load public session</h2>
+                    <p>{remoteSessionError}</p>
+                    <button type="button" className="btn-secondary mt-2" onClick={() => void handleLoadSessionUrl(sessionUrl)}>Retry session URL</button>
+                    <a className="block mt-2" href={`/viewer?${new URLSearchParams({ url: sessionUrl })}`}>Choose another session URL</a>
+                  </section>
+                )}
+                {sessionUrl && !remoteSessionError && plotData && !referenceFile && (
+                  <p className="card" role="status">Saved result loaded for editing. Re-add source FASTA files to rerun alignments.</p>
+                )}
                 <ReferenceInput
                   referenceFile={referenceFile}
                   onFileChange={handleReferenceFileChange}

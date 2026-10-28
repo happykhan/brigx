@@ -4,7 +4,7 @@ import ProductNav from '@/components/ProductNav';
 import ResultViewer from '@/components/ResultViewer';
 import { readFileText } from '@/lib/fileAccess';
 import { parseResultSnapshotJson, type ResultSnapshot } from '@/lib/resultSnapshot';
-import { fetchGitHubJson } from '@/lib/remoteJson';
+import { fetchRemoteJson } from '@/lib/remoteJson';
 import { importSession } from '@/lib/session';
 
 interface ViewerPayload {
@@ -41,7 +41,7 @@ export default function ViewerPage() {
     let cancelled = false;
     setSnapshot(null);
     setError(null);
-    fetchGitHubJson(sourceUrl)
+    fetchRemoteJson(sourceUrl)
       .then(parseViewerPayload)
       .then(payload => {
         if (cancelled) return;
@@ -49,7 +49,7 @@ export default function ViewerPage() {
         setEditableSession(payload.editableSession);
       })
       .catch(cause => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : 'Could not load the GitHub file');
+        if (!cancelled) setError(cause instanceof Error ? cause.message : 'Could not load the public session');
       });
     return () => { cancelled = true; };
   }, [sourceUrl]);
@@ -112,7 +112,7 @@ export default function ViewerPage() {
       <main className="publication-page publication-message preview-file-picker">
         <span className="product-kicker">BRIGX result viewer</span>
         <h1>{error ?? 'Open a read-only BRIGX result'}</h1>
-        <p>Paste a public GitHub session URL, or choose a BRIGX result or session file. Files are loaded directly in your browser.</p>
+        <p>Paste a public BRIGX session URL, or choose a BRIGX result or session file. Files are loaded directly in your browser.</p>
         <form
           className="preview-url-form"
           onSubmit={event => {
@@ -121,14 +121,16 @@ export default function ViewerPage() {
             if (value) setSearchParams({ url: value });
           }}
         >
-          <label htmlFor="github-session-url">Public GitHub file URL</label>
+          <label htmlFor="public-session-url">Public BRIGX session URL</label>
+          <p id="public-session-help">Supports public GitHub files, GitLab.com, GitHub Gists and Zenodo. Up to 25 MB.</p>
           <div>
             <input
-              id="github-session-url"
+              id="public-session-url"
+              aria-describedby="public-session-help"
               type="url"
               value={urlInput}
               onChange={event => setUrlInput(event.target.value)}
-              placeholder="https://github.com/owner/repo/blob/main/session.json"
+              placeholder="https://gitlab.com/owner/repo/-/blob/main/session.brigx-session.json"
               required
             />
             <button type="submit" className="gx-btn gx-btn-primary">Open in viewer</button>

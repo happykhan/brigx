@@ -221,7 +221,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     await page.goto(`/viewer?url=${encodeURIComponent(GITHUB_SESSION_URL)}`)
 
     await expect(page.getByRole('heading', { name: 'BRIGX Example' })).toBeVisible()
-    await expect(page.getByText('Loaded from a public GitHub session · read-only viewer')).toBeVisible()
+    await expect(page.getByText(/Loaded from a public BRIGX session/)).toBeVisible()
     await expect(page.getByRole('region', { name: 'Read-only interactive genome comparison' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Edit session' })).toHaveAttribute(
       'href',
@@ -237,7 +237,7 @@ test.describe('BRIGX e2e — circular genome plot', () => {
     }))
     await page.goto(`/app?url=${encodeURIComponent(GITHUB_SESSION_URL)}`)
 
-    await expect(page.getByText('GitHub session and saved result loaded for editing.')).toBeVisible()
+    await expect(page.getByText('Public session and saved result loaded for editing. Re-add source FASTA files to rerun alignments.')).toBeVisible()
     await expect(page.getByPlaceholder('Plot title...')).toHaveValue('BRIGX Example')
     await expect(page.getByText('Ring 1', { exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Statistics' })).toBeVisible()

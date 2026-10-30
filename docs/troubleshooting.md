@@ -30,4 +30,4 @@ Open the debug console and retain the complete error. Reload once to exclude a s
 
 ## A public session URL does not load
 
-The GitHub file must be public and point to the JSON file itself. Use a normal `github.com/.../blob/...` or raw GitHub URL. Private repository authentication is not forwarded by BRIGX.
+Use a public GitHub file, GitLab.com blob/raw file, GitHub Gist, or exact Zenodo record/file URL. Gist pages and Zenodo records must contain exactly one `.brigx-session.json` or `.brigx-result.json` file; otherwise choose a direct file URL. Check that the file is valid BRIGX JSON and no larger than 25 MB. Requests time out after 20 seconds and do not follow redirects or forward private authentication. Use a commit-pinned GitLab URL for ambiguous refs, and an exact Zenodo record version rather than a redirecting concept record. Retry in the editor, choose another URL in the viewer, or download the session and load it locally.

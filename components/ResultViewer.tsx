@@ -34,7 +34,7 @@ export default function ResultViewer({ snapshot, mode, onOpenFile, editUrl }: Re
           <h1>{snapshot.title}</h1>
           {snapshot.description && <p>{snapshot.description}</p>}
           {mode === 'remote' && (
-            <p className="publication-note">Loaded from a public GitHub session · read-only viewer</p>
+            <p className="publication-note">Loaded from a public BRIGX session · read-only viewer. Re-add source FASTA files in the editor to rerun alignments.</p>
           )}
         </div>
         <div className="publication-actions">

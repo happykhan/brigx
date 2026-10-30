@@ -39,6 +39,6 @@ Select **Run Alignments**. Progress and diagnostic messages appear in the debug 
 - **PNG** creates a raster image.
 - **Data** exports the computed plot data as JSON.
 - **Save session** stores an editable BRIGX session, including the result when available.
-- **Viewer** in the top navigation opens a read-only result or session from a local file or public GitHub URL.
+- **Viewer** in the top navigation opens a read-only result or session from a local file or public GitHub, GitLab.com, Gist or Zenodo URL.
 
-See [Sessions and sharing](reference/sessions-and-sharing.md) for public GitHub-hosted sessions.
+See [Sessions and sharing](reference/sessions-and-sharing.md) for publicly hosted sessions.

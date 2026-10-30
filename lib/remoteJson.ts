@@ -1,66 +1,126 @@
+import { recognizeRemoteSession, publicUrl, isSessionFilename } from './remoteSessionProviders';
+import type { RemoteSessionSource } from './remoteSessionProviders';
+import { resolveGitLabFile } from './remoteSessionGitLab';
+
+export { normalizeRemoteJsonUrl } from './remoteSessionProviders';
 const MAX_REMOTE_JSON_BYTES = 25 * 1024 * 1024;
 const REMOTE_FETCH_TIMEOUT_MS = 20_000;
 
-/** Convert a public GitHub blob URL into the CORS-enabled raw file URL. */
-export function normalizeGitHubJsonUrl(input: string): string {
-  let url: URL;
-  try {
-    url = new URL(input.trim());
-  } catch {
-    throw new Error('Enter a complete GitHub file URL');
-  }
-
-  if (url.protocol !== 'https:') {
-    throw new Error('Only HTTPS GitHub URLs are supported');
-  }
-
-  if (url.hostname === 'raw.githubusercontent.com') {
-    return url.toString();
-  }
-
-  if (url.hostname !== 'github.com') {
-    throw new Error('Only public GitHub file URLs are supported');
-  }
-
-  const parts = url.pathname.split('/').filter(Boolean);
-  if (parts.length < 5 || parts[2] !== 'blob') {
-    throw new Error('Use a GitHub file URL containing /blob/');
-  }
-
-  const [owner, repository, , ref, ...fileParts] = parts;
-  return `https://raw.githubusercontent.com/${owner}/${repository}/${ref}/${fileParts.join('/')}`;
+export class RemoteHttpError extends Error {
+  constructor(public status: number) { super(`Public session provider returned HTTP ${status}`); }
 }
 
-export async function fetchGitHubJson(input: string): Promise<string> {
-  const url = normalizeGitHubJsonUrl(input);
+export type ReadRemoteJson = (url: string) => Promise<unknown>;
+function record(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('The provider returned invalid metadata');
+  return value as Record<string, unknown>;
+}
+
+function onlySession<T>(files: T[], name: (file: T) => string): T {
+  const candidates = files.filter(file => isSessionFilename(name(file)));
+  if (!candidates.length) throw new Error('No BRIGX session or result file was found. Use a direct raw-file URL.');
+  if (candidates.length !== 1) throw new Error('Multiple BRIGX files were found. Use a direct raw-file URL to choose one.');
+  return candidates[0];
+}
+
+async function resolveMetadata(source: RemoteSessionSource, read: ReadRemoteJson): Promise<string> {
+  if (source.kind === 'gitlab') return resolveGitLabFile(source.url, read);
+  if (source.kind === 'file') return source.url.toString();
+  if (source.kind === 'gist') {
+    const metadata = record(await read(`https://api.github.com/gists/${source.id}${source.revision ? `/${source.revision}` : ''}`));
+    if (metadata.public !== true) throw new Error('Only public Gists are supported');
+    if (metadata.truncated === true) throw new Error('The Gist file list is incomplete. Use a direct raw-file URL.');
+    const files = Object.values(record(metadata.files)).map(record);
+    const file = onlySession(files, file => typeof file.filename === 'string' ? file.filename : '');
+    if (typeof file.raw_url !== 'string') throw new Error('The Gist file has no downloadable raw URL');
+    const raw = recognizeRemoteSession(file.raw_url);
+    if (raw.provider !== 'Gist' || raw.kind !== 'file'
+      || raw.url.pathname.split('/')[2].toLowerCase() !== source.id?.toLowerCase()
+      || (source.revision && raw.url.pathname.split('/')[4] !== source.revision)) {
+      throw new Error('The Gist returned an unsafe raw-file URL');
+    }
+    // Always read the complete raw file; API content can be truncated or absent.
+    return raw.url.toString();
+  }
+  const metadata = record(await read(`https://zenodo.org/api/records/${source.id}`));
+  if (String(metadata.id) !== source.id) throw new Error('Zenodo returned a different record version. Use an exact record URL.');
+  if (!Array.isArray(metadata.files)) throw new Error('The Zenodo record has no public downloadable files');
+  const files = metadata.files.map(record);
+  const file = source.filename
+    ? files.find(file => file.key === source.filename)
+    : onlySession(files, file => typeof file.key === 'string' ? file.key : '');
+  if (!file) throw new Error('The requested Zenodo file is not available in this record');
+  const link = record(file.links).self;
+  if (typeof link !== 'string') throw new Error('The Zenodo file has no downloadable URL');
+  const raw = publicUrl(link);
+  const path = raw.pathname;
+  if (raw.hostname !== 'zenodo.org' || !(
+    path === `/api/records/${source.id}/files/${encodeURIComponent(String(file.key))}/content`
+    || (/^\/api\/files\/[a-f\d-]+\/[^/]+$/i.test(path) && decodeURIComponent(path.slice(path.lastIndexOf('/') + 1)) === file.key)
+    || path === `/records/${source.id}/files/${encodeURIComponent(String(file.key))}`
+  )) throw new Error('Zenodo returned an unsafe file URL');
+  return raw.toString();
+}
+
+/** Download only provider-approved URLs. Reject redirects before the browser follows them. */
+export async function fetchRemoteJson(input: string): Promise<string> {
+  const source = recognizeRemoteSession(input);
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), REMOTE_FETCH_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      credentials: 'omit',
-      cache: 'no-store',
-      headers: { Accept: 'application/json, text/plain;q=0.9' },
+  const readText = async (inputUrl: string): Promise<string> => {
+    const url = publicUrl(inputUrl, true);
+    if (!['raw.githubusercontent.com', 'gist.githubusercontent.com', 'api.github.com', 'gitlab.com', 'zenodo.org'].includes(url.hostname)) {
+      throw new Error('The provider returned an unsafe download URL');
+    }
+    // Internal API queries are generated by the adapter, never accepted from user input.
+    const response = await fetch(inputUrl, {
+      signal: controller.signal, credentials: 'omit', cache: 'no-store', redirect: 'error',
+      referrerPolicy: 'no-referrer', headers: { Accept: 'application/json, text/plain;q=0.9' },
     });
-    if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
-
-    const declaredLength = Number(response.headers.get('content-length') ?? 0);
-    if (declaredLength > MAX_REMOTE_JSON_BYTES) {
-      throw new Error('The GitHub file is larger than 25 MB');
+    if (response.redirected || response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+      throw new Error('Redirects are not supported. Use the direct public file or exact record version URL.');
     }
-
-    const text = await response.text();
-    if (new TextEncoder().encode(text).byteLength > MAX_REMOTE_JSON_BYTES) {
-      throw new Error('The GitHub file is larger than 25 MB');
+    if (response.url && new URL(response.url).origin !== url.origin) throw new Error('The provider returned an unsafe download origin');
+    if (!response.ok) throw new RemoteHttpError(response.status);
+    if (Number(response.headers.get('content-length') ?? 0) > MAX_REMOTE_JSON_BYTES) {
+      await response.body?.cancel();
+      throw new Error('The public session response is larger than 25 MB');
     }
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error('The provider returned an empty response');
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > MAX_REMOTE_JSON_BYTES) {
+          await reader.cancel();
+          throw new Error('The public session response is larger than 25 MB');
+        }
+        chunks.push(value);
+      }
+    } finally { reader.releaseLock(); }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    return new TextDecoder().decode(bytes);
+  };
+  const readJson: ReadRemoteJson = async url => {
+    const text = await readText(url);
+    try { return JSON.parse(text) as unknown; }
+    catch { throw new Error('The provider did not return JSON. Check that the file is public.'); }
+  };
+  try {
+    const url = await resolveMetadata(source, readJson);
+    const text = await readText(url);
+    try { JSON.parse(text); }
+    catch { throw new Error('The provider did not return JSON. Check that the file is public.'); }
     return text;
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('GitHub took too long to return the file');
-    }
+    if (controller.signal.aborted) throw new Error('The public session provider took too long (20 seconds). Try again.');
+    if (error instanceof TypeError) throw new Error('Could not fetch the public session. Check public access and use a direct file URL; redirects are not supported.');
     throw error;
-  } finally {
-    window.clearTimeout(timeout);
-  }
+  } finally { window.clearTimeout(timeout); }
 }
